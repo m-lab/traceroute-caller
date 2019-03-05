@@ -1,0 +1,103 @@
+.\"
+.\" sc_tracediff.1
+.\"
+.\" Author: Matthew Luckie <mjl@luckie.org.nz>
+.\"
+.\" Copyright (c) 2011 University of Waikato
+.\"                    All rights reserved
+.\"
+.\" $Id: sc_tracediff.1,v 1.6 2015/09/20 02:54:58 mjl Exp $
+.\"
+.Dd April 21, 2011
+.Dt SC_TRACEDIFF 1
+.Os
+.Sh NAME
+.Nm sc_tracediff
+.Nd display traceroute paths where the path has changed.
+.Sh SYNOPSIS
+.Nm
+.Bk -words
+.Op Fl a
+.Op Fl m Ar method
+.Op Fl n
+file1.warts file2.warts
+.Sh DESCRIPTION
+The
+.Nm
+utility displays pairs of traceroutes to a destination where the path has
+changed.
+It takes two warts files as input and displays paths where a hop differs
+by its address.
+The options are as follows:
+.Bl -tag -width Ds
+.It Fl a
+dump all traceroute pairs regardless of whether they have changed.
+.It Fl m Ar method
+specifies the method used to match pairs of traceroutes together.
+If
+.Ar dst
+is specified, traceroutes are matched if the destination IP address of both
+traces are the same.
+If
+.Ar userid
+is specified, traceroutes are matched if the userid field of both traces are
+the same.
+If
+.Ar dstuserid
+is specified, traceroutes are matched if the destination IP address and
+userid fields are the same.
+By default, the destination IP address is used.
+.It Fl n
+names should be reported instead of IP addresses, where possible.
+.El
+.Pp
+.Nm
+can be useful in network monitoring to identify when a forward IP path
+has changed.
+In this scenario, it is recommended that Paris traceroute is used with
+the same UDP source and destination ports for each execution of scamper so
+that only paths that have changed are identified, not merely alternate paths
+visible due to per-flow load-balancing.
+By default scamper uses a source port based on the process ID, which will
+change with each execution of scamper.
+.Sh EXAMPLES
+The command:
+.Pp
+.in +.3i
+scamper -O warts -o file1.warts -c 'trace -P udp-paris -s 31337' -f list.txt
+.in -.3i
+.Pp
+collects the forward IP paths towards a set of IP addresses found in list.txt
+using 31337 as the UDP source port value.
+If the above command is adjusted to subsequently collect file2.warts, then
+we can identify paths that have subsequently changed with the command:
+.Pp
+.in +.3i
+sc_tracediff file1.warts file2.warts
+.in -.3i
+.Pp
+If Paris traceroute with ICMP probes is preferred, then the following
+invocation of scamper is appropriate:
+.Pp
+.in +.3i
+scamper -O warts -o file1.warts -c 'trace -P icmp-paris -d 31337' -f list.txt
+.in -.3i
+.Pp
+In this case, scamper uses 31337 as the ICMP checksum value in each probe.
+.Sh SEE ALSO
+.Xr scamper 1 ,
+.Rs
+.%A "B. Augustin"
+.%A "X. Cuvellier"
+.%A "B. Orgogozo"
+.%A "F. Viger"
+.%A "T. Friedman"
+.%A "M. Latapy"
+.%A "C. Magnien"
+.%A "R. Teixeira"
+.%T "Avoiding traceroute anomalies with Paris traceroute"
+.%O "Proc. ACM/SIGCOMM Internet Measurement Conference 2006"
+.Re
+.Sh AUTHOR
+.Nm
+was written by Matthew Luckie <mjl@luckie.org.nz>.

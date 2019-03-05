@@ -1,0 +1,52 @@
+.\"
+.\" sc_warts2csv.1
+.\"
+.\" Author: Matthew Luckie <mjl@luckie.org.nz>
+.\"
+.\" Copyright (c) 2018 Matthew Luckie
+.\"                    All rights reserved
+.\"
+.\" $Id: sc_warts2csv.1,v 1.1 2018/03/08 08:16:05 mjl Exp $
+.\"
+.Dd March 8, 2018
+.Dt SC_WARTS2CSV 1
+.Os
+.Sh NAME
+.Nm sc_warts2csv
+.Nd dump traceroutes collected by scamper in csv format
+.Sh SYNOPSIS
+.Nm
+.Op Ar
+.Sh DESCRIPTION
+The
+.Nm
+utility provides a CSV dump of traceroute records in
+.Xr warts 5
+files.
+.Pp
+.Sh EXAMPLES
+Given two
+.Xr warts 5
+files named file1.warts and file2.warts, the following dumps all trace
+records contained within them:
+.Pp
+.Dl sc_warts2csv file1.warts file2.warts
+.Pp
+Given a compressed warts file named file3.warts.bz2, the following dumps
+all trace records contained within:
+.Pp
+.Dl bzcat file3.warts.bz2 | sc_warts2csv
+.Pp
+.\""""""""""""
+.Sh SEE ALSO
+.Xr scamper 1 ,
+.Xr sc_wartsdump 1 ,
+.Xr sc_warts2json 1 ,
+.Rs
+.%A "M. Luckie"
+.%T "Scamper: a Scalable and Extensible Packet Prober for Active Measurement of the Internet"
+.%O "Proc. ACM/SIGCOMM Internet Measurement Conference 2010"
+.Re
+.Sh AUTHOR
+.Nm
+was written by Matthew Luckie <mjl@luckie.org.nz>.

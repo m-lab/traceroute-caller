@@ -1,0 +1,320 @@
+.\"
+.\" sc_bdrmap.1
+.\"
+.\" Author: Matthew Luckie <mjl@luckie.org.nz>
+.\"
+.\" Copyright (c) 2016 The University of Waikato
+.\"                    All rights reserved
+.\"
+.\" $Id: sc_bdrmap.1,v 1.4 2016/12/22 09:16:21 mjl Exp $
+.\"
+.Dd December 22, 2016
+.Dt SC_BDRMAP 1
+.Os
+.Sh NAME
+.Nm sc_bdrmap
+.Nd scamper driver to map first hop border routers of networks
+.Sh SYNOPSIS
+.Nm
+.Bk -words
+.Op Fl 6ADi
+.Op Fl a Ar ip2as-file
+.Op Fl c Ar allyconf
+.Op Fl f Ar firsthop
+.Op Fl l Ar log-file
+.Op Fl o Ar output-file
+.Op Fl O Ar option
+.Op Fl p Ar port
+.Op Fl U Ar unix
+.Op Fl R Ar unix
+.Op Fl v Ar vpases
+.Op Fl x Ar ixp-file
+.Ek
+.Pp
+.Nm
+.Bk -words
+.Op Fl 6
+.Op Fl a Ar ip2as-file
+.Op Fl d Ar dump
+.Op Fl g Ar delegated-file
+.Op Fl n Ar names-file
+.Op Fl r Ar relationships-file
+.Op Fl v Ar vpases
+.Op Fl x Ar ixp-file
+.Op Ar
+.Ek
+.\""""""""""""
+.Sh DESCRIPTION
+The
+.Nm
+utility provides the ability to connect to a running
+.Xr scamper 1
+instance and use it to map the first hop border routers of networks
+using the "bdrmap" technique.
+.Nm
+uses targeted traceroutes, alias resolution techniques, knowledge
+of traceroute idiosyncrasies, and codification of topologicial
+constraints in a structured set of constraints, to correctly identify
+interdomain links at the granularity of individual border routers.
+.Nm
+operates in two distinct modes: data collection, and data analysis.
+.Pp
+In the data collection mode,
+.Nm
+uses Paris traceroute with ICMP-echo probes to trace the paths towards
+every distinct address block, using a stop-set to avoid re-probing portions
+of paths that do not provide useful constraints for the first hop border
+routers, as well as alias resolution techniques (Mercator, Ally, Prefixscan,
+and the Too-Big-Trick) to collapse the interface graph into a router-level
+topology.
+.Nm
+will also use probes with the record-route and pre-specified timestamp
+IP-level options to collect additional information on the return path
+from a router, where the probes are usable.
+.Pp
+In the data analysis mode,
+.Nm
+uses the collected data to infer a router-level topology of the
+hosting network and the interconnecting routers belonging to the
+hosting network's neighbors.
+.Pp
+The supported options to
+.Nm
+are as follows:
+.Bl -tag -width Ds
+.It Fl 6
+specifies that
+.Nm
+should infer IPv6 border routers, and that the input files are for the
+IPv6 topology.  This feature is currently work in progress.
+.It Fl a Ar ip2as-file
+specifies the IP prefix to Autonomous System (AS) mapping file that
+.Nm
+should use when collecting and analysing topology data.  See the examples
+section for a description of how this file must be formatted.
+.It Fl A
+specifies the AS numbers (ASNs) that
+.Nm
+should collect data towards.  This option is useful for testing and
+debugging.
+.It Fl c Ar allyconf
+specifies the number of times that
+.Nm
+should repeat pair-wise alias inferences that were made implying a
+central shared IP-ID counter.  By default, each pair of aliases is tested
+five additional times at 5 minute intervals because two IP addresses
+belonging to two different routers could happen to return IP-ID values
+that imply a central shared IP-ID counter.
+.It Fl d Ar dump
+specifies the dump ID to use to analyze the collected data.
+Currently, ID values 1 (routers) and 2 (traces) are valid, which dumps
+inferred routers and annotated traceroute paths, respectively.
+.It Fl D
+causes
+.Nm
+to detach and become a daemon.
+.It Fl f Ar firsthop
+specifies the first hop in a traceroute path that
+.Nm
+should begin at when collecting traceroute paths.  If
+.Nm
+is being run behind a NAT router, the private IP address of that router
+is uninteresting, and this option allows that hop to be skipped.
+.It Fl g Ar delegated-file
+specifies an IP address delegations file that can be provided to
+.Nm
+to allow inferences in the analysis phase of who operates unrouted IP
+address space.
+.It Fl i
+specifies the IP addresses that
+.Nm
+should collect data towards.  This option is useful for testing and
+debugging.
+.It Fl l Ar log-file
+specifies the name of a file to log progress output from
+.Nm
+generated at run time.
+.It Fl n Ar names-file
+specifies the name of a file containing IP address to domain name system
+names.
+.It Fl o Ar output-file
+specifies the name of the output file to be written during the data collection
+phase.  The output file will use the
+.Xr warts 5
+format.
+.It Fl O Ar option
+allows the behavior of
+.Nm
+to be further tailored.  The current choices for this option are:
+.Bl -dash -offset 2n -compact -width 1n
+.It
+.Sy dumpborders:
+only dump inferred border routers, not all VP routers.
+.It
+.Sy dumponedsts:
+further annotate routers that were only observed towards one AS.
+.It
+.Sy dumptracesets:
+dump the traceroutes observed towards networks where no topology
+was observed to be routed by a neighbor network.
+.It
+.Sy impatient:
+probe the destination ASes in order of number of address blocks, so
+that the probing will complete fastest.
+.It
+.Sy nogss:
+do not use a global stop set when collecting topology.
+.It
+.Sy noipopts:
+do not probe with IP record route and IP prespecified timestamp options.
+.It
+.Sy nomerge:
+do not analytically merge IP interfaces to routers based on common
+adjacent neighbor routers.
+.It
+.Sy noself:
+do not report links to other routers operated by the network hosting the
+vantage point.
+.It
+.Sy randomdst:
+probe a random address in each address block, rather than the first.
+.El
+.It Fl p Ar port
+specifies the port on the local host where
+.Xr scamper 1
+is accepting control socket connections.
+.It Fl r Ar relationships-file
+specifies the AS relationships file which is used in the analysis phase
+to reason about who owns each router in the observed topology.
+.It Fl R Ar unix
+specifies the name of a unix domain socket where a remote
+.Xr scamper 1
+instance is accepting remote control socket connections.
+.It Fl U Ar unix
+specifies the name of a unix domain socket where a local
+.Xr scamper 1
+instance is accepting control socket connections.
+.It Fl v Ar vpases
+specifies the name of a file, or a list of ASes, that represent the
+network hosting the vantage point.
+.It Fl x Ar ixp-file
+specifies the name of a file that contains a list of prefixes used by
+an IXP to enable interconnection at their facilities.
+.El
+.Sh EXAMPLES
+Given a set of prefixes with origin AS in a file named ip2as.txt, a list
+of VP ases in vpases.txt, a list of IXP prefixes in ixp.txt, and a
+.Xr scamper 1
+instance listening on port 31337 configured to probe at 100 packets
+per second started as follows:
+.Pp
+.Dl scamper -P 31337 -p 100
+.Pp
+the following command will collect raw topology data to support inference
+of border routers for the network hosting the vantage point, storing raw
+data into bdrmap.warts, and logging run-time information into logfile1.txt:
+.Pp
+.Dl sc_bdrmap -p 31337 -o bdrmap.warts -l logfile1.txt -a ip2as.txt -v vpases.txt -x ixp.txt
+.Pp
+To infer border routers from the collected data, using the same input files
+as above, with a set of AS relationships contained in asrel.txt, and a
+set of prefix delegations assembled from the Regional Internet Registry (RIR)
+Statistics files in delegated.txt:
+.Pp
+.Dl sc_bdrmap -d routers -a ip2as.txt -g delegated.txt -r asrel.txt -v vpases.txt -x ixp.txt bdrmap.warts >bdrmap.routers.txt
+.Pp
+To view annotated traceroutes stored in bdrmap.warts with IP to DNS names
+information stored in names.txt:
+.Pp
+.Dl sc_bdrmap -d traces -a ip2as.txt -v vpases.txt -x ixp.txt -n names.txt bdrmap.wart >bdrmap.traces.txt
+.Pp
+.\""""""""""""
+.Sh SEE ALSO
+.Xr scamper 1 ,
+.Xr sc_ally 1 ,
+.Xr sc_speedtrap 1 ,
+.Xr sc_wartsdump 1 ,
+.Xr sc_warts2text 1 ,
+.Xr sc_warts2json 1
+.Rs
+.%A "M. Luckie"
+.%A "A. Dhamdhere"
+.%A "B. Huffaker"
+.%A "D. Clark"
+.%A "k. claffy"
+.%T "bdrmap: Inference of Borders Between IP Networks"
+.%O "Proc. ACM/SIGCOMM Internet Measurement Conference 2016"
+.Re
+.Rs
+.%A "R. Govindan"
+.%A "H. Tangmunarunkit"
+.%T "Heuristics for Internet Map Discovery"
+.%O "Proc. IEEE INFOCOM 2000"
+.Re
+.Rs
+.%A "N. Spring"
+.%A "R. Mahajan"
+.%A "D. Wetherall"
+.%T "Measuring ISP topologies with Rocketfuel"
+.%O "Proc. ACM SIGCOMM 2002"
+.Re
+.Rs
+.%A "B. Donnet"
+.%A "P. Raoult"
+.%A "T. Friedman"
+.%A "M. Crovella"
+.%T "Efficient algorithms for large-scale topology discovery"
+.%O "Proc. ACM SIGMETRICS 2005"
+.Re
+.Rs
+.%A "B. Augustin"
+.%A "X. Cuvellier"
+.%A "B. Orgogozo"
+.%A "F. Viger"
+.%A "T. Friedman"
+.%A "M. Latapy"
+.%A "C. Magnien"
+.%A "R. Teixeira"
+.%T "Avoiding traceroute anomalies with Paris traceroute"
+.%O "Proc. ACM/SIGCOMM Internet Measurement Conference 2006"
+.Re
+.Rs
+.%A "A. Bender"
+.%A "R. Sherwood"
+.%A "N. Spring"
+.%T "Fixing Ally's growing pains with velocity modeling"
+.%O "Proc. ACM/SIGCOMM Internet Measurement Conference 2008"
+.Re
+.Rs
+.%A "M. Luckie"
+.%T "Scamper: a Scalable and Extensible Packet Prober for Active Measurement of the Internet"
+.%O "Proc. ACM/SIGCOMM Internet Measurement Conference 2010"
+.Re
+.Rs
+.%A "R. Beverly"
+.%A "W. Brinkmeyer"
+.%A "M. Luckie"
+.%A "J.P. Rohrer"
+.%T "IPv6 Alias Resolution via Induced Fragmentation"
+.%O "Proc. Passive and Active Measurement Conference 2013"
+.Re
+.Rs
+.%A "M. Luckie"
+.%A "R. Beverly"
+.%A "W. Brinkmeyer"
+.%A "k claffy"
+.%T "Speedtrap: Internet-scale IPv6 Alias Resolution"
+.%O "Proc. ACM/SIGCOMM Internet Measurement Conference 2013"
+.Re
+.Rs
+.%A "M. Luckie"
+.%A "B. Huffaker"
+.%A "A. Dhamdhere"
+.%A "V. Giotsas"
+.%A "k claffy"
+.%T "AS Relationships, Customer Cones, and Validation"
+.%O "Proc. ACM/SIGCOMM Internet Measurement Conference 2013"
+.Re
+.Sh AUTHOR
+.Nm
+was written by Matthew Luckie <mjl@luckie.org.nz>.

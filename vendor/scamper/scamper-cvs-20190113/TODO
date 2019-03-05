@@ -1,0 +1,21 @@
+$Id: TODO,v 1.17 2012/05/29 17:27:50 mjl Exp $
+
+* investigate if gettimeofday has to be called so much
+
+* check that the TOS bits are being set properly on tx.
+
+* remove the use of FILE handles in scamper_file_traceroute.c
+
+* ensure that all clients that have observed sources unobserves.
+
+* ensure that all outfiles are closed when scamper shuts down.
+
+* in the scamper.1 man page:
+   document control socket quoting rules.
+   how to feed adhoc sources
+   how to set socket as output for traces
+   how does priority value translate into the way lists are mixed
+   what is the syntax of responses on control socket
+   what is the maximum supported length of source and outfile names and aliases
+   how does the cycles value of a source change as cycles are finished
+   when does source update take effect

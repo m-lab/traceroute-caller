@@ -1,0 +1,47 @@
+.\"
+.\" sc_wartsfix.1
+.\"
+.\" Author: Matthew Luckie <mjl@luckie.org.nz>
+.\"
+.\" Copyright (c) 2018 Matthew Luckie
+.\"                    All rights reserved
+.\"
+.\" $Id: sc_wartsfix.1,v 1.1 2018/03/08 08:47:02 mjl Exp $
+.\"
+.Dd March 8, 2018
+.Dt SC_WARTSFIX 1
+.Os
+.Sh NAME
+.Nm sc_wartsfix
+.Nd truncate damaged warts files.
+.Sh SYNOPSIS
+.Nm
+.Op Ar
+.Sh DESCRIPTION
+The
+.Nm
+utility truncates a
+.Xr warts 5
+file at the last intact record.
+.Pp
+.Sh EXAMPLE
+Given a
+.Xr warts 5
+file named file1.warts which is damaged due to disk corruption:
+.Pp
+.Dl sc_wartsfix file1.warts
+.Pp
+will create a copy named file1.warts.fix truncated at the last intact record.
+.\""""""""""""
+.Sh SEE ALSO
+.Xr scamper 1 ,
+.Xr sc_wartsdump 1 ,
+.Xr sc_warts2json 1 ,
+.Rs
+.%A "M. Luckie"
+.%T "Scamper: a Scalable and Extensible Packet Prober for Active Measurement of the Internet"
+.%O "Proc. ACM/SIGCOMM Internet Measurement Conference 2010"
+.Re
+.Sh AUTHOR
+.Nm
+was written by Matthew Luckie <mjl@luckie.org.nz>.

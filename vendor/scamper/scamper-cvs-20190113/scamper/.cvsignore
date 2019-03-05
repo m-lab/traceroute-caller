@@ -1,0 +1,8 @@
+.deps
+.dirstamp
+.libs
+Makefile
+Makefile.in
+*.lo
+libscamperfile.la
+scamper

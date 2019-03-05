@@ -1,0 +1,163 @@
+.\"
+.\" sc_tbitblind.1
+.\"
+.\" Author: Matthew Luckie <mjl@luckie.org.nz>
+.\"
+.\" Copyright (c) 2015 Matthew Luckie
+.\"                    All rights reserved
+.\"
+.\" $Id: sc_tbitblind.1,v 1.5 2016/12/24 01:42:08 mjl Exp $
+.\"
+.Dd September 19, 2015
+.Dt SC_TBITBLIND 1
+.Os
+.Sh NAME
+.Nm sc_tbitblind
+.Nd scamper driver to test systems for resilience to blind TCP attacks.
+.Sh SYNOPSIS
+.Nm
+.Bk -words
+.Op Fl r
+.Op Fl a Ar addressfile
+.Op Fl A Ar application
+.Op Fl c Ar completed-file
+.Op Fl l Ar limit-per-file
+.Op Fl o Ar output-file
+.Op Fl O Ar options
+.Op Fl p Ar scamper-port
+.Op Fl t Ar log-file
+.Op Fl T Ar ttl
+.Op Fl w Ar wait-between
+.Ek
+.\""""""""""""
+.Sh DESCRIPTION
+The
+.Nm
+utility provides the ability to connect to a running
+.Xr scamper 1
+instance and use that instance to test systems for resilience to blind
+TCP attacks, with the output written to a file in warts format.
+The utility tests a given system for regular TCP behavior, and then
+tests the system for response to reset, SYN, and data packets that could
+have come from a blind attacker because the sequence number is not the
+next sequence number value expected by the receiver (the reset and SYN
+cases) or the acknowledgment value covers data ahead or behind the
+receiver's point in their sequence number space (the data cases).
+The utility also tests the system's response to a connection that
+advertises support for window scaling, TCP timestamps, and Selective
+Acknowledgments (SACK).
+.Pp
+The options are as follows:
+.Bl -tag -width Ds
+.It Fl ?
+prints a list of command line options and a synopsis of each.
+.It Fl a Ar addressfile
+specifies the name of the input file which constists of a sequence
+of systems to test, one system per line.
+.It Fl A Ar application
+specifies the type of application to simulate while testing the system.
+Options are HTTP and BGP.
+.It Fl c Ar completed-file
+specifies the name of a file to record IP addresses that have been tested.
+.It Fl l Ar limit-per-file
+specifies the number of tbit objects to record per warts file, before opening
+a new file and placing new objects.
+.It Fl o Ar output-file
+specifies the name of the file to be written.  The output file will use
+the warts format.
+.It Fl O Ar options
+allows the behavior of
+.Nm
+to be further tailored.
+The current choices for this option are:
+.Bl -dash -offset 2n -compact -width 1n
+.It
+.Sy noshuffle:
+do not shuffle the order of the input list or the order of the tests.
+.El
+.It Fl p Ar scamper-port
+specifies the port on the local host where
+.Xr scamper 1
+is accepting control socket connections.
+.It Fl r
+causes the random number generator used to shuffle tests be seeded.
+.It Fl t Ar log-file
+specifies the name of a file to log progress output from
+.Nm
+generated at run time.
+.It Fl T Ar ttl
+specifies the IP-TTL to use with the blind TCP tests.
+.It Fl w Ar wait-between
+specifies the length of time to wait between any two TCP tests to one
+system.
+.El
+.Sh EXAMPLES
+.Pp
+Use of this driver requires a scamper instance listening on a port for
+commands, which has been configured to use the IPFW firewall rules 1 to
+100, as follows:
+.Pp
+.Dl scamper -P 31337 -F ipfw:1-100
+.Pp
+To test a set of web servers specified in a file named webservers.txt and
+formatted as follows:
+.Pp
+.in +.3i
+.nf
+1,example.com 1263 192.0.2.1 http://www.example.com/
+1,example.com 1263 2001:DB8::1 http://www.example.com/
+1,example.com 1263 2001:DB8::2 https://www.example.com/
+.fi
+.in -.3i
+.Pp
+the following command will test all servers for resilience to blind
+TCP attacks and record raw data into webservers_00.warts,
+webservers_01.warts, etc:
+.Pp
+.Dl sc_tbitblind -a webservers.txt -p 31337 -o webservers
+.Pp
+The webservers.txt file is required to be formatted as above.
+The format is: numeric ID to pass to tbit, a label for the webserver,
+the size of the object to be fetched, the IP address to contact, and the
+URL to use.
+.Pp
+To test a set of BGP routers specified in bgprouters.txt and formatted
+as follows:
+.Pp
+.in +.3i
+.nf
+192.0.2.2 65000
+192.0.2.2 65001
+.fi
+.in -.3i
+.Pp
+the following command will test all BGP routers for resilience to blind
+TCP attacks, without shuffling the test order, waiting 180 seconds
+between tests, and record raw data into bgprouters_00.warts,
+bgprouters_01.warts, etc:
+.Pp
+.Dl sc_tbitblind -a bgprouters.txt -p 31337 -o bgprouters -A bgp -O noshuffle -w 180
+.Pp
+The bgprouters.txt file is required to be formatted as above.
+The format of that file is: IP address to establish a BGP session
+with, and the ASN to use.
+.Sh SEE ALSO
+.Rs
+.%A "M. Luckie"
+.%A "R. Beverly"
+.%A "T. Wu"
+.%A "M. Allman"
+.%A "k. claffy"
+.%T "Resilience of Deployed TCP to Blind Attacks"
+.%O "Proc. ACM/SIGCOMM Internet Measurement Conference 2015"
+.Re
+.Xr scamper 1 ,
+.Xr sc_wartsdump 1 ,
+.Xr sc_warts2json 1 ,
+.Xr warts 5
+.Sh AUTHORS
+.Nm
+was written by Matthew Luckie <mjl@luckie.org.nz>.
+Tiange Wu contributed an initial implementation of the blind in-window
+TBIT test to scamper, and Robert Beverly contributed support for
+testing BGP routers.

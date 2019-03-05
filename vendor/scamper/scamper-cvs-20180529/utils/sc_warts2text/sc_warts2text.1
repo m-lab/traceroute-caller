@@ -1,0 +1,85 @@
+.\"
+.\" sc_warts2text.1
+.\"
+.\" Author: Matthew Luckie <mjl@luckie.org.nz>
+.\"
+.\" Copyright (c) 2010 University of Waikato
+.\"                    All rights reserved
+.\"
+.\" $Id: sc_warts2text.1,v 1.6 2015/09/20 02:54:59 mjl Exp $
+.\"
+.\"  nroff -man sc_warts2text.1
+.\"  groff -man -Tascii sc_warts2text.1 | man2html -title sc_warts2text.1
+.\"
+.Dd October 15, 2010
+.Dt SC_WARTS2TEXT 1
+.Os
+.Sh NAME
+.Nm sc_warts2text
+.Nd simple dump of information contained in a warts file.
+.Sh SYNOPSIS
+.Nm
+.Bk -words
+.Op Fl d Ar ip2descr-file
+.Op Ar
+.Sh DESCRIPTION
+The
+.Nm
+utility provides a simple dump of information contained in a sequence of
+warts files.
+The output is the same as that which would have been provided by scamper
+if the text output option had been chosen instead of the warts output
+option when the data was collected.
+The options are as follows:
+.Bl -tag -width Ds
+.It Fl d Ar ip2descr-file
+specifies the name of a file with IP-address, description mappings, one
+mapping per line.  See the examples section for further information.
+.El
+.Pp
+While the output of
+.Nm
+is structured and suitable for initial analyses of results,
+the format of the output is not suitable for automated parsing and analysis
+as the output of
+.Nm
+will change overtime with no regard to backwards compatibility.
+Analyses of the contents of a warts file should be made using specialised
+programs which link against the scamper file API.
+.Sh EXAMPLES
+The command:
+.Pp
+.in +.3i
+sc_warts2text file1.warts file2.warts
+.in -.3i
+.Pp
+will decode and print the contents of file1.warts, followed by the contents
+of file2.warts.
+.Pp
+The command:
+.Pp
+.in +.3i
+gzcat file1.warts.gz | sc_warts2text
+.in -.3i
+.Pp
+will print the contents of the uncompressed file supplied on stdin.
+.Pp
+Given a set of IP-address, description pairs in a file name mappings.txt:
+.Pp
+.in +.3i
+.nf
+192.0.2.1 "foo"
+192.0.2.2 "bar"
+.fi
+.in -.3i
+.Pp
+then the command gzcat file1.warts.gz | sc_warts2text -d mappings.txt will
+print the description associated with a given destination address before each
+result is presented.
+.Sh SEE ALSO
+.Xr scamper 1 ,
+.Xr sc_wartsdump 1 ,
+.Xr sc_warts2json 1
+.Sh AUTHORS
+.Nm
+was written by Matthew Luckie <mjl@luckie.org.nz>.

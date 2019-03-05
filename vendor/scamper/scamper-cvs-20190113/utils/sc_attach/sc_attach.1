@@ -1,0 +1,143 @@
+.\"
+.\" sc_attach.1
+.\"
+.\" Author: Matthew Luckie <mjl@luckie.org.nz>
+.\"
+.\" Copyright (c) 2010 University of Waikato
+.\"               2012 The Regents of the University of California
+.\"                    All rights reserved
+.\"
+.\" $Id: sc_attach.1,v 1.11 2016/06/09 09:44:25 mjl Exp $
+.\"
+.\"  nroff -man sc_attach.1
+.\"  groff -man -Tascii sc_attach.1 | man2html -title sc_attach.1
+.\"
+.Dd February 2, 2016
+.Dt SC_ATTACH 1
+.Os
+.Sh NAME
+.Nm sc_attach
+.Nd simple scamper driver.
+.Sh SYNOPSIS
+.Nm
+.Bk -words
+.Op Fl ?dDv
+.Op Fl c Ar command
+.Op Fl i Ar infile
+.Op Fl o Ar outfile
+.Op Fl O Ar options
+.Op Fl p Ar [ip:]port
+.Op Fl P Ar priority
+.Op Fl R Ar unix-domain
+.Op Fl U Ar unix-domain
+.Ek
+.\""""""""""""
+.Sh DESCRIPTION
+The
+.Nm
+utility provides the ability to connect to a running
+.Xr scamper 1
+instance, have a set of commands defined in a file be executed, and the
+output be written into a single file, in warts format.
+The options are as follows:
+.Bl -tag -width Ds
+.It Fl ?
+prints a list of command line options and a synopsis of each.
+.It Fl d
+prints each command sent to
+.Xr scamper 1
+on stderr.
+.It Fl D
+causes
+.Nm
+to operate as a daemon.
+.It Fl v
+prints the current revision of
+.Nm
+and exits.
+.It Fl c Ar command
+specifies the
+.Xr scamper 1
+command to prepend to each address in the input file.
+.It Fl i Ar infile
+specifies the name of the input file which consists of a sequence
+of
+.Xr scamper 1
+commands or addresses (with the -c option), one per line.
+If '-' is specified, commands are read from stdin.
+.It Fl o Ar outfile
+specifies the name of the output file to be written.
+The output file will use the warts format.
+If '-' is specified, output will be sent to stdout.
+.It Fl O Ar options
+allows the behavior of
+.Nm
+to be further tailored.
+The current choices for this option are:
+.Bl -dash -offset 2n -compact -width 1n
+.It
+.Sy random:
+shuffle the input commands randomly.
+.It
+.Sy impatient:
+send commands to scamper without waiting for scamper to ask for them.
+.El
+.It Fl p Ar [ip:]port
+specifies the IP address and port where a
+.Xr scamper 1
+is accepting control socket connections.
+If an IP address is not specified,
+.Nm
+connects to the specified port on the local host.
+.It Fl P Ar priority
+specifies the mixing priority
+.Xr scamper 1
+should assign to the source.
+.It Fl R Ar unix-domain
+specifies the unix domain socket on the local host where a remote
+.Xr scamper 1
+instance is accepting commands.
+.It Fl U Ar unix-domain
+specifies the unix domain socket on the local host where a local
+.Xr scamper 1
+isntance is accepting commands.
+.El
+.Sh EXAMPLES
+Given a set of commands in a file named infile.txt:
+.Pp
+.in +.3i
+.nf
+tbit -M 1280 -u 'http://www.example.com/' 2620:0:2d0:200::10
+trace -P udp-paris -M 192.0.2.1
+ping -P icmp-echo 192.0.32.10
+.fi
+.in -.3i
+.Pp
+and a
+.Xr scamper 1
+daemon listening on port 31337, then these commands can be executed using:
+.Pp
+sc_attach -i infile.txt -o outfile.warts -p 31337
+.Pp
+Given a set of addresses in a file named infile2.txt:
+.Pp
+.in +.3i
+.nf
+2620:0:2d0:200::10
+192.0.2.1
+192.0.32.10
+.fi
+.in -.3i
+.Pp
+these addresses can be pinged with
+.Nm
+operating as a daemon with:
+.Pp
+sc_attach -D -c 'ping' -i infile2.txt -o outfile2.warts -p 31337
+.Sh SEE ALSO
+.Xr scamper 1 ,
+.Xr sc_wartsdump 1 ,
+.Xr sc_warts2json 1
+.Sh AUTHORS
+.Nm
+was written by Matthew Luckie <mjl@luckie.org.nz>.
