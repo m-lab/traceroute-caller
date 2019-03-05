@@ -1,0 +1,226 @@
+.Dd November 21, 2017
+.Dt SC_RADARGUN 1
+.Os
+.Sh NAME
+.Nm sc_radargun
+.Nd scamper driver to run radargun on a list of candidate aliases.
+.Sh SYNOPSIS
+.Nm
+.Bk -words
+.Op Fl ?D
+.Op Fl a Ar infile
+.Op Fl f Ar fudge
+.Op Fl o Ar outfile
+.Op Fl O Ar options
+.Op Fl p Ar port
+.Op Fl P Ar pps
+.Op Fl q Ar attempts
+.Op Fl r Ar wait-round
+.Op Fl R Ar round-count
+.Op Fl t Ar logfile
+.Op Fl U Ar unix
+.Ek
+.Pp
+.Nm
+.Bk -words
+.Op Fl d Ar dump
+data-file
+.Ek
+.\""""""""""""
+.Sh DESCRIPTION
+The
+.Nm
+utility provides the ability to connect to a running
+.Xr scamper 1
+instance and infer which of the supplied IPv4 addresses are aliases using the
+Radargun technique.
+For all addresses in the file,
+.Nm
+establishes which probe methods (UDP, TCP-ack, ICMP-echo) solicit an
+incrementing IP-ID value, and then uses the Radargun technique on
+addresses where a probe method is able to obtain an incrementing IP-ID
+for the addresses.
+The output is written to a warts file.
+The options are as follows:
+.Bl -tag -width Ds
+.It Fl ?
+prints a list of command line options and a synopsis of each.
+.It Fl D
+causes
+.Nm
+to detach and become a daemon.
+.It Fl a Ar infile
+specifies the name of the input file which consists of a list of IPv4
+addresses.  The file can either contain sets to test, one set per line,
+or simply one set, one address per line.
+.It Fl d Ar dump
+specifies the dump ID to use to analyze the collected data.
+The current choices for this option are:
+.Bl -dash -offset 2n -compact -width 1n
+.It
+.Sy 1:
+dump inferred aliases.
+.It
+.Sy 2:
+dump interface classifications.
+.El
+.It Fl f Ar fudge
+specifies the fudge to use when inferring if a device is deriving
+IP-ID values from a counter.  By default, responses the maximum
+difference between two samples must be no larger than 5000.  The fudge
+value also impacts alias inference.  If a value of zero is used, the
+IP-ID samples must simply be in order.
+.It Fl o Ar outfile
+specifies the name of the output file to be written.
+The output file will use the warts format.
+.It Fl O Ar options
+allows the behavior of
+.Nm
+to be further tailored.
+The current choices for this option are:
+.Bl -dash -offset 2n -compact -width 1n
+.It
+.Sy nobs:
+do not consider if IP-ID values might be byte-swapped in the header
+.It
+.Sy nobudget:
+do not consider if the radargun measurement can complete in the round
+time give the packets-per-second rate specified.
+.It
+.Sy noradargun:
+do not conduct radargun step.  Stop after classifying interface IP-ID
+behavior.
+.It
+.Sy noreserved:
+do not probe reserved IP addresses.
+.It
+.Sy rows:
+the addresses in the input file are supplied in rows, and the radargun
+measurements will probe and evaluate each set independently.
+.It
+.Sy tc:
+when dumping candidate aliases, report the transitive closure, rather
+than pairs in isolation.
+.El
+.It Fl p Ar port
+specifies the port on the local host where
+.Xr scamper 1
+is accepting control socket connections.
+.It Fl P Ar pps
+specifies the packets-per-second rate that scamper is running at.  The
+PPS value is used to infer if the radargun measurement can fit in
+scamper's probe budget.
+.It Fl q Ar attempts
+specifies the number of probe packets to use to when inferring if
+an IP address assigns IP-ID values from a counter.
+.It Fl r Ar wait-round
+specifies the length of time, in seconds, each round should aim to
+complete in.  By default, 30 seconds.
+.It Fl R Ar round-count
+specifies the number of rounds to pursue in radargun.  By default,
+30 rounds.
+.It Fl t Ar logfile
+specifies the name of a file to log progress output from
+.Nm
+generated at run time.
+.It Fl U Ar unix
+specifies the name of a unix domain socket where a local
+.Xr scamper 1
+instance is accepting control socket connections.
+.El
+.\""""""""""""
+.Sh EXAMPLES
+.Pp
+.Nm
+requires a
+.Xr scamper 1
+instance listening on a port for commands in order to collect data, at
+20 packets per second:
+.Pp
+.in +.3i
+.nf
+scamper -P 31337 -p 20
+.fi
+.in -.3i
+.Pp
+will start a
+.Xr scamper 1
+instance listening on port 31337 on the loopback interface.  To use
+.Nm
+to infer which addresses might be aliases, listed in a file named set-1.txt
+.Pp
+.in +.3i
+.nf
+192.0.2.2
+192.0.32.10
+192.0.30.64
+192.0.31.8
+.fi
+.in -.3i
+.Pp
+the following command will test these IP addresses for aliases using
+ICMP, UDP, and TCP probes (as appropriate) using the radargun technique
+with 10 rounds, each round taking 4 seconds:
+.Pp
+.in +.3i
+.nf
+sc_radargun -a set-1.txt -o set-1.warts -p 20 -r 4 -R 10
+.fi
+.in -.3i
+.Pp
+To use
+.Nm
+to infer which addresses might be aliases, listed in a file named set-2.txt
+organized as sets of candidate aliases to test:
+.Pp
+.in +.3i
+.nf
+192.0.2.2 192.0.32.10 192.0.30.64 192.0.31.8
+192.0.2.3 192.0.32.11 192.0.30.65 192.0.31.9
+.fi
+.in -.3i
+.Pp
+the following command will test these organized sets of IP addresses for
+aliases:
+.Pp
+.in +.3i
+.nf
+sc_radargun -a set-2.txt -o set-2.warts -p 20 -O rows
+.fi
+.in -.3i
+.Pp
+To use data previously collected with
+.Nm
+and stored in set-2.warts, to infer likely aliases, reported in pairs:
+.Pp
+.in +.3i
+.nf
+sc_radargun -d 1 set-2.warts
+.fi
+.in -.3i
+.Pp
+To use data previously collected with
+.Nm
+and stored in set-2.warts, to report interface IP-ID classifications:
+.Pp
+.in +.3i
+.nf
+sc_radargun -d 2 set-2.warts
+.fi
+.in -.3i
+.Sh SEE ALSO
+.Rs
+.%A "A. Bender"
+.%A "R. Sherwood"
+.%A "N. Spring"
+.%T "Fixing Ally's growing pains with velocity modeling"
+.%O "Proc ACM Internet Measurement Conference 2008"
+.Re
+.Xr scamper 1 ,
+.Xr sc_ally 1 ,
+.Xr sc_wartsdump 1 ,
+.Xr sc_warts2json 1
+.Sh AUTHORS
+.Nm
+was written by Matthew Luckie <mjl@luckie.org.nz>, but the original
+implementation was by Bender et al.

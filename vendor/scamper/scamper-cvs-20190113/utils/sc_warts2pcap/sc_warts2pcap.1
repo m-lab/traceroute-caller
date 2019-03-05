@@ -1,0 +1,69 @@
+.\"
+.\" sc_warts2pcap.1
+.\"
+.\" Author: Matthew Luckie <mjl@luckie.org.nz>
+.\"         Stephen Eichler
+.\"
+.\" Copyright (c) 2011 University of Waikato
+.\"                    All rights reserved
+.\"
+.\" $Id: sc_warts2pcap.1,v 1.5 2015/09/20 02:54:59 mjl Exp $
+.\"
+.\"  nroff -man sc_warts2pcap.1
+.\"  groff -man -Tascii sc_warts2pcap.1 | man2html -title sc_warts2pcap.1
+.\"
+.Dd October 15, 2010
+.Dt SC_WARTS2PCAP 1
+.Os
+.Sh NAME
+.Nm sc_warts2pcap
+.Nd write packets included in warts object to a pcap file.
+.Sh SYNOPSIS
+.Nm
+.Bk -words
+.Op Fl o Ar outfile
+.Op Fl s Ar sort
+.Op Ar
+.Sh DESCRIPTION
+The
+.Nm
+utility provides the ability to extract packets embedded in the tbit, sting,
+and sniff warts objects and write them to a pcap file, which can be read by
+tcpdump and wireshark.
+The options are as follows:
+.Bl -tag -width Ds
+.It Fl o Ar outfile
+specifies the name of the output file.  If no output file is specified,
+it will be written to the standard output, provided that it is not a tty.
+.It Fl o Ar sort
+specifies how the pcap records (packets) are sorted before being written
+out.  By default, no sorting is applied; the packets are grouped as they
+are in the warts file.  If packet sorting is specified, the packets are
+written out in timestamp order.  Note that this operation requires the
+packets to be read into memory to be sorted, so it will require a
+corresponding amount of memory to complete.
+.El
+.Sh EXAMPLES
+The command:
+.Pp
+.in +.3i
+sc_warts2pcap -o output.pcap file1.warts file2.warts
+.in -.3i
+.Pp
+will read the packet objects from file1.warts, and then file2.warts, and
+write them to output.pcap.
+.Pp
+The command:
+.Pp
+.in +.3i
+gzcat file1.warts.gz | sc_warts2pcap -s packet >file1.pcap
+.in -.3i
+.Pp
+will read the contents of the uncompressed warts file supplied on stdin,
+sort the packets by their timestamp, and then write the output to file1.pcap.
+.Sh SEE ALSO
+.Xr scamper 1 ,
+.Xr tcpdump 1
+.Sh AUTHORS
+.Nm
+was written by Stephen Eichler and Matthew Luckie.

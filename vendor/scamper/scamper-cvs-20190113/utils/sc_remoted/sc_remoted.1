@@ -1,0 +1,183 @@
+.\"
+.\" sc_remoted.1
+.\"
+.\" Author: Matthew Luckie <mjl@luckie.org.nz>
+.\"
+.\" Copyright (c) 2014-2015 Matthew Luckie
+.\"               All rights reserved
+.\"
+.\" $Id: sc_remoted.1,v 1.9 2016/11/20 17:33:49 mjl Exp $
+.\"
+.Dd September 21, 2014
+.Dt SC_REMOTED 1
+.Os
+.Sh NAME
+.Nm sc_remoted
+.Nd interact with a collection of remotely controlled scamper instances
+.Sh SYNOPSIS
+.Nm
+.Bk -words
+.Op Fl ?46D
+.Op Fl O Ar options
+.Op Fl P Ar port
+.Op Fl U Ar directory
+.Op Fl c Ar tls-certificate
+.Op Fl p Ar tls-privatekey
+.Ek
+.\""""""""""""
+.Sh DESCRIPTION
+The
+.Nm
+utility provides the ability to connect to a
+.Xr scamper 1
+instance running remotely and interact with it by issuing commands
+and receiving results in warts format.
+The options are as follows:
+.Bl -tag -width Ds
+.It Fl ?
+prints a list of command line options and a synopsis of each.
+.It Fl D
+causes
+.Nm
+to operate as a daemon.
+.It Fl 4
+causes
+.Nm
+to only listen for IPv4-based connections.
+.It Fl 6
+causes
+.Nm
+to only listen for IPv6-based connections.
+.It Fl O Ar options
+allows the behavior of
+.Nm
+to be further tailored.
+The current choices for this option are:
+.Bl -dash -offset 2n -compact -width 1n
+.It
+.Sy allowgroup:
+allow members of the unix domain socket's group to access to the
+unix domain sockets created by
+.Nm
+.It
+.Sy allowother:
+allow anyone on the system access to the unix domain sockets created by
+.Nm
+.It
+.Sy select:
+use
+.Xr select 2
+with all sockets, rather than
+.Xr epoll 2
+or
+.Xr kqueue 2
+.El
+.It Fl P Ar port
+specifies the port on the local host where
+.Nm
+should listen for incoming connections.
+.It Fl U Ar directory
+specifies the directory on the local host where unix domain sockets
+corresponding to remote hosts should be placed.
+.It Fl c Ar tls-certificate
+specifies the server certificate file in PEM format to advertise to
+remote
+.Xr scamper 1
+instances.
+.It Fl p Ar tls-privatekey
+specifies the private key file in PEM format that corresponds to the
+certificate file.  This key should have a passphrase.
+.Nm
+will prompt for the passphrase when starting up.
+.El
+.\""""""""""""
+.Sh EXAMPLES
+The intended use of the remote control socket built into
+.Xr scamper 1
+is as follows.
+A central server with IP addresses 192.0.2.1 and 2001:db8::1
+runs a
+.Nm
+process listening on a port for remote scamper process, placing
+control sockets in a specified directory:
+.Pp
+.Dl sc_remoted -P 31337 -U scamper-remote-sockets
+.Pp
+Then, a remote host with IP address 198.51.100.55 runs scamper
+and connects to the remote controller:
+.Pp
+.Dl scamper -R 192.0.2.1:31337
+.Pp
+The
+.Nm
+process places a unix domain socket in the directory corresponding to
+the remote process.  The name corresponds to the source IP address and
+port the remote scamper process connected to controller with.  If the
+scamper process used source port 1025, then the unix domain socket's
+name will be
+.Pp
+.Dl scamper-remote-sockets/198.51.100.55:1025
+.Pp
+If a second remote host with IP address 2001:db8:1234::1 runs scamper
+and connects to the remote controller:
+.Pp
+.Dl scamper -R [2001:db8::1]:31337
+.Pp
+The same
+.Nm
+process will place another unix domain socket in the directory
+corresponding to the remote process.  If the scamper process used
+source port 1026, then the unix domain socket's name will be
+.Pp
+.Dl scamper-remote-sockets/2001:db8:1234::1.1026
+.Pp
+.\""""""""""""
+.Sh USING TRANSPORT LAYER SECURITY
+.Nm
+and scamper support the use of transport layer security (TLS) using
+OpenSSL to authenticate and encrypt communications between
+.Nm
+and scamper.
+To use this support requires a public certificate signed by a
+certificate authority.
+Scamper will verify the certificate presented by
+.Nm
+and disconnect if the certificate presented by
+.Nm
+cannot be validated.
+.Pp
+Generating a certificate that will be accepted by scamper requires you
+to create a certificate request and pass it for signing to a
+certificate authority.
+To generate a private key in file remotepriv.pem, and a request to
+sign the key in remotereq.pem:
+.Pp
+.Dl openssl req -new -keyout remotepriv.pem -out remotereq.pem
+.Pp
+and then send the remotereq.pem file to the certificate authority for
+signing.
+Do not send remotepriv.pem; that key must remain private to you.
+When openssl prompts for a passphrase, choose a passphrase that is
+unique and keep the passphrase secret.
+When your chosen certificate authority signs your private key, it will
+return a file which we will call remotecert.pem.
+Both remotecert.pem and remotepriv.pem are required parameters to
+.Nm
+to enable TLS support:
+.Pp
+.Dl sc_remoted -P 31337 -U scamper-remote-sockets -c remotecert.pem -p remotepriv.pem
+.Pp
+and then passing the -O tls option to scamper:
+.Pp
+.Dl scamper -R example.com:31337 -O tls
+.Pp
+.\""""""""""""
+.Sh SEE ALSO
+.Xr scamper 1 ,
+.Xr sc_attach 1 ,
+.Xr sc_wartsdump 1 ,
+.Xr warts 5 ,
+.Xr openssl 1
+.Sh AUTHORS
+.Nm
+was written by Matthew Luckie <mjl@luckie.org.nz>.

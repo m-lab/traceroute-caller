@@ -1,0 +1,77 @@
+.\"
+.\" sc_ipiddump.1
+.\"
+.\" Author: Matthew Luckie <mjl@luckie.org.nz>
+.\"
+.\" Copyright (c) 2013 The Regents of the University of California
+.\" Copyright (c) 2015 The University of Waikato
+.\"                    All rights reserved
+.\"
+.\" $Id: sc_ipiddump.1,v 1.3 2015/10/21 06:08:58 mjl Exp $
+.\"
+.Dd October 21, 2015
+.Dt SC_IPIDDUMP 1
+.Os
+.Sh NAME
+.Nm sc_ipiddump
+.Nd utility to dump IP-ID values embedded in ping, traceroute, and dealias
+objects in warts files.
+.Sh SYNOPSIS
+.Nm
+.Bk -words
+.Op Fl i Ar ips
+.Op Fl O Ar options
+.Op Fl U Ar userid
+.Op Ar
+.Ek
+.\""""""""""""
+.Sh DESCRIPTION
+The
+.Nm
+utility dumps the IP-ID values embedded in IPv4 and IPv6 responses to
+ping, traceroute, and dealias objects.
+The output contains the transit and receive timestamps, the source address
+used by scamper when probing, the interface address which replied, and the
+IPID value (in hexadecimal).
+The objects are sorted by transmit time.
+The supported options to
+.Nm
+are as follows:
+.Bl -tag -width Ds
+.It Fl i Ar ip
+restricts the selection of source addresses to those with the given IP
+address(es).
+.It Fl O Ar options
+allows the behavior of
+.Nm
+to be further tailored.
+The current choice for this option is:
+.Bl -dash -offset 2n -compact -width 1n
+.It
+.Sy notrace:
+do not parse traceroutes for IPID values.
+.El
+.It Fl U Ar userid
+restricts the selection of warts objects to those with the given userid(s).
+.El
+.\""""""""""""
+.Sh EXAMPLES
+Given an input file foo.warts, the following command dumps IP-ID values found
+in objects with userid values 3 and 4:
+.Pp
+.Dl sc_ipiddump -U 3,4 foo.warts
+.Pp
+Given an input file foo.warts.gz, the following command dumps IP-ID values
+found in responses from IP address 192.0.2.1
+.Pp
+.Dl zcat foo.warts.gz | sc_ipiddump -i 192.0.2.1 -
+.Pp
+.\""""""""""""
+.Sh SEE ALSO
+.Xr scamper 1 ,
+.Xr sc_wartsdump 1 ,
+.Xr sc_warts2text 1 ,
+.Xr sc_warts2json 1
+.Sh AUTHORS
+.Nm
+was written by Matthew Luckie <mjl@luckie.org.nz>.

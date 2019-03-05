@@ -1,0 +1,360 @@
+.\"
+.\" sc_filterpolicy.1
+.\"
+.\" Author: Matthew Luckie <mjl@luckie.org.nz>
+.\"
+.\" Copyright (c) 2015 Matthew Luckie
+.\"                    All rights reserved
+.\"
+.\" $Id: sc_filterpolicy.1,v 1.8 2016/07/30 08:09:20 mjl Exp $
+.\"
+.Dd December 2, 2015
+.Dt SC_FILTERPOLICY 1
+.Os
+.Sh NAME
+.Nm sc_filterpolicy
+.Nd scamper driver to test systems for congruent filtering policy
+.Sh SYNOPSIS
+.Nm
+.Bk -words
+.Op Fl D
+.Op Fl a Ar input-file
+.Op Fl l Ar log-file
+.Op Fl o Ar output-file
+.Op Fl O Ar options
+.Op Fl p Ar scamper-port
+.Op Fl t Ar host-type
+.Op Fl T Ar test
+.Op Fl U Ar scamper-unix
+.Ek
+.Pp
+.Nm
+.Bk -words
+.Op Fl r Ar data-file
+.Ek
+.\""""""""""""
+.Sh DESCRIPTION
+The
+.Nm
+utility provides the ability to connect to a running
+.Xr scamper 1
+instance and use that instance to test systems for congruent filtering
+policy.
+The utility tests each system specified in the input file by probing
+for application reachability with ICMP, UDP, and TCP probes, using
+both IPv4 and IPv6 where applicable.
+Each system in the input file should have multiple IP addresses specified;
+the driver probes each IP address on each system one at a time to avoid
+causing the remote system to rate-limit responses.
+.Nm
+obtains speed by probing systems in parallel, though it may appear to operate
+slowly because no progress is reported until all addresses belonging to
+a device have been tested one at a time.
+.Pp
+The applications supported by
+.Nm
+to test filtering policy are:
+.Bl -dash -offset 2n -compact -width 1n
+.It
+.Sy ICMP:
+test responsiveness to ICMP echo request packets.  We classify the
+IP address as responsive to ICMP echo requests if it sends an ICMP echo
+reply.
+.It
+.Sy NetBIOS:
+test responsiveness to TCP SYN packets sent to port 139 (the NetBIOS port).
+We classify the IP address as responsive if it sends a SYN/ACK.
+.It
+.Sy MSSQL:
+test responsiveness to TCP SYN packets sent to port 1433 (the Microsoft SQL
+server default port).
+We classify the IP address as responsive if it sends a SYN/ACK.
+.It
+.Sy FTP:
+test responsiveness to TCP SYN packets sent to port 21 (the default port for
+FTP control connections).
+We classify the IP address as responsive if it sends a SYN/ACK.
+.It
+.Sy SSH:
+test responsiveness to TCP SYN packets sent to port 22 (the default port for
+SSH).
+We classify the IP address as responsive if it sends a SYN/ACK.
+.It
+.Sy Telnet:
+test responsiveness to TCP SYN packets sent to port 23 (the default port for
+telnet).
+We classify the IP address as responsive if it sends a SYN/ACK.
+.It
+.Sy MySQL:
+test responsiveness to TCP SYN packets sent to port 3306 (the default port
+for MySQL).
+We classify the IP address as responsive if it sends a SYN/ACK.
+.It
+.Sy RDP:
+test responsiveness to TCP SYN packets sent to port 3389 (the default port
+for RDP).
+We classify the IP address as responsive if it sends a SYN/ACK.
+.It
+.Sy HTTPS:
+test responsiveness to TCP SYN packets sent to port 443 (the default port
+for HTTPS).
+We classify the IP address as responsive if it sends a SYN/ACK.
+.It
+.Sy SMB:
+test responsiveness to TCP SYN packets sent to port 445 (the default port
+for SMB).
+We classify the IP address as responsive if it sends a SYN/ACK.
+.It
+.Sy HTTP:
+test responsiveness to TCP SYN packets sent to port 80 (the default port
+for HTTP).
+We classify the IP address as responsive if it sends a SYN/ACK.
+.It
+.Sy BGP:
+test responsiveness to TCP SYN packets sent to port 179 (the default port
+for BGP).
+We classify the IP address as responsive if it sends a SYN/ACK.
+.It
+.Sy NTP:
+test responsiveness to UDP packets sent to port 123 (the default port
+for NTP) with an NTP version request payload.
+We classify the IP address as responsive if it sends a UDP response.
+.It
+.Sy DNS:
+test responsiveness to UDP packets sent to port 53 (the default port for
+DNS) with a query for www.google.com.
+We classify the IP address as responsive if it sends a UDP response.
+.It
+.Sy SNMP:
+test responsiveness to UDP packets sent to port 161 (the default port for
+SNMP) with a get for sysDescr via the public community using the SNMPv2c
+protocol.
+We classify the IP address as responsive if it sends a UDP response.
+.It
+.Sy VNC:
+test responsiveness to TCP SYN packets sent to port 5900 (the default
+port for VNC).
+We classify the IP address as responsive if it sends a SYN/ACK.
+.El
+.Pp
+The options supported by
+.Nm
+are as follows:
+.Bl -tag -width Ds
+.It Fl ?
+prints a list of command line options and a synopsis of each.
+.It Fl a Ar input-file
+specifies the name of the input file which consists of a sequence
+of systems to test.  See the examples section for input-file
+formatting examples.
+.It Fl D
+with this option set,
+.Nm
+will detach and become a daemon.
+.It Fl l Ar log-file
+specifies the name of a file to log progress output from
+.Nm
+generated at run time.
+.It Fl o Ar output-file
+specifies the name of the file to be written.  The output file will use
+the
+.Xr warts 5
+format.
+.It Fl O Ar options
+allows the behavior of
+.Nm
+to be further tailored.
+The current choices for this option are:
+.Bl -dash -offset 2n -compact -width 1n
+.It
+.Sy impatient:
+order the systems found in the input-file so that those with the most
+addresses are probed first, so that probing will complete as fast as
+possible.
+.It
+.Sy incongruent:
+only report systems which are inferred to have an incongruent filtering
+policy.
+.It
+.Sy trace:
+probe the addresses found in the input-file using traceroute, rather than ping.
+.It
+.Sy tuples:
+signals that the input-file is formatted as tuples, rather than rows.  See the
+examples section for more information.
+.El
+.It Fl p Ar scamper-port
+specifies the port on the local host where
+.Xr scamper 1
+is accepting control socket connections.
+.It Fl r Ar data-file
+specifies the name of a previously collected filter policy data file, in
+.Xr warts 5
+format, to read and analyse.
+.It Fl t Ar probe-class
+specifies the class of probes to send for each IP address in the input
+file.
+The current choices for this option are:
+.Bl -dash -offset 2n -compact -width 1n
+.It
+.Sy router:
+test ICMP, SSH, Telnet, HTTPS, HTTP, BGP, NTP, DNS, and SNMP.
+.It
+.Sy server:
+test ICMP, FTP, SSH, Telnet, MySQL, RDP, HTTPS, SMB, HTTP, NTP, DNS, and SNMP.
+.It
+.Sy all:
+test ICMP, NetBIOS, MSSQL, FTP, SSH, Telnet, MySQL, RDP, HTTPS, SMB, VNC,
+HTTP, BGP, NTP, DNS, and SNMP.
+.El
+.It Fl T Ar test
+specifies adjustments to the test schedule from the supported application
+types.
+Prefacing an application with + causes the application type to be
+added to the test schedule, and prefacing an application with - causes
+the application type to be removed from the test schedule.
+.It Fl U Ar scamper-unix
+specifies the unix domain socket on the local host where
+.Xr scamper 1
+is accepting control socket connections.
+.El
+.Sh EXAMPLES
+.Pp
+.Nm
+requires a
+.Xr scamper 1
+instance listening on a port or unix domain socket for
+commands in order to collect data:
+.Pp
+.in +.3i
+.nf
+scamper -P 31337
+.fi
+.in -.3i
+.Pp
+will start a
+.Xr scamper 1
+instance listening on port 31337 on the loopback interface.  To use
+.Nm
+to test the filtering policy of a set of routers specified in a file named
+routers.txt and formatted as rows as follows:
+.Pp
+.in +.3i
+.nf
+foo.example.com 192.0.2.1 2001:DB8::1
+bar.example.com 192.0.2.2 2001:DB8::2
+.fi
+.in -.3i
+.Pp
+the following command will test these routers for responsiveness to
+ICMP, SSH, Telnet, HTTPS, HTTP, BGP, NTP, DNS, and SNMP probes, recording raw
+data into example-routers.warts:
+.Pp
+.in +.3i
+.nf
+sc_filterpolicy -p 31337 -a routers.txt -t router -o example-routers.warts
+.fi
+.in -.3i
+.Pp
+Including the name of each device in the input file is optional.
+.Pp
+The following command will only test the routers for responsiveness to SSH:
+.Pp
+.in +.3i
+.nf
+sc_filterpolicy -p 31337 -a routers.txt -T +ssh -o example-ssh.warts
+.fi
+.in -.3i
+.Pp
+To use
+.Nm
+to test the filtering policy of a set of servers specified in a file named
+servers.txt and formatted as tuples as follows:
+.Pp
+.in +.3i
+.nf
+db.example.com 192.0.2.3
+db.example.com 2001::DB8::3
+corp.example.com 192.0.2.4
+corp.example.com 2001::DB8::4
+.fi
+.in -.3i
+.Pp
+the following command will test these servers for responsiveness to
+ICMP, FTP, SSH, Telnet, MySQL, RDP, HTTPS, SMB, HTTP, NTP, DNS, and SNMP
+probes, recording raw data into example-servers.warts:
+.Pp
+.in +.3i
+.nf
+sc_filterpolicy -p 31337 -a servers.txt -t server -o example-servers.warts -O tuples
+.fi
+.in -.3i
+.Pp
+In an input file formatted as tuples, the name (or an identifier) for
+each device is mandatory, and is used to ensure only one probe is sent
+to any one device at a time, and to collate responses from different
+addresses to the same device for reporting.
+.Pp
+Once raw data has been collected,
+.Nm
+can be used to analyse the collected data.  For the example-routers.warts
+file, the following command dumps a summary of the data collected for
+each router:
+.Pp
+.in +.3i
+.nf
+.ft CW
+sc_filterpolicy -r example-routers.warts
+.Pp
+            :        T                  
+            :        e  H               
+            :  I     l  T  H           S
+            :  C  S  n  T  T  B  N  D  N
+            :  M  S  e  P  T  G  T  N  M
+            :  P  H  t  S  P  P  P  S  P
+========================================
+192.0.2.1   :  O  O        O        O  O
+2001:DB8::1 :  O  O        O        O  O
+.Pp
+192.0.2.2   :  O  X
+2001:DB8::2 :  O  O
+.ft R
+.fi
+.in -.3i
+.Pp
+The first router is responsive (O) for ICMP, SSH, HTTP, DNS, and SNMP
+probes on all addresses.
+The second router is responsive (O) to ICMP probes on both addresses
+is unresponsive (X) to SSH on the IPv4 address, but is responsive (O)
+to SSH on the IPv6 address and possibly represents a filtering policy
+that is incongruent and requires attention.
+Note that the empty cells in the table represent a router that was
+unresponsive (X) to that protocol for all addresses tested; the cells
+are left empty to allow the user to focus on open and incongruent
+application services.
+.Pp
+The command:
+.Pp
+.in +.3i
+.nf
+sc_filterpolicy -O incongruent -r example-routers.warts
+.fi
+.in -.3i
+.Pp
+will only show routers with an incongruent filtering policy.
+.Sh SEE ALSO
+.Rs
+.%A "J. Czyz"
+.%A "M. Luckie"
+.%A "M. Allman"
+.%A "M. Bailey"
+.%T "Don't Forget to Lock the Back Door! A Characterization of IPv6 Network Security Policy"
+.%O "Proc. Network and Distributed Systems Security (NDSS) Conference 2016"
+.Re
+.Xr scamper 1 ,
+.Xr sc_wartsdump 1 ,
+.Xr sc_warts2json 1 ,
+.Xr warts 5
+.Sh AUTHORS
+.Nm
+was written by Matthew Luckie <mjl@luckie.org.nz> and Jakub Czyz.
