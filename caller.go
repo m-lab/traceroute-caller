@@ -53,7 +53,6 @@ func ParseSSLine(line string) (*Connection, error) {
 	}
 
 	output := &Connection{remote_ip: remoteIP, remote_port: remotePort, local_ip: localIP, local_port: localPort, cookie: cookie}
-	//log.Println(output)
 	return output, nil
 }
 
@@ -129,7 +128,6 @@ func (c *ConnectionWatcher) GetConnections() {
 		conn, err := ParseSSLine(line)
 		if err == nil {
 			c.connectionPool[*conn] = true
-			//log.Printf("pool add IP: " + conn.remote_ip)
 		}
 	}
 }
@@ -162,7 +160,6 @@ var connWatcher ConnectionWatcher
 
 func main() {
 	connWatcher.GetConnections()
-	//count := 0
 	for true {
 		closedCollection := connWatcher.GetClosedCollection()
 		fmt.Printf("length of closed connections: %d\n", len(closedCollection))
