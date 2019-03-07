@@ -11,7 +11,6 @@ import (
 	"strings"
 	"syscall"
 	"time"
-	//"github.com/m-lab/go/uuid"
 
 	"github.com/npad/sidestream/util"
 )
@@ -159,6 +158,9 @@ var connWatcher ConnectionWatcher
 ///////////////////////////////////////////////////
 
 func main() {
+	if len(os.Args) > 1 {
+		OUTPUT_PATH = os.Args[1]
+	}
 	connWatcher.GetConnections()
 	for true {
 		closedCollection := connWatcher.GetClosedCollection()
