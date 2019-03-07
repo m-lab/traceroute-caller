@@ -13,7 +13,6 @@ RUN ls -l /source/scamper-cvs-20190113/scamper
 RUN make
 RUN make install
 
-RUN chmod +x /usr/local/bin/scamper
 RUN chmod 4755 /usr/local/bin/scamper
 
 
