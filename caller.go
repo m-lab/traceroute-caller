@@ -12,7 +12,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/npad/sidestream/util"
+	"github.com/m-lab/traceroute-caller/util"
 )
 
 var SCAMPER_BIN = "/usr/local/bin/scamper"
