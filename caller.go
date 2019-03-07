@@ -88,7 +88,7 @@ func RunScamper(conn Connection) {
 	filepath := util.CreateTimePath(OUTPUT_PATH)
 	log.Println(filepath)
 
-        filename := util.MakeFilename(conn.remote_ip)
+	filename := util.MakeFilename(conn.remote_ip)
 
 	f, err := os.Create(filepath + filename)
 	if err != nil {
@@ -96,7 +96,7 @@ func RunScamper(conn Connection) {
 	}
 	defer f.Close()
 	w := bufio.NewWriter(f)
-        uuidString := "{\"uuid\":\"" + uuid + "\"}\n"
+	uuidString := "{\"uuid\":\"" + uuid + "\"}\n"
 	n, err := w.WriteString(uuidString + outbuf.String())
 	if err != nil {
 		return
