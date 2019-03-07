@@ -15,7 +15,6 @@ RUN make install
 
 RUN chmod 4755 /usr/local/bin/scamper
 
-
 FROM golang:alpine as build
 RUN apk update && apk add bash git pkgconfig geoip-dev geoip gcc libc-dev
 ADD . /go/src/github.com/m-lab/traceroute-caller
