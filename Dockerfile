@@ -29,4 +29,4 @@ COPY --from=build /go/bin/traceroute-caller /
 COPY --from=ubun /usr/local/bin/scamper /
 WORKDIR /
 
-ENTRYPOINT ["/annotation-service"]
+ENTRYPOINT ["/traceroute-caller"]
