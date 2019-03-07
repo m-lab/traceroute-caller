@@ -16,7 +16,7 @@ import (
 // like: pboothe2.nyc.corp.google.com_1548788619_00000000000084FF
 var IGNORE_IPV4_NETS = []string{"127.", "128.112.139.", "::ffff:127.0.0.1"}
 
-// MakeFilename as logtime_
+// MakeFilename as logtime_clientIP.json, such as:
 // 2019-02-04T18:01:10Z-76.14.89.46.json
 func MakeFilename(ip string) string {
 	t := time.Now()
@@ -112,8 +112,6 @@ func CreateTimePath(prefix string) string {
 // Do not traceroute to an IP more than once in this many seconds
 var IP_CACHE_TIME_SECONDS = 120
 
-var MAX_CACHE_ENTRY = 1000
-
 type RecentIPCache struct {
 	cache map[string]int64
 	mu    sync.RWMutex
@@ -125,12 +123,8 @@ func (m *RecentIPCache) New() {
 	m.mu.Unlock()
 	go func() {
 		for now := range time.Tick(time.Second) {
-			//m.mu.RLock()
-			//defer m.mu.RUnlock()
-			//fmt.Printf("func Tick: Now is %d, length of cache: %d \n", now.Unix(), len(m.cache))
 
 			for k, v := range m.cache {
-				//fmt.Printf("entry %s is %d\n", k, v)
 				if now.Unix()-v > int64(IP_CACHE_TIME_SECONDS) {
 					fmt.Println("try to delete " + k)
 					m.mu.Lock()

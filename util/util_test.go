@@ -35,7 +35,7 @@ func TestParseCookie(t *testing.T) {
 	}
 }
 
-func xTestRecentIPCache(t *testing.T) {
+func TestRecentIPCache(t *testing.T) {
 	var tmp util.RecentIPCache
 	tmp.New()
 	tmp.Add("1.2.3.4")
