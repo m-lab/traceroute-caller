@@ -91,20 +91,23 @@ func CreateTimePath(prefix string) string {
 	if len(date) != 3 {
 		return ""
 	}
-	if _, err := os.Stat(prefix + date[0]); os.IsNotExist(err) {
+	if _, err := os.Stat(prefix); os.IsNotExist(err) {
+		os.Mkdir(prefix, 0700)
+	}
+	if _, err := os.Stat(prefix + "/" + date[0]); os.IsNotExist(err) {
 		os.Mkdir(prefix+date[0], 0700)
 	}
-	if _, err := os.Stat(prefix + date[0] + "/" + date[1]); os.IsNotExist(err) {
+	if _, err := os.Stat(prefix + "/" + date[0] + "/" + date[1]); os.IsNotExist(err) {
 		os.Mkdir(prefix+date[0]+"/"+date[1], 0700)
 	}
-	if _, err := os.Stat(prefix + date[0] + "/" + date[1] + "/" + date[2]); os.IsNotExist(err) {
+	if _, err := os.Stat(prefix + "/" + date[0] + "/" + date[1] + "/" + date[2]); os.IsNotExist(err) {
 		os.Mkdir(prefix+date[0]+"/"+date[1]+"/"+date[2], 0700)
 	}
 	hostnamePrefix := GetHostnamePrefix()
-	if _, err := os.Stat(prefix + date[0] + "/" + date[1] + "/" + date[2] + "/" + hostnamePrefix); os.IsNotExist(err) {
+	if _, err := os.Stat(prefix + "/" + date[0] + "/" + date[1] + "/" + date[2] + "/" + hostnamePrefix); os.IsNotExist(err) {
 		os.Mkdir(prefix+date[0]+"/"+date[1]+"/"+date[2]+"/"+hostnamePrefix, 0700)
 	}
-	return prefix + date[0] + "/" + date[1] + "/" + date[2] + "/" + hostnamePrefix + "/"
+	return prefix + "/" + date[0] + "/" + date[1] + "/" + date[2] + "/" + hostnamePrefix + "/"
 }
 
 // ///////////////////////////////////////////////////////////////////////
