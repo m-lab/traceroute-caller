@@ -13,9 +13,7 @@ RUN ls -l /source/scamper-cvs-20190113/scamper
 RUN make
 RUN make install
 
-RUN chmod +x /usr/local/bin/scamper
 RUN chmod 4755 /usr/local/bin/scamper
-
 
 FROM golang:alpine as build
 RUN apk update && apk add bash git pkgconfig geoip-dev geoip gcc libc-dev
