@@ -34,10 +34,3 @@ func TestParseCookie(t *testing.T) {
 		t.Error("Cookie not parsed correctly")
 	}
 }
-
-func TestMakeFilename(t *testing.T) {
-	fn := util.MakeFilename("1.2.3.4")
-	if !strings.Contains(fn, "-1.2.3.4.json") {
-		t.Errorf("filename not created correctly %s", fn)
-	}
-}
