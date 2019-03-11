@@ -68,3 +68,31 @@ func ParseCookie(input string) (string, error) {
 	}
 	return input[3:], nil
 }
+
+// ParseSSLine take one line output from "ss -e" and return the parsed connection.
+func ParseSSLine(line string) (*Connection, error) {
+	segments := strings.Fields(line)
+	if len(segments) < 6 {
+		return nil, errors.New("Incomplete line")
+	}
+	if segments[0] != "tcp" || segments[1] != "ESTAB" {
+		return nil, errors.New("not a TCP connection")
+	}
+	localIP, localPort, err := ParseIPAndPort(segments[4])
+	if err != nil {
+		return nil, err
+	}
+
+	remoteIP, remotePort, err := ParseIPAndPort(segments[5])
+	if err != nil {
+		return nil, err
+	}
+
+	cookie, err := ParseCookie(segments[8])
+	if err != nil {
+		return nil, err
+	}
+
+	output := &Connection{remote_ip: remoteIP, remote_port: remotePort, local_ip: localIP, local_port: localPort, cookie: cookie}
+	return output, nil
+}
