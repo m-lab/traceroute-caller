@@ -35,20 +35,6 @@ func TestParseCookie(t *testing.T) {
 	}
 }
 
-func TestRecentIPCache(t *testing.T) {
-	var tmp util.RecentIPCache
-	tmp.New()
-	tmp.Add("1.2.3.4")
-	if !tmp.Has("1.2.3.4") {
-		t.Error("cache not working correctly")
-	}
-
-	time.Sleep(122 * time.Second)
-	if tmp.Has("1.2.3.4") {
-		t.Error("cache not expire correctly")
-	}
-}
-
 func TestMakeFilename(t *testing.T) {
 	fn := util.MakeFilename("1.2.3.4")
 	if !strings.Contains(fn, "-1.2.3.4.json") {
