@@ -1,15 +1,9 @@
 package connection
 
 import (
-	"errors"
-	"fmt"
-	"net"
-	"os"
-	"os/exec"
 	"strconv"
-	"strings"
-	"sync"
-	"time"
+
+	"github.com/m-lab/go/uuid"
 )
 
 type Connection struct {
@@ -20,4 +14,9 @@ type Connection struct {
 	cookie      string
 }
 
-
+// MakeUUID returns uuid from cookie parsed from "ss -e" output.
+func MakeUUID(cookie string) (string, error) {
+	// cookie is a hexdecimal string
+	result, _ := strconv.ParseUint(cookie, 16, 64)
+	return uuid.FromCookie(result)
+}

@@ -30,17 +30,6 @@ func GetHostname() string {
 	return strings.TrimSuffix(out, "\n")
 }
 
-func MakeUUID(cookie string) (string, error) {
-	stat, err := os.Stat("/proc")
-	if err != nil {
-		return "", err
-	}
-
-	// cookie is a hexdecimal string
-	result, _ := strconv.ParseUint(cookie, 16, 64)
-	return fmt.Sprintf("%s_%d_%016X", GetHostname(), stat.ModTime().Unix(), uint64(result)), nil
-}
-
 func ParseIPAndPort(input string) (string, int, error) {
 	seperator := strings.LastIndex(input, ":")
 	if seperator == -1 {
