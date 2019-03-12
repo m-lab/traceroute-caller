@@ -15,11 +15,11 @@ import (
 var IGNORE_IPV4_NETS = []string{"127.", "128.112.139.", "::ffff:127.0.0.1"}
 
 type Connection struct {
-	remote_ip   string
-	remote_port int
-	local_ip    string
-	local_port  int
-	cookie      string
+	Remote_ip   string
+	Remote_port int
+	Local_ip    string
+	Local_port  int
+	Cookie      string
 }
 
 // MakeUUID returns uuid from cookie parsed from "ss -e" output.
@@ -93,6 +93,6 @@ func ParseSSLine(line string) (*Connection, error) {
 		return nil, err
 	}
 
-	output := &Connection{remote_ip: remoteIP, remote_port: remotePort, local_ip: localIP, local_port: localPort, cookie: cookie}
+	output := &Connection{Remote_ip: remoteIP, Remote_port: remotePort, Local_ip: localIP, Local_port: localPort, Cookie: cookie}
 	return output, nil
 }

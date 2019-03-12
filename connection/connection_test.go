@@ -1,6 +1,7 @@
 package connection_test
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 
@@ -32,4 +33,21 @@ func TestParseCookie(t *testing.T) {
 	if err != nil || cookie != "1d10" {
 		t.Error("Cookie not parsed correctly")
 	}
+}
+
+func TestParseSSLine(t *testing.T) {
+	conn, err := connection.ParseSSLine("tcp   ESTAB      0      0         [2620:0:1003:416:a0ad:fd1a:62f:c862]:58790                       [2607:f8b0:400d:c0d::81]:5034                  timer:(keepalive,5.980ms,0) ino:6355539 sk:10f3d <->")
+	if err != nil {
+		t.Error("ss output not parsed correctly")
+	}
+	expected := &connection.Connection{
+		Remote_ip:   "2607:f8b0:400d:c0d::81",
+		Remote_port: 5034,
+		Local_ip:    "2620:0:1003:416:a0ad:fd1a:62f:c862",
+		Local_port:  58790,
+		Cookie:      "10f3d"}
+	if !reflect.DeepEqual(conn, expected) {
+		t.Errorf("Expected %v, got %v for parse ss line", expected, conn)
+	}
+
 }
