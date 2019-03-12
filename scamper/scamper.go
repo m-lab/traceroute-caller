@@ -16,7 +16,7 @@ import (
 )
 
 var SCAMPER_BIN = flag.String("SCAMPER_BIN", "/usr/local/bin/scamper", "path of scamper binary")
-var OUTPUT_PATH = flag.String("OUTPUT_PATH", "/var/spool/scamper", "path of output")
+
 
 // CreateTimePath returns a string with date in format yyyy/mm/dd/hostname/
 func CreateTimePath(prefix string) string {
@@ -70,7 +70,7 @@ func GetHostnamePrefix() string {
 }
 
 // Run start a scamper process for each connection.
-func Run(conn connection.Connection) {
+func Run(conn connection.Connection, outputPath string) {
 	command := exec.Command(*SCAMPER_BIN, "-O", "json", "-I", "tracelb -P icmp-echo -q 3 -O ptr "+conn.Remote_ip)
 	uuid, err := connection.MakeUUID(conn.Cookie)
 	if err != nil {
@@ -98,7 +98,7 @@ func Run(conn connection.Connection) {
 		return
 	}
 
-	filepath := CreateTimePath(*OUTPUT_PATH)
+	filepath := CreateTimePath(outputPath)
 	log.Println(filepath)
 
 	filename := MakeFilename(conn.Remote_ip)
