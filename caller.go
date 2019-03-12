@@ -12,24 +12,13 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/m-lab/traceroute-caller/util"
+	"github.com/m-lab/traceroute-caller/connection"
+        "github.com/m-lab/traceroute-caller/connectionwatcher"
 )
 
 var SCAMPER_BIN = "/usr/local/bin/scamper"
 var OUTPUT_PATH = "/var/spool/scamper"
 
-type Connection struct {
-	remote_ip   string
-	remote_port int
-	local_ip    string
-	local_port  int
-	cookie      string
-}
-
-
-
-
-//////////////////////////////////////////////////////////////
 
 
 var connWatcher ConnectionWatcher
