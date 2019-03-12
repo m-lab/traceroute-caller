@@ -3,7 +3,6 @@ package connection
 import (
 	"errors"
 	"net"
-	"os/exec"
 	"strconv"
 	"strings"
 
@@ -27,13 +26,6 @@ func MakeUUID(cookie string) (string, error) {
 	// cookie is a hexdecimal string
 	result, _ := strconv.ParseUint(cookie, 16, 64)
 	return uuid.FromCookie(result)
-}
-
-// GetHostname returns the hostname.
-func GetHostname() string {
-	hostname, _ := exec.Command("hostname").Output()
-	out := string(hostname)
-	return strings.TrimSuffix(out, "\n")
 }
 
 func ParseIPAndPort(input string) (string, int, error) {

@@ -16,11 +16,6 @@ import (
         "github.com/m-lab/traceroute-caller/connectionwatcher"
 )
 
-var SCAMPER_BIN = "/usr/local/bin/scamper"
-var OUTPUT_PATH = "/var/spool/scamper"
-
-
-
 var connWatcher ConnectionWatcher
 
 ///////////////////////////////////////////////////

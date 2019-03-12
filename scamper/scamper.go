@@ -3,7 +3,7 @@ package scamper
 import (
 	"bufio"
 	"bytes"
-	"errors"
+	"flag"
 	"fmt"
 	"log"
 	"os"
@@ -14,6 +14,9 @@ import (
 
 	"github.com/m-lab/traceroute-caller/connection"
 )
+
+var SCAMPER_BIN = flag.String("SCAMPER_BIN", "/usr/local/bin/scamper", "path of scamper binary")
+var OUTPUT_PATH = flag.String("OUTPUT_PATH", "/var/spool/scamper", "path of output")
 
 // CreateTimePath returns a string with date in format yyyy/mm/dd/hostname/
 func CreateTimePath(prefix string) string {
@@ -49,6 +52,13 @@ func MakeFilename(ip string) string {
 
 }
 
+// GetHostname returns the hostname.
+func GetHostname() string {
+	hostname, _ := exec.Command("hostname").Output()
+	out := string(hostname)
+	return strings.TrimSuffix(out, "\n")
+}
+
 // GetHostnamePrefix returns first two seg, like "mlab1.ath03" from hostname.
 func GetHostnamePrefix() string {
 	hostname := GetHostname()
@@ -61,8 +71,8 @@ func GetHostnamePrefix() string {
 
 // Run start a scamper process for each connection.
 func Run(conn connection.Connection) {
-	command := exec.Command(SCAMPER_BIN, "-O", "json", "-I", "tracelb -P icmp-echo -q 3 -O ptr "+conn.remote_ip)
-	uuid, err := connection.MakeUUID(conn.cookie)
+	command := exec.Command(*SCAMPER_BIN, "-O", "json", "-I", "tracelb -P icmp-echo -q 3 -O ptr "+conn.Remote_ip)
+	uuid, err := connection.MakeUUID(conn.Cookie)
 	if err != nil {
 		return
 	}
@@ -88,10 +98,10 @@ func Run(conn connection.Connection) {
 		return
 	}
 
-	filepath := util.CreateTimePath(OUTPUT_PATH)
+	filepath := CreateTimePath(*OUTPUT_PATH)
 	log.Println(filepath)
 
-	filename := MakeFilename(conn.remote_ip)
+	filename := MakeFilename(conn.Remote_ip)
 
 	f, err := os.Create(filepath + filename)
 	if err != nil {
