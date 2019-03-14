@@ -17,7 +17,6 @@ import (
 
 var SCAMPER_BIN = flag.String("SCAMPER_BIN", "/usr/local/bin/scamper", "path of scamper binary")
 
-
 // CreateTimePath returns a string with date in format yyyy/mm/dd/hostname/
 func CreateTimePath(prefix string) string {
 	currentTime := time.Now().Format("2006-01-02")
@@ -70,6 +69,7 @@ func GetHostnamePrefix() string {
 }
 
 // Run start a scamper process for each connection.
+// TODO: convert to use sc_attach
 func Run(conn connection.Connection, outputPath string) {
 	command := exec.Command(*SCAMPER_BIN, "-O", "json", "-I", "tracelb -P icmp-echo -q 3 -O ptr "+conn.Remote_ip)
 	uuid, err := connection.MakeUUID(conn.Cookie)
