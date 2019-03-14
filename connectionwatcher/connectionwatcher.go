@@ -2,6 +2,7 @@ package connectionwatcher
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"log"
@@ -131,7 +132,7 @@ func (c *ConnectionWatcher) GetClosedCollection() []connection.Connection {
 
 func New() *ConnectionWatcher {
 	c := &ConnectionWatcher{
-		recentIPCache:  *ipcache.New(),
+		recentIPCache:  *ipcache.New(context.Background()),
 		connectionPool: make(map[connection.Connection]bool),
 	}
 	c.getConnections()

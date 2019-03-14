@@ -1,6 +1,8 @@
 package ipcache_test
 
 import (
+	"context"
+	"flag"
 	"testing"
 	"time"
 
@@ -8,8 +10,10 @@ import (
 )
 
 func TestRecentIPCache(t *testing.T) {
-	ipcache.IP_CACHE_TIME_SECONDS = 20
-	tmp := ipcache.New()
+	f := flag.Lookup("IpCacheTimeout")
+	f.Value.Set("20")
+
+	tmp := ipcache.New(context.Background())
 	tmp.Add("1.2.3.4")
 	if !tmp.Has("1.2.3.4") {
 		t.Error("cache not working correctly")
