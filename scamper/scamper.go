@@ -25,7 +25,7 @@ func createTimePath(prefix string) string {
 	if len(date) != 3 {
 		return ""
 	}
-	dir := prefix + "/" + date[0] + "/" + date[1] + "/" + date[2] + "/" + GetHostnamePrefix()
+	dir := prefix + "/" + date[0] + "/" + date[1] + "/" + date[2] + "/" + getHostnamePrefix()
 	err := os.MkdirAll(dir, 0700)
 	if err != nil {
 		return ""
@@ -41,16 +41,16 @@ func makeFilename(ip string) string {
 
 }
 
-// GetHostname returns the hostname.
-func GetHostname() string {
+// getHostname returns the hostname.
+func getHostname() string {
 	hostname, _ := exec.Command("hostname").Output()
 	out := string(hostname)
 	return strings.TrimSuffix(out, "\n")
 }
 
-// GetHostnamePrefix returns first two seg, like "mlab1.ath03" from hostname.
-func GetHostnamePrefix() string {
-	hostname := GetHostname()
+// getHostnamePrefix returns first two seg, like "mlab1.ath03" from hostname.
+func getHostnamePrefix() string {
+	hostname := getHostname()
 	segs := strings.Split(hostname, ".")
 	if len(segs) < 2 {
 		return hostname
@@ -58,7 +58,7 @@ func GetHostnamePrefix() string {
 	return segs[0] + "." + segs[1]
 }
 
-// Run start a scamper process for each connection.
+// Run starts a scamper process for each connection.
 // TODO: convert to use sc_attach
 func Run(conn connection.Connection, outputPath string) {
 	command := exec.Command(*scamperBin, "-O", "json", "-I", "tracelb -P icmp-echo -q 3 -O ptr "+conn.Remote_ip)
