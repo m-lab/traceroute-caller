@@ -10,7 +10,6 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/m-lab/traceroute-caller/connection"
 	"github.com/m-lab/traceroute-caller/ipcache"
@@ -124,7 +123,6 @@ func (c *ConnectionWatcher) GetClosedCollection() []connection.Connection {
 			closed = append(closed, conn)
 			log.Printf("Try to add " + conn.Remote_ip)
 			c.recentIPCache.Add(conn.Remote_ip)
-			log.Printf("cache length : %d at %d", c.recentIPCache.Len(), time.Now().Unix())
 		}
 	}
 	return closed
