@@ -15,37 +15,27 @@ import (
 	"github.com/m-lab/traceroute-caller/connection"
 )
 
-var SCAMPER_BIN = flag.String("SCAMPER_BIN", "/usr/local/bin/scamper", "path of scamper binary")
+var scamperBin = flag.String("scamperBin", "/usr/local/bin/scamper", "path of scamper binary")
 
-// CreateTimePath returns a string with date in format yyyy/mm/dd/hostname/
-func CreateTimePath(prefix string) string {
+// createTimePath returns a string with date in format yyyy/mm/dd/hostname/
+func createTimePath(prefix string) string {
+
 	currentTime := time.Now().Format("2006-01-02")
 	date := strings.Split(currentTime, "-")
 	if len(date) != 3 {
 		return ""
 	}
-	if _, err := os.Stat(prefix); os.IsNotExist(err) {
-		os.Mkdir(prefix, 0700)
+	dir := prefix + "/" + date[0] + "/" + date[1] + "/" + date[2] + "/" + GetHostnamePrefix()
+	err := os.MkdirAll(dir, 0700)
+	if err != nil {
+		return ""
 	}
-	if _, err := os.Stat(prefix + "/" + date[0]); os.IsNotExist(err) {
-		os.Mkdir(prefix+date[0], 0700)
-	}
-	if _, err := os.Stat(prefix + "/" + date[0] + "/" + date[1]); os.IsNotExist(err) {
-		os.Mkdir(prefix+date[0]+"/"+date[1], 0700)
-	}
-	if _, err := os.Stat(prefix + "/" + date[0] + "/" + date[1] + "/" + date[2]); os.IsNotExist(err) {
-		os.Mkdir(prefix+date[0]+"/"+date[1]+"/"+date[2], 0700)
-	}
-	hostnamePrefix := GetHostnamePrefix()
-	if _, err := os.Stat(prefix + "/" + date[0] + "/" + date[1] + "/" + date[2] + "/" + hostnamePrefix); os.IsNotExist(err) {
-		os.Mkdir(prefix+date[0]+"/"+date[1]+"/"+date[2]+"/"+hostnamePrefix, 0700)
-	}
-	return prefix + "/" + date[0] + "/" + date[1] + "/" + date[2] + "/" + hostnamePrefix + "/"
+	return dir
 }
 
-// MakeFilename as logtime_clientIP.json, such as:
+// makeFilename returns filesname in format logtime_clientIP.json, such as:
 // 2019-02-04T18:01:10Z-76.14.89.46.json
-func MakeFilename(ip string) string {
+func makeFilename(ip string) string {
 	t := time.Now()
 	return fmt.Sprintf("%s-%s.json", t.Format(time.RFC3339), ip)
 
@@ -71,7 +61,7 @@ func GetHostnamePrefix() string {
 // Run start a scamper process for each connection.
 // TODO: convert to use sc_attach
 func Run(conn connection.Connection, outputPath string) {
-	command := exec.Command(*SCAMPER_BIN, "-O", "json", "-I", "tracelb -P icmp-echo -q 3 -O ptr "+conn.Remote_ip)
+	command := exec.Command(*scamperBin, "-O", "json", "-I", "tracelb -P icmp-echo -q 3 -O ptr "+conn.Remote_ip)
 	uuid, err := conn.UUID()
 	if err != nil {
 		return
@@ -98,10 +88,10 @@ func Run(conn connection.Connection, outputPath string) {
 		return
 	}
 
-	filepath := CreateTimePath(outputPath)
+	filepath := createTimePath(outputPath)
 	log.Println(filepath)
 
-	filename := MakeFilename(conn.Remote_ip)
+	filename := makeFilename(conn.Remote_ip)
 
 	f, err := os.Create(filepath + filename)
 	if err != nil {
