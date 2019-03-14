@@ -14,7 +14,8 @@ type RecentIPCache struct {
 	mu    sync.RWMutex
 }
 
-func (m *RecentIPCache) New() {
+func New() *RecentIPCache {
+	m := &RecentIPCache{}
 	m.mu.Lock()
 	m.cache = make(map[string]int64)
 	m.mu.Unlock()
@@ -33,7 +34,7 @@ func (m *RecentIPCache) New() {
 		}
 
 	}()
-	return
+	return m
 }
 
 func (m *RecentIPCache) Flush() {

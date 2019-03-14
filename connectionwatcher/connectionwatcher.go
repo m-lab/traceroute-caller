@@ -87,7 +87,7 @@ type ConnectionWatcher struct {
 	connectionPool map[connection.Connection]bool
 }
 
-func (c *ConnectionWatcher) GetConnections() {
+func (c *ConnectionWatcher) getConnections() {
 	cmd := exec.Command("ss", "-e")
 	var out bytes.Buffer
 	var stderr bytes.Buffer
@@ -108,18 +108,14 @@ func (c *ConnectionWatcher) GetConnections() {
 	}
 }
 
-func (c *ConnectionWatcher) GetPoolSize() int {
+func (c *ConnectionWatcher) getPoolSize() int {
 	return len(c.connectionPool)
-}
-
-func (c *ConnectionWatcher) GetCacheSize() int {
-	return c.recentIPCache.Len()
 }
 
 func (c *ConnectionWatcher) GetClosedCollection() []connection.Connection {
 	oldConn := c.connectionPool
 	fmt.Printf("old connection size %d\n", len(oldConn))
-	c.GetConnections()
+	c.getConnections()
 	fmt.Printf("new connection size %d\n", len(c.connectionPool))
 	var closed []connection.Connection
 	for conn, _ := range oldConn {
@@ -133,7 +129,11 @@ func (c *ConnectionWatcher) GetClosedCollection() []connection.Connection {
 	return closed
 }
 
-func (c *ConnectionWatcher) Init() {
-	c.recentIPCache.New()
-	c.connectionPool = make(map[connection.Connection]bool)
+func New() *ConnectionWatcher {
+	c := &ConnectionWatcher{
+		recentIPCache:  *ipcache.New(),
+		connectionPool: make(map[connection.Connection]bool),
+	}
+	c.getConnections()
+	return c
 }

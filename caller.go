@@ -18,9 +18,7 @@ func main() {
 	flag.StringVar(&outputPath, "outputPath", "/var/spool/scamper", "path of output")
 	flag.Parse()
 
-	var connWatcher connectionwatcher.ConnectionWatcher
-	connWatcher.Init()
-	connWatcher.GetConnections()
+	connWatcher := connectionwatcher.New()
 	for {
 		closedCollection := connWatcher.GetClosedCollection()
 		fmt.Printf("length of closed connections: %d\n", len(closedCollection))

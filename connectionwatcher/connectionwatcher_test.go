@@ -46,11 +46,9 @@ func TestParseSSLine(t *testing.T) {
 }
 
 func TestConnectionWatcher(t *testing.T) {
-	var connWatcher ConnectionWatcher
-	connWatcher.Init()
-	connWatcher.GetConnections()
+	connWatcher := New()
 
-	if connWatcher.GetPoolSize() != 0 {
-		log.Println(connWatcher.GetPoolSize())
+	if connWatcher.getPoolSize() != 0 {
+		log.Println(connWatcher.getPoolSize())
 	}
 }
