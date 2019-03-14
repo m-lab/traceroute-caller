@@ -72,7 +72,7 @@ func GetHostnamePrefix() string {
 // TODO: convert to use sc_attach
 func Run(conn connection.Connection, outputPath string) {
 	command := exec.Command(*SCAMPER_BIN, "-O", "json", "-I", "tracelb -P icmp-echo -q 3 -O ptr "+conn.Remote_ip)
-	uuid, err := connection.MakeUUID(conn.Cookie)
+	uuid, err := conn.UUID()
 	if err != nil {
 		return
 	}
