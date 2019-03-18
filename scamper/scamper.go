@@ -35,16 +35,12 @@ func makeFilename(ip string) string {
 
 }
 
-// getHostname returns the hostname.
-func getHostname() string {
-	hostname, _ := exec.Command("hostname").Output()
-	out := string(hostname)
-	return strings.TrimSuffix(out, "\n")
-}
-
 // getHostnamePrefix returns first two seg, like "mlab1.ath03" from hostname.
 func getHostnamePrefix() string {
-	hostname := getHostname()
+	hostname, err := os.Hostname()
+	if err != nil {
+		return ""
+	}
 	segs := strings.Split(hostname, ".")
 	if len(segs) < 2 {
 		return hostname
@@ -55,6 +51,7 @@ func getHostnamePrefix() string {
 // Run starts a scamper process for each connection.
 // TODO: convert to use sc_attach
 func Run(conn connection.Connection, outputPath string) {
+	// scamper -I options take a list of scamper commands provided on the command line.
 	command := exec.Command(*scamperBin, "-O", "json", "-I", "tracelb -P icmp-echo -q 3 -O ptr "+conn.Remote_ip)
 	uuid, err := conn.UUID()
 	if err != nil {
@@ -78,7 +75,7 @@ func Run(conn connection.Connection, outputPath string) {
 	exitCode := ws.ExitStatus()
 
 	if exitCode != 0 {
-		log.Printf("call not exit correctly")
+		log.Println(command.Path, command.Args, "exited unsuccessfully with code", exitCode)
 		return
 	}
 
