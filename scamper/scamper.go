@@ -19,13 +19,7 @@ var scamperBin = flag.String("scamperBin", "/usr/local/bin/scamper", "path of sc
 
 // createTimePath returns a string with date in format yyyy/mm/dd/hostname/
 func createTimePath(prefix string) string {
-
-	currentTime := time.Now().Format("2006-01-02")
-	date := strings.Split(currentTime, "-")
-	if len(date) != 3 {
-		return ""
-	}
-	dir := prefix + "/" + date[0] + "/" + date[1] + "/" + date[2] + "/" + getHostnamePrefix()
+	dir := prefix + "/" + time.Now().Format("2006/01/02") + "/" + getHostnamePrefix()
 	err := os.MkdirAll(dir, 0700)
 	if err != nil {
 		return ""

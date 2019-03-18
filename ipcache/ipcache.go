@@ -17,15 +17,16 @@ type RecentIPCache struct {
 }
 
 func New(ctx context.Context) *RecentIPCache {
-	if ctx.Err() != nil {
-		return nil
-	}
+
 	m := &RecentIPCache{}
 	m.mu.Lock()
 	m.cache = make(map[string]time.Time)
 	m.mu.Unlock()
 	go func() {
 		for now := range time.Tick(time.Second) {
+			if ctx.Err() != nil {
+				return
+			}
 			for k, v := range m.cache {
 				if now.Sub(v) > *IpCacheTimeout {
 					fmt.Println("try to delete " + k)
