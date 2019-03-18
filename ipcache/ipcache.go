@@ -22,7 +22,9 @@ func New(ctx context.Context) *RecentIPCache {
 	m.cache = make(map[string]time.Time)
 	m.mu.Unlock()
 	go func() {
-		for now := range time.Tick(time.Second) {
+		ticker := time.NewTicker(time.Second)
+		defer ticker.Stop()
+		for now := range ticker.C {
 			if ctx.Err() != nil {
 				return
 			}
