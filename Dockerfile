@@ -1,8 +1,6 @@
-FROM ubuntu:latest
-MAINTAINER Ya Chang <yachang@google.com>
+FROM ubuntu:latest as ubun
 # Install all the standard packages we need
 RUN apt-get update && apt-get install -y python python-pip make iproute2 coreutils
-
 
 RUN ls -l
 RUN mkdir /source
@@ -16,3 +14,17 @@ RUN make
 RUN make install
 
 RUN chmod 4755 /usr/local/bin/scamper
+
+FROM golang:alpine as build
+RUN apk update && apk add bash git pkgconfig geoip-dev geoip gcc libc-dev
+ADD . /go/src/github.com/m-lab/traceroute-caller
+RUN go get github.com/m-lab/traceroute-caller
+RUN chmod -R a+rx /go/bin/traceroute-caller
+
+FROM golang:alpine
+RUN apk update
+COPY --from=build /go/bin/traceroute-caller /
+COPY --from=ubun /usr/local/bin/scamper /
+WORKDIR /
+
+ENTRYPOINT ["/traceroute-caller"]
