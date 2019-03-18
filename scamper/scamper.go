@@ -93,7 +93,7 @@ func Run(conn connection.Connection, outputPath string) {
 
 	filename := makeFilename(conn.Remote_ip)
 
-	f, err := os.Create(filepath + filename)
+	f, err := os.Create(filepath + "/" + filename)
 	if err != nil {
 		return
 	}
