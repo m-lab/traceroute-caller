@@ -17,7 +17,6 @@ type RecentIPCache struct {
 }
 
 func New(ctx context.Context) *RecentIPCache {
-
 	m := &RecentIPCache{}
 	m.mu.Lock()
 	m.cache = make(map[string]time.Time)

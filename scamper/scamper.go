@@ -12,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/m-lab/go/rtx"
 	"github.com/m-lab/traceroute-caller/connection"
 )
 
@@ -20,10 +21,7 @@ var scamperBin = flag.String("scamperBin", "/usr/local/bin/scamper", "path of sc
 // createTimePath returns a string with date in format yyyy/mm/dd/hostname/
 func createTimePath(prefix string) string {
 	dir := prefix + "/" + time.Now().Format("2006/01/02") + "/" + getHostnamePrefix()
-	err := os.MkdirAll(dir, 0700)
-	if err != nil {
-		return ""
-	}
+	rtx.Must(os.MkdirAll(dir, 0700), "Could not create the output dir")
 	return dir
 }
 
