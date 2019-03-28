@@ -1,7 +1,7 @@
 FROM golang:alpine as build
 RUN apk update && apk add bash git pkgconfig geoip-dev geoip gcc libc-dev
 ADD . /go/src/github.com/m-lab/traceroute-caller
-RUN go get github.com/m-lab/traceroute-caller
+RUN GOARCH=amd64 CGO_ENABLED=0 GOOS=linux go get github.com/m-lab/traceroute-caller
 RUN chmod -R a+rx /go/bin/traceroute-caller
 
 FROM ubuntu:latest
