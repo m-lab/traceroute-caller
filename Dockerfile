@@ -25,7 +25,4 @@ COPY --from=build /go/bin/traceroute-caller /
 
 WORKDIR /
 
-RUN ls -l /usr/local/bin/
-RUN ls -l /bin/
-
 ENTRYPOINT ["/traceroute-caller"]
