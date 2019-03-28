@@ -88,7 +88,7 @@ type ConnectionWatcher struct {
 }
 
 func (c *ConnectionWatcher) getConnections() {
-	cmd := exec.Command("ss", "-e")
+	cmd := exec.Command("/bin/ss", "-e")
 	var out bytes.Buffer
 	var stderr bytes.Buffer
 	cmd.Stdout = &out
