@@ -12,7 +12,7 @@ script:
 - go test ./... -v -coverpkg=./... -coverprofile=_coverage.cov
 
 # Build a Docker image to make sure that we can.
-- docker build --build-arg COMMIT=$TRAVIS_BRANCH -t measurementlab/traceroute-caller .
+- docker build .
 
 # Coveralls
 # Upload coverage information for unit tests.
