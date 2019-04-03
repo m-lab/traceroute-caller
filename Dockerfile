@@ -1,7 +1,12 @@
-FROM golang:alpine as build
-RUN apk update && apk add bash git pkgconfig geoip-dev geoip gcc libc-dev
+FROM golang:1.12 as build
 ADD . /go/src/github.com/m-lab/traceroute-caller
-RUN GOARCH=amd64 CGO_ENABLED=0 GOOS=linux go get github.com/m-lab/traceroute-caller
+ENV GOARCH amd64
+ENV CGO_ENABLED 0
+ENV GOOS linux
+WORKDIR /go/src/github.com/m-lab/traceroute-caller
+RUN go get -v \
+      -ldflags "-X github.com/m-lab/go/prometheusx.GitShortCommit=$(git log -1 --format=%h)" \
+      .
 RUN chmod -R a+rx /go/bin/traceroute-caller
 
 FROM ubuntu:latest
@@ -10,12 +15,10 @@ RUN apt-get update && apt-get install -y python python-pip make iproute2 coreuti
 
 RUN ls -l
 RUN mkdir /source
-ADD . /go/src/github.com/m-lab/traceroute-caller
-RUN mv /go/src/github.com/m-lab/traceroute-caller/vendor/scamper/scamper-cvs-20190113 /source
+ADD ./vendor/scamper/ /source
 RUN chmod +x /source/scamper-cvs-20190113/configure
 RUN /source/scamper-cvs-20190113/configure
-RUN cd /source/scamper-cvs-20190113/
-RUN ls -l /source/scamper-cvs-20190113/scamper
+WORKDIR /source/scamper-cvs-20190113/
 RUN make
 RUN make install
 
