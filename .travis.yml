@@ -1,0 +1,19 @@
+language: go
+
+before_install:
+- go get github.com/mattn/goveralls
+# Install dependencies, including test dependencies.
+- go get -v -t ./...
+
+script:
+# Vet the code, build the code, and run all the tests.
+- go vet ./...
+- go build ./...
+- go test ./... -v -coverpkg=./... -coverprofile=_coverage.cov
+
+# Build a Docker image to make sure that we can.
+- docker build --build-arg COMMIT=$TRAVIS_BRANCH -t measurementlab/traceroute-caller .
+
+# Coveralls
+# Upload coverage information for unit tests.
+- $HOME/gopath/bin/goveralls -coverprofile=_coverage.cov -service=travis-ci
