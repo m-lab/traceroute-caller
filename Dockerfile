@@ -9,6 +9,7 @@ RUN go get -v \
       .
 RUN chmod -R a+rx /go/bin/traceroute-caller
 
+
 FROM ubuntu:latest
 # Install all the standard packages we need
 RUN apt-get update && apt-get install -y python python-pip make iproute2 coreutils
@@ -21,8 +22,7 @@ WORKDIR /source/scamper-cvs-20190113/
 RUN ./configure
 RUN make
 RUN make install
-
-RUN chmod 4755 /usr/local/bin/scamper
+RUN ldconfig
 
 COPY --from=build /go/bin/traceroute-caller /
 

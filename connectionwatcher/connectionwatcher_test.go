@@ -34,11 +34,11 @@ func TestParseSSLine(t *testing.T) {
 		t.Error("ss output not parsed correctly")
 	}
 	expected := &connection.Connection{
-		Remote_ip:   "2607:f8b0:400d:c0d::81",
-		Remote_port: 5034,
-		Local_ip:    "2620:0:1003:416:a0ad:fd1a:62f:c862",
-		Local_port:  58790,
-		Cookie:      "10f3d"}
+		RemoteIP:   "2607:f8b0:400d:c0d::81",
+		RemotePort: 5034,
+		LocalIP:    "2620:0:1003:416:a0ad:fd1a:62f:c862",
+		LocalPort:  58790,
+		Cookie:     "10f3d"}
 	if !reflect.DeepEqual(conn, expected) {
 		t.Errorf("Expected %v, got %v for parse ss line", expected, conn)
 	}

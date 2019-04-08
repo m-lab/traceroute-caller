@@ -7,11 +7,11 @@ import (
 )
 
 type Connection struct {
-	Remote_ip   string
-	Remote_port int
-	Local_ip    string
-	Local_port  int
-	Cookie      string
+	RemoteIP   string
+	RemotePort int
+	LocalIP    string
+	LocalPort  int
+	Cookie     string
 }
 
 // UUID returns uuid from cookie parsed from "ss -e" output.

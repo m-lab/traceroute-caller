@@ -9,7 +9,7 @@ import (
 )
 
 // Do not traceroute to an IP more than once in this many seconds
-var IpCacheTimeout = flag.Duration("IpCacheTimeout", 120*time.Second, "Timeout duration in seconds for IPCache")
+var IPCacheTimeout = flag.Duration("IPCacheTimeout", 120*time.Second, "Timeout duration in seconds for IPCache")
 
 type RecentIPCache struct {
 	cache map[string]time.Time
@@ -29,7 +29,7 @@ func New(ctx context.Context) *RecentIPCache {
 				return
 			}
 			for k, v := range m.cache {
-				if now.Sub(v) > *IpCacheTimeout {
+				if now.Sub(v) > *IPCacheTimeout {
 					fmt.Println("try to delete " + k)
 					m.mu.Lock()
 					delete(m.cache, k)
