@@ -17,8 +17,8 @@ RUN ls -l
 RUN mkdir /source
 ADD ./vendor/scamper/ /source
 RUN chmod +x /source/scamper-cvs-20190113/configure
-RUN /source/scamper-cvs-20190113/configure
 WORKDIR /source/scamper-cvs-20190113/
+RUN ./configure
 RUN make
 RUN make install
 
