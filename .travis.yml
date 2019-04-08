@@ -1,9 +1,11 @@
 language: go
 
+sudo: true
+
 before_install:
 - go get github.com/mattn/goveralls
 # Install dependencies, including test dependencies.
-- apt-get update && apt-get install -y scamper
+- sudo apt-get update && sudo apt-get install -y scamper
 - go get -v -t ./...
 
 script:
