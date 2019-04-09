@@ -16,8 +16,8 @@ import (
 )
 
 // The new test output filename is joint of hostname, server boot time, and socker TCO cookie.
-// like: pboothe2.nyc.corp.google.com_1548788619_00000000000084FF
-var IGNORE_IPV4_NETS = []string{"127.", "128.112.139.", "::ffff:127.0.0.1"}
+// like: myhost.example.com_1548788619_00000000000084FF
+var localIPv4 = []string{"127.", "128.112.139.", "::ffff:127.0.0.1"}
 
 // parseIPAndPort returns a valid IP and port from "ss -e" output.
 func parseIPAndPort(input string) (string, int, error) {
@@ -29,7 +29,7 @@ func parseIPAndPort(input string) (string, int, error) {
 	if IPStr[0] == '[' {
 		IPStr = IPStr[1 : len(IPStr)-1]
 	}
-	for _, prefix := range IGNORE_IPV4_NETS {
+	for _, prefix := range localIPv4 {
 		if strings.HasPrefix(IPStr, prefix) {
 			return "", 0, errors.New("ignore this IP address")
 		}
@@ -78,7 +78,14 @@ func parseSSLine(line string) (*connection.Connection, error) {
 		return nil, err
 	}
 
-	output := &connection.Connection{Remote_ip: remoteIP, Remote_port: remotePort, Local_ip: localIP, Local_port: localPort, Cookie: cookie}
+	output := &connection.Connection{
+		RemoteIP:   remoteIP,
+		RemotePort: remotePort,
+		LocalIP:    localIP,
+		LocalPort:  localPort,
+		Cookie:     cookie,
+	}
+
 	return output, nil
 }
 
@@ -118,11 +125,11 @@ func (c *ConnectionWatcher) GetClosedCollection() []connection.Connection {
 	c.getConnections()
 	fmt.Printf("new connection size %d\n", len(c.connectionPool))
 	var closed []connection.Connection
-	for conn, _ := range oldConn {
-		if !c.connectionPool[conn] && !c.recentIPCache.Has(conn.Remote_ip) {
+	for conn := range oldConn {
+		if !c.connectionPool[conn] && !c.recentIPCache.Has(conn.RemoteIP) {
 			closed = append(closed, conn)
-			log.Printf("Try to add " + conn.Remote_ip)
-			c.recentIPCache.Add(conn.Remote_ip)
+			log.Printf("Try to add " + conn.RemoteIP)
+			c.recentIPCache.Add(conn.RemoteIP)
 		}
 	}
 	return closed
