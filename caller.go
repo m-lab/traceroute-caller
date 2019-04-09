@@ -49,7 +49,7 @@ func main() {
 		fmt.Printf("length of closed connections: %d\n", len(closedCollection))
 		for _, conn := range closedCollection {
 			log.Printf("PT start: %s %d", conn.RemoteIP, conn.RemotePort)
-			go daemon.Trace(&conn)
+			go daemon.Trace(&conn, time.Now())
 		}
 		time.Sleep(5 * time.Second)
 	}

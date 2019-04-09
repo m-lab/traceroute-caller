@@ -87,11 +87,11 @@ func (d *Daemon) generateFilename(cookie string, t time.Time) string {
 }
 
 // Trace starts a sc_attach connecting to the scamper process for each connection.
-func (d *Daemon) Trace(conn *connection.Connection) {
+func (d *Daemon) Trace(conn *connection.Connection, t time.Time) {
 	tracesInProgress.Inc()
 	defer tracesInProgress.Dec()
 
-	filename := d.createTimePath(conn.DiscoveryTime) + d.generateFilename(conn.Cookie, conn.DiscoveryTime)
+	filename := d.createTimePath(t) + d.generateFilename(conn.Cookie, t)
 	log.Println("Starting a trace to be put in", filename)
 
 	// Write the UUID as the first line of the file. If we want to add other

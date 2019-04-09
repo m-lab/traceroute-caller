@@ -2,18 +2,16 @@ package connection
 
 import (
 	"strconv"
-	"time"
 
 	"github.com/m-lab/uuid"
 )
 
 type Connection struct {
-	RemoteIP      string
-	RemotePort    int
-	LocalIP       string
-	LocalPort     int
-	Cookie        string
-	DiscoveryTime time.Time
+	RemoteIP   string
+	RemotePort int
+	LocalIP    string
+	LocalPort  int
+	Cookie     string
 }
 
 // UUID returns uuid from cookie parsed from "ss -e" output.

@@ -71,11 +71,12 @@ func TestTraceWritesUUID(t *testing.T) {
 	}
 
 	c := connection.Connection{
-		Cookie:        "1",
-		DiscoveryTime: time.Date(2019, time.April, 1, 3, 45, 51, 0, time.UTC),
+		Cookie: "1",
 	}
 
-	d.Trace(&c)
+	faketime := time.Date(2019, time.April, 1, 3, 45, 51, 0, time.UTC)
+
+	d.Trace(&c, faketime)
 
 	// Unmarshal the first line of the output file.
 	b, err := ioutil.ReadFile(tempdir + "/2019/04/01/testhostname/20190401T034551Z_1.jsonl")

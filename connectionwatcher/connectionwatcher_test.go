@@ -5,7 +5,6 @@ import (
 	"log"
 	"reflect"
 	"testing"
-	"time"
 
 	"github.com/m-lab/traceroute-caller/connection"
 )
@@ -31,7 +30,6 @@ func TestParseCookie(t *testing.T) {
 
 func TestParseSSLine(t *testing.T) {
 	conn, err := parseSSLine("tcp   ESTAB      0      0         [2620:0:1003:416:a0ad:fd1a:62f:c862]:58790                       [2607:f8b0:400d:c0d::81]:5034                  timer:(keepalive,5.980ms,0) ino:6355539 sk:10f3d <->")
-	conn.DiscoveryTime = time.Time{} // Scrub time.Now() value to allow use of deep equals.
 	if err != nil {
 		t.Error("ss output not parsed correctly")
 	}
