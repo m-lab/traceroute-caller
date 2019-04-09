@@ -2,12 +2,16 @@ package scamper
 
 import (
 	"context"
+	"encoding/json"
 	"io/ioutil"
 	"log"
 	"os"
+	"strings"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/m-lab/traceroute-caller/connection"
 
 	"github.com/m-lab/go/rtx"
 )
@@ -46,5 +50,49 @@ func TestCancelStopsDaemon(t *testing.T) {
 	wg.Wait()
 	if !done {
 		t.Error("wg.Done() but done is still false")
+	}
+}
+
+func TestTraceWritesUUID(t *testing.T) {
+	tempdir, err := ioutil.TempDir("", "TestTraceWritesUUID")
+	rtx.Must(err, "Could not create tempdir")
+	defer os.RemoveAll(tempdir)
+
+	// Temporarily set the hostname to a value for testing.
+	defer func(oldHn string) {
+		hostname = oldHn
+	}(hostname)
+	hostname = "testhostname"
+
+	d := Daemon{
+		AttachBinary:     "echo",
+		Warts2JSONBinary: "cat",
+		OutputPath:       tempdir,
+	}
+
+	c := connection.Connection{
+		Cookie:        "1",
+		DiscoveryTime: time.Date(2019, time.April, 1, 3, 45, 51, 0, time.UTC),
+	}
+
+	d.Trace(&c)
+
+	// Unmarshal the first line of the output file.
+	b, err := ioutil.ReadFile(tempdir + "/2019/04/01/testhostname/20190401T034551Z_1.jsonl")
+	rtx.Must(err, "Could not read file")
+
+	type metadata struct {
+		UUID string
+	}
+	m := metadata{}
+	lines := strings.Split(string(b), "\n")
+	if len(lines) < 2 {
+		t.Error("Not enough lines in", lines)
+	}
+	rtx.Must(json.Unmarshal([]byte(lines[0]), &m), "Could not unmarshal")
+
+	uuidChunks := strings.Split(m.UUID, "_")
+	if uuidChunks[len(uuidChunks)-1] != "0000000000000001" {
+		t.Error("Bad uuid:", m.UUID)
 	}
 }

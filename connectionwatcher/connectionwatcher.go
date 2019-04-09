@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/m-lab/traceroute-caller/connection"
 	"github.com/m-lab/traceroute-caller/ipcache"
@@ -78,7 +79,15 @@ func parseSSLine(line string) (*connection.Connection, error) {
 		return nil, err
 	}
 
-	output := &connection.Connection{RemoteIP: remoteIP, RemotePort: remotePort, LocalIP: localIP, LocalPort: localPort, Cookie: cookie}
+	output := &connection.Connection{
+		RemoteIP:      remoteIP,
+		RemotePort:    remotePort,
+		LocalIP:       localIP,
+		LocalPort:     localPort,
+		Cookie:        cookie,
+		DiscoveryTime: time.Now(),
+	}
+
 	return output, nil
 }
 
