@@ -30,8 +30,13 @@ var (
 			Name: "traces_in_progress",
 			Help: "The number of traces currently being run",
 		})
+	crashedTraces = promauto.NewCounter(
+		prometheus.CounterOpts{
+			Name: "traces_crashed_total",
+			Help: "The number of traces that have crashed",
+		})
 
-	// The hostname of the current machine. Only call os.Hostname once, because the
+	// hostname of the current machine. Only call os.Hostname once, because the
 	// result should never change.
 	hostname string
 )
@@ -43,6 +48,10 @@ func init() {
 }
 
 // MustStart starts a scamper binary running and listening to the given context.
+// There should only be a single instance of scamper being run by
+// traceroute-caller, and if it can't start, then traceroutes can not be
+// performed.
+//
 // We expect this function to be mostly used as a goroutine:
 //    go d.MustStart(ctx)
 func (d *Daemon) MustStart(ctx context.Context) {
@@ -75,10 +84,11 @@ func (d *Daemon) MustStart(ctx context.Context) {
 	command.Process.Signal(syscall.SIGKILL)
 }
 
-// createTimePath returns a string with date in format prefix/yyyy/mm/dd/hostname/
+// createTimePath returns a string with date in format
+// prefix/yyyy/mm/dd/hostname/ after creating a directory of the same name.
 func (d *Daemon) createTimePath(t time.Time) string {
 	dir := d.OutputPath + "/" + t.Format("2006/01/02") + "/" + hostname + "/"
-	rtx.Must(os.MkdirAll(dir, 0777), "Could not create the output dir")
+	rtx.PanicOnError(os.MkdirAll(dir, 0777), "Could not create the output dir")
 	return dir
 }
 
@@ -86,11 +96,25 @@ func (d *Daemon) generateFilename(cookie string, t time.Time) string {
 	return t.Format("20060102T150405Z") + "_" + cookie + ".jsonl"
 }
 
-// Trace starts a sc_attach connecting to the scamper process for each connection.
+// Trace starts a sc_attach connecting to the scamper process for each
+// connection.
+//
+// All checks inside of this function and its subfunctions should call
+// PanicOnError instead of Must because each trace is independent of the others,
+// so we should prevent a single failed trace from crashing everything.
 func (d *Daemon) Trace(conn *connection.Connection, t time.Time) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("Recovered (%v) a crashed trace for %v at %v\n", r, *conn, t)
+			crashedTraces.Inc()
+		}
+	}()
 	tracesInProgress.Inc()
 	defer tracesInProgress.Dec()
+	d.trace(conn, t)
+}
 
+func (d *Daemon) trace(conn *connection.Connection, t time.Time) {
 	filename := d.createTimePath(t) + d.generateFilename(conn.Cookie, t)
 	log.Println("Starting a trace to be put in", filename)
 
@@ -101,8 +125,8 @@ func (d *Daemon) Trace(conn *connection.Connection, t time.Time) {
 	// decide to add more, then this quick-and-dirty approach should be converted
 	// into proper json.Marshal calls.
 	uuid, err := conn.UUID()
-	rtx.Must(err, "Could not parse UUID - this should never happen")
-	rtx.Must(
+	rtx.PanicOnError(err, "Could not parse UUID - this should never happen")
+	rtx.PanicOnError(
 		ioutil.WriteFile(filename, []byte("{\"UUID\": \""+uuid+"\"}\n"), 0666),
 		"Could not write to file before traceroute")
 
@@ -112,8 +136,5 @@ func (d *Daemon) Trace(conn *connection.Connection, t time.Time) {
 		pipe.Exec(d.Warts2JSONBinary),
 		pipe.AppendFile(filename, 0666),
 	)
-	err = pipe.Run(cmd)
-	if err != nil {
-		log.Printf("Command failed: %v (err: %v)\n", cmd, err)
-	}
+	rtx.PanicOnError(pipe.Run(cmd), "Command %v failed", cmd)
 }
