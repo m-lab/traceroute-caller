@@ -97,3 +97,30 @@ func TestTraceWritesUUID(t *testing.T) {
 		t.Error("Bad uuid:", m.UUID)
 	}
 }
+
+func TestRecovery(t *testing.T) {
+	tempdir, err := ioutil.TempDir("", "TestRecovery")
+	rtx.Must(err, "Could not create tempdir")
+	defer os.RemoveAll(tempdir)
+
+	// Temporarily set the hostname to a value for testing.
+	defer func(oldHn string) {
+		hostname = oldHn
+	}(hostname)
+	hostname = "testhostname"
+
+	d := Daemon{
+		AttachBinary:     "echo",
+		Warts2JSONBinary: "cat",
+		OutputPath:       tempdir,
+	}
+
+	c := connection.Connection{
+		Cookie: "not a number in base 16 at all",
+	}
+
+	faketime := time.Date(2019, time.April, 1, 3, 45, 51, 0, time.UTC)
+	d.Trace(&c, faketime)
+
+	// If this doesn't crash, then the recovery process works!
+}
