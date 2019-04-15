@@ -10,7 +10,7 @@ import (
 
 func TestRecentIPCache(t *testing.T) {
 	*ipcache.IPCacheTimeout = 100 * time.Millisecond
-	*ipcache.IPCacheUpdateFrequency = 10 * time.Millisecond
+	*ipcache.IPCacheUpdatePeriod = 10 * time.Millisecond
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

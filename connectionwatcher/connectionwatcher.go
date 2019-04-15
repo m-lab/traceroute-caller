@@ -1,3 +1,5 @@
+// Package connectionwatcher provides a way of discovering what connections are
+// currently open, and what connections have recently disappeared.
 package connectionwatcher
 
 import (
@@ -21,7 +23,7 @@ var (
 	// like: myhost.example.com_1548788619_00000000000084FF
 	localIPv4 = []string{"127.", "128.112.139.", "::ffff:127.0.0.1"}
 
-	ssBinary = flag.String("-ss-binary", "/bin/ss", "The location on disk of the ss binary.")
+	ssBinary = flag.String("ss-binary", "/bin/ss", "The location on disk of the ss binary.")
 
 	// Turned into a variable to enable testing of error cases.
 	logFatal = log.Fatal
@@ -66,7 +68,7 @@ func parseCookie(input string) (string, error) {
 func parseSSLine(line string) (*connection.Connection, error) {
 	segments := strings.Fields(line)
 	if len(segments) < 6 {
-		return nil, errors.New("Incomplete line")
+		return nil, errors.New("incomplete line")
 	}
 	if segments[0] != "tcp" || segments[1] != "ESTAB" {
 		return nil, errors.New("not a TCP connection")
@@ -131,11 +133,16 @@ type connectionWatcher struct {
 	connectionPool map[connection.Connection]struct{}
 }
 
+// ConnectionWatcher is in interface for an object that returns a list of all
+// connections which it previously measured to be open, but it can no longer
+// measure to be open.
 type ConnectionWatcher interface {
-	GetClosedCollection() []connection.Connection
+	GetClosedConnections() []connection.Connection
 }
 
-func (c *connectionWatcher) GetClosedCollection() []connection.Connection {
+// GetClosedConnections returns the list of connections which were previously
+// measured to be open but were not measured to be open this time..
+func (c *connectionWatcher) GetClosedConnections() []connection.Connection {
 	oldConn := c.connectionPool
 	fmt.Printf("old connection size %d\n", len(oldConn))
 	c.connectionPool = c.GetConnections()
@@ -151,6 +158,7 @@ func (c *connectionWatcher) GetClosedCollection() []connection.Connection {
 	return closed
 }
 
+// New creates and returns a new ConnectionWatcher.
 func New() ConnectionWatcher {
 	c := &connectionWatcher{
 		finder:         &ssFinder{},

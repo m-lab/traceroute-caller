@@ -1,3 +1,4 @@
+// Package main provides the traceroute-caller.
 package main
 
 import (
@@ -47,9 +48,9 @@ func main() {
 
 	connWatcher := connectionwatcher.New()
 	for ctx.Err() == nil {
-		closedCollection := connWatcher.GetClosedCollection()
-		fmt.Printf("length of closed connections: %d\n", len(closedCollection))
-		daemon.TraceAll(closedCollection)
+		closedConnections := connWatcher.GetClosedConnections()
+		fmt.Printf("length of closed connections: %d\n", len(closedConnections))
+		daemon.TraceAll(closedConnections)
 
 		select {
 		case <-time.After(5 * time.Second):

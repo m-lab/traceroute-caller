@@ -1,3 +1,4 @@
+// Package scamper takes care of all interaction with the scamper binary.
 package scamper
 
 import (
