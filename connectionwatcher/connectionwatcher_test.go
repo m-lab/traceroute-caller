@@ -4,6 +4,7 @@ package connectionwatcher
 import (
 	"io/ioutil"
 	"log"
+	"os"
 	"reflect"
 	"testing"
 
@@ -82,6 +83,7 @@ func TestParseSSLine(t *testing.T) {
 func TestGetConnectionsWithFakeSS(t *testing.T) {
 	tmpdir, err := ioutil.TempDir("", "TestConnectionWithFakeSS")
 	rtx.Must(err, "Could not create tempdir")
+	defer os.RemoveAll(tmpdir)
 
 	// Print out two connections, one of which has no cookie.
 	fakeSS := `#!/bin/bash
