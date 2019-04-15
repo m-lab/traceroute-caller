@@ -21,6 +21,7 @@ var (
 	scwarts2jsonBin   = flag.String("scamper.sc_warts2json", "sc_warts2json", "path of sc_warts2json binary")
 	scamperCtrlSocket = flag.String("scamper.unixsocket", "/tmp/scamperctrl", "The name of the UNIX-domain socket that the scamper daemon should listen on")
 	outputPath        = flag.String("outputPath", "/var/spool/scamper", "path of output")
+	waitTime          = flag.Duration("waitTime", 5*time.Second, "how long to wait between subsequent listings of open connections")
 
 	ctx, cancel = context.WithCancel(context.Background())
 )
@@ -53,7 +54,7 @@ func main() {
 		daemon.TraceAll(closedConnections)
 
 		select {
-		case <-time.After(5 * time.Second):
+		case <-time.After(*waitTime):
 		case <-ctx.Done():
 		}
 	}

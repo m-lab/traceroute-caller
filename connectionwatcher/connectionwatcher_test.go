@@ -2,10 +2,12 @@
 package connectionwatcher
 
 import (
+	"io/ioutil"
 	"log"
 	"reflect"
 	"testing"
 
+	"github.com/m-lab/go/rtx"
 	"github.com/m-lab/traceroute-caller/connection"
 )
 
@@ -75,7 +77,26 @@ func TestParseSSLine(t *testing.T) {
 	if !reflect.DeepEqual(conn, expected) {
 		t.Errorf("Expected %v, got %v for parse ss line", expected, conn)
 	}
+}
 
+func TestGetConnectionsWithFakeSS(t *testing.T) {
+	tmpdir, err := ioutil.TempDir("", "TestConnectionWithFakeSS")
+	rtx.Must(err, "Could not create tempdir")
+	fakeSS := `#!/bin/bash
+	echo 'tcp   ESTAB      0      0         [2620:0:1003:416:a0ad:fd1a:62f:c862]:58790                       [2607:f8b0:400d:c0d::81]:5034                  timer:(keepalive,5.980ms,0) ino:6355539 sk:10f3d <->'
+	`
+	rtx.Must(ioutil.WriteFile(tmpdir+"/ss", []byte(fakeSS), 0777), "Could not create fake ss")
+
+	defer func(s string) {
+		*ssBinary = s
+	}(*ssBinary)
+	*ssBinary = tmpdir + "/ss"
+
+	f := &ssFinder{}
+	connections := f.GetConnections()
+	if len(connections) != 1 {
+		log.Println("We should have seen exactly one connection")
+	}
 }
 
 func TestConnectionWatcherConstruction(t *testing.T) {
