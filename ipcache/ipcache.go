@@ -8,8 +8,13 @@ import (
 	"time"
 )
 
-// Do not traceroute to an IP more than once in this many seconds
-var IPCacheTimeout = flag.Duration("IPCacheTimeout", 120*time.Second, "Timeout duration in seconds for IPCache")
+var (
+	// Do not traceroute to an IP more than once in this many seconds
+	IPCacheTimeout = flag.Duration("IPCacheTimeout", 120*time.Second, "Timeout duration in seconds for IPCache")
+
+	// Do not traceroute to an IP more than once in this many seconds
+	IPCacheUpdateFrequency = flag.Duration("IPCacheUpdateFrequency", 1*time.Second, "We run the cache eviction loop with this frequency")
+)
 
 type RecentIPCache struct {
 	cache map[string]time.Time
@@ -22,7 +27,7 @@ func New(ctx context.Context) *RecentIPCache {
 	m.cache = make(map[string]time.Time)
 	m.mu.Unlock()
 	go func() {
-		ticker := time.NewTicker(time.Second)
+		ticker := time.NewTicker(*IPCacheUpdateFrequency)
 		defer ticker.Stop()
 		for now := range ticker.C {
 			if ctx.Err() != nil {
@@ -55,7 +60,7 @@ func (m *RecentIPCache) Add(ip string) {
 	fmt.Printf("func Add: Now is %d\n", time.Now().Unix())
 	_, ok := m.cache[ip]
 	if !ok || m.len() == 0 {
-		if m.cache == nil {
+		if len(m.cache) == 0 {
 			m.cache = make(map[string]time.Time)
 		}
 		m.cache[ip] = time.Now()

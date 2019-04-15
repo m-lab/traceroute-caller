@@ -9,7 +9,8 @@ import (
 )
 
 func TestRecentIPCache(t *testing.T) {
-	*ipcache.IPCacheTimeout = 2 * time.Second
+	*ipcache.IPCacheTimeout = 100 * time.Millisecond
+	*ipcache.IPCacheUpdateFrequency = 10 * time.Millisecond
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -19,8 +20,10 @@ func TestRecentIPCache(t *testing.T) {
 		t.Error("cache not working correctly")
 	}
 
-	time.Sleep(4 * time.Second)
+	time.Sleep(300 * time.Millisecond)
 	if tmp.Has("1.2.3.4") {
 		t.Error("cache not expire correctly")
 	}
+	cancel()
+	time.Sleep(200 * time.Millisecond)
 }

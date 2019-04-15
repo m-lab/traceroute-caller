@@ -4,7 +4,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/m-lab/go/flagx"
@@ -32,7 +31,10 @@ func main() {
 	flag.Parse()
 	rtx.Must(flagx.ArgsFromEnv(flag.CommandLine), "Could not get args from environment")
 
+	defer cancel()
+
 	promSrv := prometheusx.MustServeMetrics()
+	defer promSrv.Shutdown(ctx)
 
 	daemon := scamper.Daemon{
 		Binary:           *scamperBin,
@@ -47,11 +49,11 @@ func main() {
 	for ctx.Err() == nil {
 		closedCollection := connWatcher.GetClosedCollection()
 		fmt.Printf("length of closed connections: %d\n", len(closedCollection))
-		for _, conn := range closedCollection {
-			log.Printf("PT start: %s %d", conn.RemoteIP, conn.RemotePort)
-			go daemon.Trace(&conn, time.Now())
+		daemon.TraceAll(closedCollection)
+
+		select {
+		case <-time.After(5 * time.Second):
+		case <-ctx.Done():
 		}
-		time.Sleep(5 * time.Second)
 	}
-	promSrv.Shutdown(ctx)
 }

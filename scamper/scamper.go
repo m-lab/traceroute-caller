@@ -39,6 +39,9 @@ var (
 	// hostname of the current machine. Only call os.Hostname once, because the
 	// result should never change.
 	hostname string
+
+	// log.Fatal turned into a variable to aid in testing of error conditions.
+	logFatal = log.Fatal
 )
 
 func init() {
@@ -58,7 +61,7 @@ func (d *Daemon) MustStart(ctx context.Context) {
 	derivedCtx, derivedCancel := context.WithCancel(ctx)
 	defer derivedCancel()
 	if _, err := os.Stat(d.ControlSocket); !os.IsNotExist(err) {
-		log.Fatal("The control socket file must not already exist")
+		logFatal("The control socket file must not already exist")
 	}
 	defer os.Remove(d.ControlSocket)
 	command := exec.Command(d.Binary, "-U", d.ControlSocket)
@@ -102,10 +105,10 @@ func (d *Daemon) generateFilename(cookie string, t time.Time) string {
 // All checks inside of this function and its subfunctions should call
 // PanicOnError instead of Must because each trace is independent of the others,
 // so we should prevent a single failed trace from crashing everything.
-func (d *Daemon) Trace(conn *connection.Connection, t time.Time) {
+func (d *Daemon) Trace(conn connection.Connection, t time.Time) {
 	defer func() {
 		if r := recover(); r != nil {
-			log.Printf("Recovered (%v) a crashed trace for %v at %v\n", r, *conn, t)
+			log.Printf("Recovered (%v) a crashed trace for %v at %v\n", r, conn, t)
 			crashedTraces.Inc()
 		}
 	}()
@@ -114,7 +117,15 @@ func (d *Daemon) Trace(conn *connection.Connection, t time.Time) {
 	d.trace(conn, t)
 }
 
-func (d *Daemon) trace(conn *connection.Connection, t time.Time) {
+// TraceAll runs N independent traces on N passed-in connections.
+func (d *Daemon) TraceAll(connections []connection.Connection) {
+	for _, c := range connections {
+		log.Printf("PT start: %s %d", c.RemoteIP, c.RemotePort)
+		go d.Trace(c, time.Now())
+	}
+}
+
+func (d *Daemon) trace(conn connection.Connection, t time.Time) {
 	filename := d.createTimePath(t) + d.generateFilename(conn.Cookie, t)
 	log.Println("Starting a trace to be put in", filename)
 

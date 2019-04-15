@@ -53,6 +53,37 @@ func TestCancelStopsDaemon(t *testing.T) {
 	}
 }
 
+func TestExistingFileStopsDaemonCreation(t *testing.T) {
+	defer func() {
+		logFatal = log.Fatal
+	}()
+	logFatal = func(args ...interface{}) {
+		panic("An error for testing")
+	}
+
+	tempdir, err := ioutil.TempDir("", "TestExistingFileStopsDaemonCreation")
+	rtx.Must(err, "Could not create tempdir")
+	defer os.RemoveAll(tempdir)
+	rtx.Must(ioutil.WriteFile(tempdir+"/ctrl", []byte("test"), 0666), "Could not create file")
+	d := Daemon{
+		// Let the shell use the path to discover these.
+		Binary:           "scamper",
+		AttachBinary:     "sc_attach",
+		Warts2JSONBinary: "sc_warts2json",
+		ControlSocket:    tempdir + "/ctrl",
+		OutputPath:       tempdir,
+	}
+
+	defer func() {
+		r := recover()
+		if r == nil {
+			t.Error("This was supposed to cause a panic")
+		}
+	}()
+
+	d.MustStart(context.Background())
+}
+
 func TestTraceWritesUUID(t *testing.T) {
 	tempdir, err := ioutil.TempDir("", "TestTraceWritesUUID")
 	rtx.Must(err, "Could not create tempdir")
@@ -76,7 +107,7 @@ func TestTraceWritesUUID(t *testing.T) {
 
 	faketime := time.Date(2019, time.April, 1, 3, 45, 51, 0, time.UTC)
 
-	d.Trace(&c, faketime)
+	d.Trace(c, faketime)
 
 	// Unmarshal the first line of the output file.
 	b, err := ioutil.ReadFile(tempdir + "/2019/04/01/testhostname/20190401T034551Z_1.jsonl")
@@ -119,8 +150,8 @@ func TestRecovery(t *testing.T) {
 		Cookie: "not a number in base 16 at all",
 	}
 
-	faketime := time.Date(2019, time.April, 1, 3, 45, 51, 0, time.UTC)
-	d.Trace(&c, faketime)
-
+	// Run both trace methods.
+	d.TraceAll([]connection.Connection{c})
+	d.Trace(c, time.Now())
 	// If this doesn't crash, then the recovery process works!
 }
