@@ -82,7 +82,7 @@ func TestConnectionWatcherConstruction(t *testing.T) {
 	// The only thing we can verify by default is that the code does not crash.
 	// Which is not nothing, but it's not a lot.
 	connWatcher := New()
-	connWatcher.GetClosedCollection()
+	connWatcher.GetClosedConnections()
 }
 
 type testFinder struct {
@@ -112,7 +112,7 @@ func TestGetClosedCollection(t *testing.T) {
 	}
 	connWatcher.connectionPool = connWatcher.GetConnections()
 
-	c := connWatcher.GetClosedCollection()
+	c := connWatcher.GetClosedConnections()
 
 	if len(c) != 1 || c[0] != conn2 {
 		t.Errorf("Wanted %v but got %v", []connection.Connection{conn2}, c)
