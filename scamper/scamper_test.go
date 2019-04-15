@@ -54,6 +54,12 @@ func TestCancelStopsDaemon(t *testing.T) {
 }
 
 func TestExistingFileStopsDaemonCreation(t *testing.T) {
+	// This test verifies that, when the indicated control socket already exists on
+	// the file system, the Daemon.MustStart function calls log.Fatal. The control
+	// socket needs to exist in a well-known location. If there is already a file
+	// in that well-known location, then that is an indication that something has
+	// gone wrong with the surrounding environment.
+
 	defer func() {
 		logFatal = log.Fatal
 	}()
