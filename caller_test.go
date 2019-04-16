@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/m-lab/go/prometheusx"
 
@@ -17,7 +18,11 @@ func TestMain(t *testing.T) {
 	// Verify that main doesn't crash, and that it does exit when the context is canceled.
 	// TODO: verify more in this test.
 	*prometheusx.ListenAddress = ":0"
+	*waitTime = time.Nanosecond // Run through the loop a few times.
 	ctx, cancel = context.WithCancel(context.Background())
-	cancel()
+	go func() {
+		time.Sleep(1 * time.Second)
+		cancel()
+	}()
 	main()
 }

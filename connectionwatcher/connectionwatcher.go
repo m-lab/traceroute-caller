@@ -1,9 +1,12 @@
+// Package connectionwatcher provides a way of discovering what connections are
+// currently open, and what connections have recently disappeared.
 package connectionwatcher
 
 import (
 	"bytes"
 	"context"
 	"errors"
+	"flag"
 	"fmt"
 	"log"
 	"net"
@@ -15,9 +18,16 @@ import (
 	"github.com/m-lab/traceroute-caller/ipcache"
 )
 
-// The new test output filename is joint of hostname, server boot time, and socker TCO cookie.
-// like: myhost.example.com_1548788619_00000000000084FF
-var localIPv4 = []string{"127.", "128.112.139.", "::ffff:127.0.0.1"}
+var (
+	// The new test output filename is joint of hostname, server boot time, and socker TCO cookie.
+	// like: myhost.example.com_1548788619_00000000000084FF
+	localIPv4 = []string{"127.", "128.112.139.", "::ffff:127.0.0.1"}
+
+	ssBinary = flag.String("ss-binary", "/bin/ss", "The location on disk of the ss binary.")
+
+	// Turned into a variable to enable testing of error cases.
+	logFatal = log.Fatal
+)
 
 // parseIPAndPort returns a valid IP and port from "ss -e" output.
 func parseIPAndPort(input string) (string, int, error) {
@@ -58,7 +68,7 @@ func parseCookie(input string) (string, error) {
 func parseSSLine(line string) (*connection.Connection, error) {
 	segments := strings.Fields(line)
 	if len(segments) < 6 {
-		return nil, errors.New("Incomplete line")
+		return nil, errors.New("incomplete line")
 	}
 	if segments[0] != "tcp" || segments[1] != "ESTAB" {
 		return nil, errors.New("not a TCP connection")
@@ -89,44 +99,57 @@ func parseSSLine(line string) (*connection.Connection, error) {
 	return output, nil
 }
 
-type ConnectionWatcher struct {
-	recentIPCache  ipcache.RecentIPCache
-	connectionPool map[connection.Connection]bool
-}
+type ssFinder struct{}
 
-func (c *ConnectionWatcher) getConnections() {
-	cmd := exec.Command("/bin/ss", "-e")
+func (f *ssFinder) GetConnections() map[connection.Connection]struct{} {
+	cmd := exec.Command(*ssBinary, "-e")
 	var out bytes.Buffer
 	var stderr bytes.Buffer
 	cmd.Stdout = &out
 	cmd.Stderr = &stderr
 	err := cmd.Run()
 	if err != nil {
-		log.Fatal(err)
+		logFatal(err)
 	}
 
 	lines := strings.Split(out.String(), "\n")
-	c.connectionPool = make(map[connection.Connection]bool)
+	connectionPool := make(map[connection.Connection]struct{})
 	for _, line := range lines {
 		conn, err := parseSSLine(line)
 		if err == nil {
-			c.connectionPool[*conn] = true
+			connectionPool[*conn] = struct{}{}
 		}
 	}
+	return connectionPool
 }
 
-func (c *ConnectionWatcher) getPoolSize() int {
-	return len(c.connectionPool)
+type finder interface {
+	GetConnections() map[connection.Connection]struct{}
 }
 
-func (c *ConnectionWatcher) GetClosedCollection() []connection.Connection {
+type connectionWatcher struct {
+	finder
+	recentIPCache  ipcache.RecentIPCache
+	connectionPool map[connection.Connection]struct{}
+}
+
+// ConnectionWatcher is in interface for an object that returns a list of all
+// connections which it previously measured to be open, but it can no longer
+// measure to be open.
+type ConnectionWatcher interface {
+	GetClosedConnections() []connection.Connection
+}
+
+// GetClosedConnections returns the list of connections which were previously
+// measured to be open but were not measured to be open this time..
+func (c *connectionWatcher) GetClosedConnections() []connection.Connection {
 	oldConn := c.connectionPool
 	fmt.Printf("old connection size %d\n", len(oldConn))
-	c.getConnections()
+	c.connectionPool = c.GetConnections()
 	fmt.Printf("new connection size %d\n", len(c.connectionPool))
 	var closed []connection.Connection
 	for conn := range oldConn {
-		if !c.connectionPool[conn] && !c.recentIPCache.Has(conn.RemoteIP) {
+		if _, hasConn := c.connectionPool[conn]; !hasConn && !c.recentIPCache.Has(conn.RemoteIP) {
 			closed = append(closed, conn)
 			log.Printf("Try to add " + conn.RemoteIP)
 			c.recentIPCache.Add(conn.RemoteIP)
@@ -135,11 +158,13 @@ func (c *ConnectionWatcher) GetClosedCollection() []connection.Connection {
 	return closed
 }
 
-func New() *ConnectionWatcher {
-	c := &ConnectionWatcher{
+// New creates and returns a new ConnectionWatcher.
+func New() ConnectionWatcher {
+	c := &connectionWatcher{
+		finder:         &ssFinder{},
 		recentIPCache:  *ipcache.New(context.Background()),
-		connectionPool: make(map[connection.Connection]bool),
+		connectionPool: make(map[connection.Connection]struct{}),
 	}
-	c.getConnections()
+	c.GetConnections()
 	return c
 }
