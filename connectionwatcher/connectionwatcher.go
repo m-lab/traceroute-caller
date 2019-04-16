@@ -31,11 +31,11 @@ var (
 
 // parseIPAndPort returns a valid IP and port from "ss -e" output.
 func parseIPAndPort(input string) (string, int, error) {
-	seperator := strings.LastIndex(input, ":")
-	if seperator == -1 {
+	separator := strings.LastIndex(input, ":")
+	if separator == -1 {
 		return "", 0, errors.New("cannot parse IP and port correctly")
 	}
-	IPStr := input[0:seperator]
+	IPStr := input[0:separator]
 	if IPStr[0] == '[' {
 		IPStr = IPStr[1 : len(IPStr)-1]
 	}
@@ -49,7 +49,7 @@ func parseIPAndPort(input string) (string, int, error) {
 		return "", 0, errors.New("invalid IP address")
 	}
 
-	port, err := strconv.Atoi(input[seperator+1:])
+	port, err := strconv.Atoi(input[separator+1:])
 	if err != nil {
 		return "", 0, errors.New("invalid IP port")
 	}
