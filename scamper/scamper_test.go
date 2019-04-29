@@ -108,7 +108,8 @@ func TestTraceWritesUUID(t *testing.T) {
 	}
 
 	c := connection.Connection{
-		Cookie: "1",
+		Cookie:   "1",
+		RemoteIP: "1.2.3.4",
 	}
 
 	faketime := time.Date(2019, time.April, 1, 3, 45, 51, 0, time.UTC)
@@ -116,7 +117,7 @@ func TestTraceWritesUUID(t *testing.T) {
 	d.Trace(c, faketime)
 
 	// Unmarshal the first line of the output file.
-	b, err := ioutil.ReadFile(tempdir + "/2019/04/01/testhostname/20190401T034551Z_1.jsonl")
+	b, err := ioutil.ReadFile(tempdir + "/2019/04/01/testhostname/20190401T034551Z_1.2.3.4_1.jsonl")
 	rtx.Must(err, "Could not read file")
 
 	type metadata struct {
