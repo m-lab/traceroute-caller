@@ -2,6 +2,7 @@
 package scamper
 
 import (
+	"bytes"
 	"context"
 	"io/ioutil"
 	"log"
@@ -129,6 +130,7 @@ func (d *Daemon) TraceAll(connections []connection.Connection) {
 func (d *Daemon) trace(conn connection.Connection, t time.Time) {
 	filename := d.createTimePath(t) + d.generateFilename(conn.Cookie, conn.RemoteIP, t)
 	log.Println("Starting a trace to be put in", filename)
+	buff := bytes.Buffer{}
 
 	// Write the UUID as the first line of the file. If we want to add other
 	// metadata, this is the place to do it.
@@ -138,15 +140,15 @@ func (d *Daemon) trace(conn connection.Connection, t time.Time) {
 	// into proper json.Marshal calls.
 	uuid, err := conn.UUID()
 	rtx.PanicOnError(err, "Could not parse UUID - this should never happen")
-	rtx.PanicOnError(
-		ioutil.WriteFile(filename, []byte("{\"UUID\": \""+uuid+"\"}\n"), 0666),
-		"Could not write to file before traceroute")
+	_, err = buff.WriteString("{\"UUID\": \"" + uuid + "\"}\n")
+	rtx.PanicOnError(err, "Could not write to buffer")
 
 	cmd := pipe.Line(
 		pipe.Println("tracelb -P icmp-echo -q 3 -O ptr ", conn.RemoteIP),
 		pipe.Exec(d.AttachBinary, "-i-", "-o-", "-U", d.ControlSocket),
 		pipe.Exec(d.Warts2JSONBinary),
-		pipe.AppendFile(filename, 0666),
+		pipe.Write(&buff),
 	)
 	rtx.PanicOnError(pipe.Run(cmd), "Command %v failed", cmd)
+	rtx.PanicOnError(ioutil.WriteFile(filename, buff.Bytes(), 0666), "Could not save output to file")
 }
