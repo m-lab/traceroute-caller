@@ -96,8 +96,8 @@ func (d *Daemon) createTimePath(t time.Time) string {
 	return dir
 }
 
-func (d *Daemon) generateFilename(cookie string, t time.Time) string {
-	return t.Format("20060102T150405Z") + "_" + cookie + ".jsonl"
+func (d *Daemon) generateFilename(cookie string, client_ip string, t time.Time) string {
+	return t.Format("20060102T150405Z") + "_" + client_ip + "_" + cookie + ".jsonl"
 }
 
 // Trace starts a sc_attach connecting to the scamper process for each
@@ -127,7 +127,7 @@ func (d *Daemon) TraceAll(connections []connection.Connection) {
 }
 
 func (d *Daemon) trace(conn connection.Connection, t time.Time) {
-	filename := d.createTimePath(t) + d.generateFilename(conn.Cookie, t)
+	filename := d.createTimePath(t) + d.generateFilename(conn.Cookie, conn.RemoteIP, t)
 	log.Println("Starting a trace to be put in", filename)
 
 	// Write the UUID as the first line of the file. If we want to add other
