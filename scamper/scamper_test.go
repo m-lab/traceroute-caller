@@ -11,9 +11,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/m-lab/traceroute-caller/connection"
-
 	"github.com/m-lab/go/rtx"
+	"github.com/m-lab/traceroute-caller/connection"
+	"github.com/m-lab/uuid/prefix"
 )
 
 func TestCancelStopsDaemon(t *testing.T) {
@@ -117,7 +117,7 @@ func TestTraceWritesUUID(t *testing.T) {
 	d.Trace(c, faketime)
 
 	// Unmarshal the first line of the output file.
-	b, err := ioutil.ReadFile(tempdir + "/2019/04/01/testhostname/20190401T034551Z_1.2.3.4_1.jsonl")
+	b, err := ioutil.ReadFile(tempdir + "/2019/04/01/20190401T034551Z_" + prefix.UnsafeString() + "_0000000000000001.jsonl")
 	rtx.Must(err, "Could not read file")
 
 	type metadata struct {

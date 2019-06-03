@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -16,6 +17,7 @@ import (
 
 	"github.com/m-lab/go/rtx"
 	"github.com/m-lab/traceroute-caller/connection"
+	"github.com/m-lab/uuid"
 	pipe "gopkg.in/m-lab/pipe.v3"
 )
 
@@ -92,13 +94,15 @@ func (d *Daemon) MustStart(ctx context.Context) {
 // createTimePath returns a string with date in format
 // prefix/yyyy/mm/dd/hostname/ after creating a directory of the same name.
 func (d *Daemon) createTimePath(t time.Time) string {
-	dir := d.OutputPath + "/" + t.Format("2006/01/02") + "/" + hostname + "/"
+	dir := d.OutputPath + "/" + t.Format("2006/01/02") + "/"
 	rtx.PanicOnError(os.MkdirAll(dir, 0777), "Could not create the output dir")
 	return dir
 }
 
-func (d *Daemon) generateFilename(cookie string, client_ip string, t time.Time) string {
-	return t.Format("20060102T150405Z") + "_" + client_ip + "_" + cookie + ".jsonl"
+func (d *Daemon) generateFilename(cookie string, t time.Time) string {
+	c, err := strconv.ParseInt(cookie, 16, 64)
+	rtx.PanicOnError(err, "Could not turn cookie into number")
+	return t.Format("20060102T150405Z") + "_" + uuid.FromCookie(uint64(c)) + ".jsonl"
 }
 
 // Trace starts a sc_attach connecting to the scamper process for each
@@ -128,7 +132,7 @@ func (d *Daemon) TraceAll(connections []connection.Connection) {
 }
 
 func (d *Daemon) trace(conn connection.Connection, t time.Time) {
-	filename := d.createTimePath(t) + d.generateFilename(conn.Cookie, conn.RemoteIP, t)
+	filename := d.createTimePath(t) + d.generateFilename(conn.Cookie, t)
 	log.Println("Starting a trace to be put in", filename)
 	buff := bytes.Buffer{}
 
