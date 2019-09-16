@@ -17,8 +17,8 @@ RUN apt-get update && apt-get install -y python python-pip make iproute2 coreuti
 RUN ls -l
 RUN mkdir /source
 ADD ./vendor/scamper/ /source
-RUN chmod +x /source/scamper-cvs-20190113/configure
-WORKDIR /source/scamper-cvs-20190113/
+RUN chmod +x /source/scamper-cvs-20190916/configure
+WORKDIR /source/scamper-cvs-20190916/
 RUN ./configure
 RUN make
 RUN make install
