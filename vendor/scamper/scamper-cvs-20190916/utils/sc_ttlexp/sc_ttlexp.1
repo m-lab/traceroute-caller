@@ -1,0 +1,74 @@
+.\"
+.\" sc_ttlexp.1
+.\"
+.\" Author: Matthew Luckie <mjl@luckie.org.nz>
+.\"
+.\" Copyright (c) 2018 Matthew Luckie
+.\"                    All rights reserved
+.\"
+.\" $Id: sc_ttlexp.1,v 1.2 2018/10/29 07:40:05 mjl Exp $
+.\"
+.Dd March 8, 2018
+.Dt SC_TTLEXP 1
+.Os
+.Sh NAME
+.Nm sc_ttlexp
+.Nd dump source addresses from ICMP TTL expired messages in warts files
+.Sh SYNOPSIS
+.Nm
+.Op Fl O Ar options
+.Op Ar
+.Sh DESCRIPTION
+The
+.Nm
+utility provides a dump of source IP addresses contained trace and tracelb
+records in
+.Xr warts 5
+files.
+.Pp
+The options are as follows:
+.Bl -tag -width Ds
+.It Fl ?
+prints a list of command line options and a synopsis of each.
+.It Fl O Ar option
+allows the behavior of
+.Nm
+to be further tailored.  The current choices for this option are:
+.Bl -dash -offset 2n -compact -width 1n
+.It
+.Sy nodst:
+do not dump source address of a TTL expired message if it matches the
+destination address probed.
+.It
+.Sy noreserved:
+do not dump source address of a TTL expired message if the address
+is a reserved address.
+.El
+.El
+.Sh EXAMPLES
+Given two
+.Xr warts 5
+files named file1.warts and file2.warts, the following dumps all source
+addresses that sent TTL expired messages:
+.Pp
+.Dl sc_ttlexp file1.warts file2.warts
+.Pp
+Given a compressed warts file named file3.warts.bz2, the following dumps
+all source addresses that sent TTL expired messages, skipping those that
+were only observed in TTL expired messages from the destination probed:
+.Pp
+.Dl bzcat file3.warts.bz2 | sc_ttlexp -O nodst
+.Pp
+.\""""""""""""
+.Sh SEE ALSO
+.Xr scamper 1 ,
+.Xr sc_wartsdump 1 ,
+.Xr sc_warts2json 1 ,
+.Rs
+.%A "M. Luckie"
+.%T "Scamper: a Scalable and Extensible Packet Prober for Active Measurement of the Internet"
+.%O "Proc. ACM/SIGCOMM Internet Measurement Conference 2010"
+.Re
+.Sh AUTHOR
+.Nm
+was written by Matthew Luckie <mjl@luckie.org.nz>.

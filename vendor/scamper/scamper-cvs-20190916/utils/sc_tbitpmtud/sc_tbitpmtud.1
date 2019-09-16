@@ -1,0 +1,180 @@
+.\"
+.\" sc_tbitpmtud.1
+.\"
+.\" Author: Matthew Luckie <mjl@luckie.org.nz>
+.\"
+.\" Copyright (c) 2018 Matthew Luckie
+.\"                    All rights reserved
+.\"
+.\" $Id: sc_tbitpmtud.1,v 1.2 2018/03/08 00:31:53 mjl Exp $
+.\"
+.Dd March 1, 2018
+.Dt SC_TBITPMTUD 1
+.Os
+.Sh NAME
+.Nm sc_tbitpmtud
+.Nd scamper driver to test systems for responsiveness to ICMP
+packet too big messages
+.Sh SYNOPSIS
+.Nm
+.Bk -words
+.Op Fl r
+.Op Fl a Ar address-file
+.Op Fl c Ar completed-file
+.Op Fl l Ar limit-per-file
+.Op Fl m Ar maximum-transmission-unit
+.Op Fl o Ar output-file
+.Op Fl p Ar scamper-port
+.Op Fl t Ar log-file
+.Op Fl w Ar window
+.Ek
+.Pp
+.Nm
+.Bk -words
+.Op Fl d Ar dump-id
+.Op Fl A Ar ip2as-file
+.Op Fl m Ar maximum-transmission-unit
+.Op Ar
+.Ek
+.\""""""""""""
+.Sh DESCRIPTION
+The
+.Nm
+utility provides the ability to connect to a running
+.Xr scamper 1
+instance and use that instance to test end systems for their ability
+to perform Path MTU Discovery, with the output written to a file in warts
+format.
+.Nm
+first tests a given system for responsiveness to ICMP echo packets, and
+then tests the given system's TCP stack response to ICMP packet too
+big messages.
+.Pp
+The options are as follows:
+.Bl -tag -width Ds
+.It Fl ?
+prints a list of command line options and a synopsis of each.
+.It Fl a Ar address-file
+specifies the name of the input file which consists of a sequence
+of systems to test, one system per line.
+.It Fl A Ar ip2as-file
+specifies the name of a file which consists of a mapping of prefixes
+to ASes, one prefix per line.
+.It Fl c Ar completed-file
+specifies the name of a file to record IP addresses that have been tested.
+.It Fl d Ar dump-id
+specifies the dump ID to use to analyze the collected data.
+Currently, ID values 1 (mssresults) and 2 (asnresults) are valid, which
+report PMTUD behaviour according to the server's MSS or the server's origin
+ASN.
+.It Fl l Ar limit-per-file
+specifies the number of tbit objects to record per warts file, before opening
+a new file and placing new objects.
+.It Fl m Ar maximum transmission unit
+specifies the pseudo maximum transmission unit to use.  The available
+choices are 0, 256, 576, 1280, 1480.  If 0 is chosen,
+.Nm
+will test each website with all available MTU choices in decreasing
+size.
+The default MTU value tested is 1280.
+.It Fl o Ar output-file
+specifies the name of the file to be written.  The output file will use
+the warts format.
+.It Fl p Ar scamper-port
+specifies the port on the local host where
+.Xr scamper 1
+is accepting control socket connections.
+.It Fl r
+shuffle the order in which websites are tested.
+.It Fl t Ar log-file
+specifies the name of a file to log progress output from
+.Nm
+generated at run time.
+.It Fl w Ar window-size
+specifies the maximum number of tests to conduct in parallel.  The
+window size value depends on the value of the -F parameter passed to the
+.Xr scamper 1
+instance.
+.El
+.Sh EXAMPLES
+.Pp
+Use of this driver requires a
+.Xr scamper 1
+instance listening on a port for commands with a configured firewall.
+The following invocation uses
+.Xr ipfw 8
+firewall rules 1 to 100, with a corresponding window size of 100, and
+an unrestricted packets per second rate, as follows:
+.Pp
+.Dl scamper -P 31337 -F ipfw:1-100 -w 100 -p 0
+.Pp
+To test a set of web servers specified in a file named webservers.txt and
+formatted as follows:
+.Pp
+.in +.3i
+.nf
+1,example.com 5063 192.0.2.1 http://www.example.com/
+.br
+1,example.com 5063 2001:DB8::1 http://www.example.com/
+.br
+1,example.com 5063 2001:DB8::2 https://www.example.com/
+.fi
+.in -.3i
+.Pp
+the following command will test all servers for responsiveness to
+ICMP packet too big messages and record raw data into webservers_00.warts,
+webservers_01.warts, etc:
+.Pp
+.Dl sc_tbitpmtud -a webservers.txt -p 31337 -o webservers
+.Pp
+The webservers.txt file is required to be formatted as above.
+The format is: numeric ID to pass to tbit, a label for the webserver,
+the size of the object to be fetched, the IP address to contact, and the
+URL to use.
+.Pp
+To characterize PMTUD behaviour according to the server's advertised MSS
+value:
+.Pp
+.Dl sc_tbitpmtud -d mssresults webservers_*.warts
+.Pp
+Given files with IPv4 prefixes in prefix2as4.txt and IPv6 prefixes in
+prefix2as6.txt formatted as follows:
+.Pp
+.in +.3i
+.nf
+2001:DB8::     48     64496
+.br
+2001:DB8:1::   48     64497
+.br
+192.0.2.0      24     64498
+.fi
+.in -.3i
+.Pp
+the following command will characterize PMTUD behaviour according to the
+origin ASN of the server:
+.Pp
+.Dl sc_tbitpmtud -d asnresults -A prefix2as4.txt -A prefix2as6.txt webservers_*.warts
+.Pp
+.Sh SEE ALSO
+.Xr scamper 1 ,
+.Xr sc_wartsdump 1 ,
+.Xr sc_warts2json 1 ,
+.Xr warts 5 ,
+.Rs
+.%A "M. Luckie"
+.%A "B. Stasiewicz"
+.%T "Measuring Path MTU Discovery Behaviour"
+.%O "Proc. ACM/SIGCOMM Internet Measurement Conference 2010"
+.Re
+.Rs
+.%A "A. Medina"
+.%A "M. Allman"
+.%A "S. Floyd"
+.%T "Measuring Interactions between Transport Protocols and Middleboxes"
+.%O "Proc. ACM/SIGCOMM Internet Measurement Conference 2004"
+.Re
+.Sh AUTHORS
+.Nm
+was written by Matthew Luckie <mjl@luckie.org.nz>.
+Ben Stasiewicz contributed an initial implementation of the Path MTU
+Discovery TBIT test to scamper, building on the work of Medina et al.

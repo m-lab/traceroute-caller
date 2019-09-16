@@ -1,0 +1,59 @@
+.\"
+.\" sc_warts2json.1
+.\"
+.\" Author: Matthew Luckie <mjl@luckie.org.nz>
+.\"
+.\" Copyright (c) 2013 The Regents of the University of California
+.\"                    All rights reserved
+.\"
+.\" $Id: sc_warts2json.1,v 1.5 2015/09/20 02:54:59 mjl Exp $
+.\"
+.\"  nroff -man sc_warts2json.1
+.\"  groff -man -Tascii sc_warts2json.1 | man2html -title sc_warts2json.1
+.\"
+.Dd July 18, 2013
+.Dt SC_WARTS2JSON 1
+.Os
+.Sh NAME
+.Nm sc_warts2json
+.Nd JSON dump of information contained in a warts file.
+.Sh SYNOPSIS
+.Nm
+.Op Ar
+.Sh DESCRIPTION
+The
+.Nm
+utility provides a JSON dump of information contained in a sequence of
+warts files.
+The output is the same as that which would have been provided by scamper
+if the JSON output option had been chosen instead of the warts output
+option when the data was collected.
+.Sh EXAMPLES
+The command:
+.Pp
+.in +.3i
+sc_warts2json file1.warts file2.warts
+.in -.3i
+.Pp
+will decode and print the contents of file1.warts, followed by the contents
+of file2.warts.
+.Pp
+The command:
+.Pp
+.in +.3i
+gzcat file1.warts.gz | sc_warts2json
+.in -.3i
+.Pp
+will print the contents of the uncompressed file supplied on stdin.
+.Sh SEE ALSO
+.Xr scamper 1 ,
+.Xr sc_wartsdump 1 ,
+.Xr sc_warts2text 1
+.Sh AUTHORS
+.Nm
+was written by Matthew Luckie <mjl@luckie.org.nz>.
+The JSON output format for traceroute and ping was built on an initial
+prototype provided by Brian Hammond of Internap Network Services
+Corporation.
+The JSON output format for tbit and dealias was implemented by
+Matthew Luckie.

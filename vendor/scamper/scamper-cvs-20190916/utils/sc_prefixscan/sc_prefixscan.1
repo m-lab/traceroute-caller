@@ -1,0 +1,153 @@
+.\"
+.\" sc_prefixscan.1
+.\"
+.\" Author: Matthew Luckie <mjl@luckie.org.nz>
+.\"
+.\" Copyright (c) 2016 Matthew Luckie
+.\"                    All rights reserved
+.\"
+.\" $Id: sc_prefixscan.1,v 1.2 2016/12/03 21:31:16 mjl Exp $
+.\"
+.Dd December 2, 2016
+.Dt SC_PREFIXSCAN 1
+.Os
+.Sh NAME
+.Nm sc_prefixscan
+.Nd scamper driver to test if a set of IPv4 links are point-to-point.
+.Sh SYNOPSIS
+.Nm
+.Bk -words
+.Op Fl D
+.Op Fl i Ar infile
+.Op Fl o Ar outfile
+.Op Fl p Ar port
+.Op Fl l Ar logfile
+.Op Fl U Ar unix-socket
+.Op Fl w Ar wait
+.Op Fl x Ar prefixlen
+.Ek
+.Pp
+.Nm
+.Bk -words
+.Op Fl r Ar data-file
+.Op Fl x Ar prefixlen
+.Ek
+.\""""""""""""
+.Sh DESCRIPTION
+The
+.Nm
+utility provides the ability to connect to a running
+.Xr scamper 1
+instance and use it to collect data to infer if an IPv4 link is likely a
+point-to-point link using the prefixscan method.
+An address B is the in-bound interface of a router in a traceroute path if
+we find an alias A' of the address A returned for the previous hop and A'
+is a /31 or /30 mate of B, i.e. the link between A and B is a point-to-point
+link.
+The prefixscan method infers A and A' are aliases if the IPIDs in responses
+to five alternating probes sent one second apart monotonically increase and
+differ by no more than 1,000, or probes to A and A' elicit responses with
+a common source address.
+The first technique is a pairwise comparison similar to Ally, and the second
+is the Mercator technique.
+The supported options to
+.Nm
+are as follows:
+.Bl -tag -width Ds
+.It Fl D
+causes
+.Nm
+to detach and become a daemon.
+.It Fl i Ar infile
+specifies a file containing a list of IPv4 address pairs adjacent in
+traceroute paths to test if they are point-to-point links.
+.It Fl o Ar outfile
+specifies the name of the output file to be written during the data collection
+phase.  The output file will use the
+.Xr warts 5
+format.
+.It Fl p Ar port
+specifies the port on the local host where
+.Xr scamper 1
+is accepting control socket connections.
+.It Fl l Ar logfile
+specifies the name of a file to log progress output from
+.Nm
+generated at run time.
+.It Fl r Ar data-file
+specifies the name of the data file to be parsed for point-to-point link
+inferences that were collected by
+.Nm
+in a previous data collection.
+.It Fl U Ar unix-socket
+specifies the name of a unix domain socket where a local
+.Xr scamper 1
+instance is accepting control socket connections.
+.It Fl w Ar wait
+specifies the length of time in seconds to wait between probing the same
+IPv4 address with different methods.
+By default,
+.Nm
+waits five seconds between methods.
+.It Fl x Ar prefixlen
+specifies the maximum size of prefix to consider.
+By default,
+.Nm
+considers up to an IPv4 /30 prefix.
+.El
+.\""""""""""""
+.Sh EXAMPLES
+Given a traceroute with the following path:
+.Pp
+.Dl traceroute to 192.0.30.64
+.Dl  1 192.0.2.1
+.Dl  2 192.0.32.10
+.Dl  3 192.0.31.8
+.Dl  4 192.0.30.64
+.Pp
+then to collect data to infer if the implied IPv4 links are point-to-point,
+put the links in a file named infile.txt formatted as follows:
+.Pp
+.Dl 192.0.2.1 192.0.32.10
+.Dl 192.0.32.10 192.0.31.8
+.Dl 192.0.31.8 192.0.30.64
+.Pp
+and use a
+.Xr scamper 1
+daemon listening on port 31337 using:
+.Pp
+.Dl sc_prefixscan -i infile.txt -o outfile.warts -p 31337
+.Pp
+To obtain the inferred point-to-point links from outfile.warts:
+.Pp
+.Dl sc_prefixscan -r outfile.warts
+.\""""""""""""
+.Sh SEE ALSO
+.Xr scamper 1 ,
+.Xr sc_ally 1 ,
+.Xr sc_ipiddump 1 ,
+.Xr sc_wartsdump 1 ,
+.Xr sc_warts2text 1 ,
+.Xr sc_warts2json 1 ,
+.Rs
+.%A "M. Luckie"
+.%A "k. claffy"
+.%T "A Second Look at Detecting Third-party Addresses in Traceroute Traces with the IP Timestamp Option"
+.%O "Proc. Passive and Active Measurement Conference 2014"
+.Re
+.Rs
+.%A "R. Govindan"
+.%A "H. Tangmunarunkit"
+.%T "Heuristics for Internet Map Discovery"
+.%O "Proc. IEEE INFOCOM 2000"
+.Re
+.Rs
+.%A "N. Spring"
+.%A "R. Mahajan"
+.%A "D. Wetherall"
+.%T "Measuring ISP topologies with Rocketfuel"
+.%O "Proc. ACM SIGCOMM 2002"
+.Re
+.Sh AUTHORS
+.Nm
+was written by Matthew Luckie <mjl@luckie.org.nz>.

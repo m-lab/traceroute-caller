@@ -1,0 +1,190 @@
+.\"
+.\" sc_ally.1
+.\"
+.\" Author: Matthew Luckie <mjl@luckie.org.nz>
+.\"
+.\" Copyright (c) 2011 University of Waikato
+.\" Copyright (c) 2016-2019 Matthew Luckie
+.\"                    All rights reserved
+.\"
+.\" $Id: sc_ally.1,v 1.8 2019/05/04 08:06:55 mjl Exp $
+.\"
+.Dd May 4, 2019
+.Dt SC_ALLY 1
+.Os
+.Sh NAME
+.Nm sc_ally
+.Nd scamper driver to run Ally on a list of candidate aliases.
+.Sh SYNOPSIS
+.Nm
+.Bk -words
+.Op Fl ?D
+.Op Fl a Ar infile
+.Op Fl o Ar outfile
+.Op Fl p Ar port
+.Op Fl U Ar unix-socket
+.Op Fl f Ar fudge
+.Op Fl i Ar probe-wait
+.Op Fl O Ar options
+.Op Fl q Ar attempts
+.Op Fl t Ar logfile
+.Op Fl w Ar waittime
+.Ek
+.Pp
+.Nm
+.Bk -words
+.Op Fl d Ar dump-id
+.Op Fl O Ar options
+.Op Ar
+.Ek
+.\""""""""""""
+.Sh DESCRIPTION
+The
+.Nm
+utility provides the ability to connect to a running
+.Xr scamper 1
+instance and have a set of IPv4 address sets tested for aliases using the
+Ally technique.
+For each address pair on a single line in the file,
+.Nm
+establishes which probe methods (UDP, TCP-ack, ICMP-echo) solicit an
+incrementing IP-ID value, and then uses the Ally technique on pairs where
+a probe method is able to obtain an incrementing IP-ID for both addresses.
+.Nm
+can also infer which IP addresses are aliases using the Mercator
+common source address technique as a byproduct of the UDP probing that
+.Nm
+does.
+The output of
+.Nm
+is written to a
+.Xr warts 5
+file, which can then be processed to extract aliases.
+The options are as follows:
+.Bl -tag -width Ds
+.It Fl ?
+prints a list of command line options and a synopsis of each.
+.It Fl D
+causes
+.Nm
+to detach and become a daemon.
+.It Fl a Ar infile
+specifies the name of the input file which consists of a sequence of
+IPv4 addresses, one candidate set per line.
+.It Fl o Ar outfile
+specifies the name of the output file to be written.
+The output file will use the warts format.
+.It Fl p Ar port
+specifies the port on the local host where
+.Xr scamper 1
+is accepting control socket connections.
+.It Fl U Ar unix-socket
+specifies the name of a unix domain socket where
+.Xr scamper 1
+is accepting control socket connections.
+.It Fl d Ar dump-id
+specifies the number identifying an analysis to conduct.
+The current choices for are 1-3, and are:
+.Bl -dash -offset 2n -compact -width 1n
+.It
+.Sy 1:
+dump aliases inferred using the Ally (IPID-based) technique.
+.It
+.Sy 2:
+dump aliases inferred using the Mercator (common source address based)
+technique.
+.It
+.Sy 3:
+dump aliases inferred using both Ally and Mercator techniques.
+.El
+.It Fl f Ar fudge
+specifies the fudge factor to use when (1) inferring if IPIDs are assigned
+from a counter, and (2) inferring if two addresses share the same counter.
+A value of zero will cause ally to infer aliases if the IPIDs are in a
+monotonic sequence.
+.It Fl i Ar probe-wait
+specifies the inter-probe gap for both ping and Ally measurements,
+in milliseconds.  The default is 1000ms (1 second); the minimum is 200ms,
+and the maximum is 2000ms.
+.It Fl O Ar options
+allows the behavior of
+.Nm
+to be further tailored.
+The current choices for this option are:
+.Bl -dash -offset 2n -compact -width 1n
+.It
+.Sy nobs:
+do not consider byte swapped IPID values when inferring if IPID values
+are assigned from a counter.
+.It
+.Sy tc:
+dump transitive closure when reporting aliases.
+.El
+.It Fl q Ar attempts
+specifies the number of probes to use with Ally.
+.It Fl t Ar logfile
+specifies the name of a file to log output from
+.Nm
+generated at run time.
+.It Fl w Ar waittime
+specifies the minimum length of time, in seconds, to wait between completing
+a measurement to a particular IP address and issuing the next.
+.El
+.\""""""""""""
+.Sh EXAMPLES
+Given a set of IPv4-address sets in a file named infile.txt:
+.Pp
+.in +.3i
+.nf
+192.0.2.1 192.0.32.10 192.0.31.60
+192.0.2.2 192.0.31.8
+192.0.2.3 192.0.30.64
+.fi
+.in -.3i
+.Pp
+and a
+.Xr scamper 1
+daemon listening on port 31337, then these addresses can be tested for
+aliases using
+.Pp
+sc_ally -a infile.txt -o outfile.warts -p 31337
+.Pp
+To obtain a list of inferred alias pairs using the Ally technique from a
+.Xr warts 5
+file:
+.Pp
+sc_ally -d 1 outfile.warts
+.Pp
+To obtain a list of inferred routers using a transitive closure of alias
+pairs inferred using the Ally and Mercator techniques:
+.Pp
+sc_ally -d 3 -O tc outfile.warts
+.\""""""""""""
+.Sh SEE ALSO
+.Xr scamper 1 ,
+.Xr sc_radargun 1 ,
+.Xr sc_wartsdump 1 ,
+.Xr sc_warts2text 1 ,
+.Rs
+.%A "N. Spring"
+.%A "R. Mahajan"
+.%A "D. Wetherall"
+.%T "Measuring ISP topologies with Rocketfuel"
+.%O "Proc. ACM SIGCOMM 2002"
+.Re
+.Rs
+.%A "R. Govindan"
+.%A "H. Tangmunarunkit"
+.%T "Heuristics for Internet Map Discovery"
+.%O "Proc. IEEE INFOCOM 2000"
+.Re
+.Rs
+.%A "A. Bender"
+.%A "R. Sherwood"
+.%A "N. Spring"
+.%T "Fixing Ally's growing pains with velocity modeling"
+.%O "Proc. ACM/SIGCOMM Internet Measurement Conference 2008"
+.Re
+.Sh AUTHORS
+.Nm
+was written by Matthew Luckie <mjl@luckie.org.nz>.
