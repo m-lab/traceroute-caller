@@ -1,0 +1,256 @@
+.\"
+.\" sc_uptime.1
+.\"
+.\" Author: Matthew Luckie <mjl@luckie.org.nz>
+.\"
+.\" Copyright (c) 2017 Matthew Luckie
+.\"                    All rights reserved
+.\"
+.\" $Id: sc_uptime.1,v 1.12 2019/01/22 22:24:40 mjl Exp $
+.\"
+.Dd July 2, 2017
+.Dt SC_UPTIME 1
+.Os
+.Sh NAME
+.Nm sc_uptime
+.Nd scamper driver to infer reboot windows for systems with IPv6 addresses.
+.Sh SYNOPSIS
+.Nm
+.Bk -words
+.Op Fl o
+.Op Fl d Ar dbfile
+.Op Fl E Ar expire
+.Op Fl I Ar interval
+.Op Fl l Ar logfile
+.Op Fl O Ar option
+.Op Fl p Ar port
+.Op Fl S Ar srcaddr
+.Op Fl U Ar unix-socket
+.Ar outfile.warts
+.Ek
+.Pp
+.Nm
+.Bk -words
+.Op Fl a
+.Op Fl d Ar dbfile
+.Op Fl E Ar expire
+.Op Fl O Ar option
+.Ar addrfile.txt
+.Ek
+.Pp
+.Nm
+.Bk -words
+.Op Fl c
+.Op Fl d Ar dbfile
+.Op Fl O Ar option
+.Ek
+.Pp
+.Nm
+.Bk -words
+.Op Fl i
+.Op Fl d Ar dbfile
+.Op Fl O Ar option
+.Ar
+.Ek
+.Pp
+.Nm
+.Bk -words
+.Op Fl r
+.Op Fl d Ar dbfile
+.Op Fl O Ar option
+.Ar ip ...
+.Ek
+.Pp
+.Nm
+.Bk -words
+.Op Fl x
+.Op Fl d Ar dbfile
+.Op Fl O Ar option
+.Ar do-not-probe.txt
+.Ek
+.\""""""""""""
+.Sh DESCRIPTION
+The
+.Nm
+utility provides the ability to connect to a running
+.Xr scamper 1
+instance and use it to collect data for inferring if and when a system with an
+IPv6 address rebooted.
+.Nm
+induces each system to send fragmented ICMP echo replies, with the
+goal of obtaining an incrementing Identifier (ID) field in the
+fragmentation header.
+If the system assigns ID values from a counter, and the counter resets
+to zero, the system rebooted in the interval between probes.
+Note, the technique does not work if the system does not send ICMP6
+fragments, if fragments are blocked, or if the system assigns ID values
+randomly.
+.Nm
+implements a scalable algorithm to avoid probing systems that assign
+ID values at random or are unresponsive.
+Further information about the algorithm is found in the "see also"
+section.
+The supported options to
+.Nm
+are as follows:
+.Bl -tag -width Ds
+.It Fl a
+specifies the name of the input file which consists of a sequence of
+IPv6 addresses to probe for reboots, one address per line.  Any new
+addresses are added to the sqlite3 database for subsequent processing.
+Any addresses in the sqlite3 database but not in the addressfile continue
+to be probed.
+.It Fl c
+specifies that a sqlite3 database file is to be created.
+The mode of database is specified with
+.Fl O
+.It Fl d Ar dbfile
+specifies the name of the output sqlite3 database file to use
+.It Fl E Ar expire
+specifies the length of time, in days, that an address may remain in the probe
+state database after last being seen in traceroute, and not responding
+with incrementing IPID values.
+.It Fl i
+specifies that the IPID samples in the supplied
+.Xr warts 5
+files should be imported into the sqlite3 database.
+.It Fl I Ar interval
+specifies the desired probe interval, in seconds, for each address.
+.It Fl l Ar logfile
+specifies the name of a file to log progress output from
+.Nm
+generated at run time.
+.It Fl o
+specifies the name of the output file to be written.
+The output file will use the
+.Xr warts 5
+format.
+.It Fl O Ar options
+allows the behavior of
+.Nm
+to be further tailored.
+The current choices for this option are:
+.Bl -dash -offset 2n -compact -width 1n
+.It
+.Sy init-state:
+initialise a brand new sqlite3 database for data collection.
+Use this option with
+.Fl c
+.It
+.Sy init-data:
+initialise a brand new sqlite3 database for data analysis.
+Use this option with
+.Fl c
+.It
+.Sy safe-db:
+when importing into the data database, use safe operations.  By default,
+.Nm
+enables optimizations that will speed up bulk data importing, at the expense
+of possible database corruption in the event power is lost during the import.
+.It
+.Sy vacuum-db:
+perform a database vacuum before doing any operations.
+.El
+.It Fl p Ar port
+specifies the port on the local host where
+.Xr scamper 1
+is accepting control socket connections.
+.It Fl r
+specifies that
+.Nm
+should use the IPID samples in the sqlite3 database to infer reboots.
+.It Fl S Ar srcaddr
+specifies the unicast IPv6 source address to use in probes.
+This option is recommended when the prober has multiple or changing
+IPv6 addresses, as some probed systems maintain an IPID counter
+related to the source IPv6 address of the prober.
+If the source address of probes changes, the returned IPID sequence
+could have a discontinuity unrelated to a reboot of the probed system.
+.It Fl U Ar unix-socket
+specifies the name of a unix domain socket where
+.Xr scamper 1
+is accepting control socket connections.
+.It Fl x
+specifies that the do-not-probe list has been updated and the state
+database should be cleared of matching addresses.  The do-not-probe
+file is a text file with one prefix per line.  Individual addresses
+may be specified by including the address without a suffix.
+.El
+.\""""""""""""
+.Sh EXAMPLES
+Given a set of IPv6 addresses contained in a file named
+addrs.txt and a scamper process listening on port 31337
+configured to probe at 30 packets per second started as follows:
+.Pp
+.Dl scamper -P 31337 -p 30
+.Pp
+the following command will create a sqlite3 database named
+state.sqlite to record probe state within, probe the addresses
+contained in addrs.txt once to collect raw data that can be used to
+infer reboot windows, and store the raw data in out1.warts:
+.Pp
+.Dl sc_uptime -p 31337 -O create-db -d state.sqlite -a addrs.txt -o out1.warts
+.Pp
+To infer reboot windows,
+.Nm
+must be run in rounds.  The next time
+.Nm
+is run, use:
+.Pp
+.Dl sc_uptime -p 31337 -d state.sqlite -o out2.warts
+.Pp
+Import the IPID samples from out1.warts and out2.warts into a separate
+probe database:
+.Pp
+.Dl sc_uptime -i -O create-db -d data.sqlite out1.warts out2.warts
+.Pp
+Infer reboots across all imported data:
+.Pp
+.Dl sc_uptime -r -d data.sqlite
+.Pp
+To infer reboots just for IPv6 address 2001:DB8::1, use:
+.Pp
+.Dl sc_uptime -r -d data.sqlite 2001:DB8::1
+.Pp
+.\""""""""""""
+.Sh HINTS
+Store the state.sqlite file on a memory file system to improve speed
+and reduce disk wear.  In between invocations of
+.Nm ,
+copy the state.sqlite file to disk.
+You can store probe data in the same database used to maintain state,
+but you should use a separate database.
+To obtain better performance, import the data into a time-series
+database.
+.Pp
+.Sh NOTES
+.Nm
+will only probe addresses in 2000::/3.
+.\""""""""""""
+.Sh SEE ALSO
+.Xr scamper 1 ,
+.Xr sc_ally 1 ,
+.Xr sc_ipiddump 1 ,
+.Xr sc_speedtrap 1 ,
+.Xr sc_wartsdump 1 ,
+.Xr sc_warts2text 1 ,
+.Xr sc_warts2json 1 ,
+.Xr sqlite 1 ,
+.Xr warts 5 ,
+.Rs
+.%A "M. Luckie"
+.%A "R. Beverly"
+.%T "The Impact of Router Outages on the AS-level Internet"
+.%O "Proc. ACM/SIGCOMM Conference 2017"
+.Re
+.Rs
+.%A "R. Beverly"
+.%A "M. Luckie"
+.%A "L. Mosley"
+.%A "k claffy"
+.%T "Measuring and Characterizing IPv6 Router Availability"
+.%O "Proc. PAM 2015"
+.Re
+.Sh AUTHORS
+.Nm
+was written by Matthew Luckie and Robert Beverly.

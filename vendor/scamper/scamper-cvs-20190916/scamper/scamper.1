@@ -1,0 +1,1461 @@
+.\"
+.\" scamper.1
+.\"
+.\" Authors: Matthew Luckie <mjl@luckie.org.nz>
+.\"          Boris Pfahringer
+.\"
+.\" Copyright (c) 2007-2011 University of Waikato
+.\" Copyright (c) 2012-2015 The Regents of the University of California
+.\" Copyright (c) 2015      Matthew Luckie
+.\"                         All rights reserved
+.\"
+.\" $Id: scamper.1,v 1.78 2019/09/16 05:33:35 mjl Exp $
+.\"
+.\"  nroff -man scamper.1
+.\"  groff -man -Tascii scamper.1 | man2html -title scamper.1
+.\"
+.Dd July 2, 2017
+.Dt SCAMPER 1
+.Os
+.\""""""""""""
+.Sh NAME
+.Nm scamper
+.Nd parallel Internet measurement utility
+.Sh SYNOPSIS
+.Nm
+.Bk -words
+.Op Fl ?Dv
+.Op Fl c Ar command
+.Op Fl p Ar pps
+.Op Fl w Ar window
+.Op Fl M Ar monitorname
+.Op Fl l Ar listname
+.Op Fl L Ar listid
+.Op Fl C Ar cycleid
+.Op Fl o Ar outfile
+.Op Fl F Ar firewall
+.Op Fl d Ar debugfile
+.Op Fl e Ar pidfile
+.Op Fl O Ar options
+.Op Fl i Ar IPs | Fl I Ar cmds | Fl f Ar file | Fl P Ar [ip:]port | Fl R Ar name:port | Fl U Ar unix-dom
+.Ek
+.\""""""""""""
+.Sh DESCRIPTION
+The
+.Nm
+utility provides the ability to execute Internet measurement techniques
+to IPv4 and IPv6 addresses, in parallel, to fill a specified
+packets-per-second rate.  Currently,
+.Nm
+supports the well-known traceroute and ping techniques,
+as well as MDA traceroute, alias resolution, some parts of tbit, sting,
+and neighbour discovery.
+.Pp
+.Nm
+has five modes of operation.
+First,
+.Nm
+can be supplied a list of addresses on the command line with the
+.Fl i
+option.
+.Nm
+will then execute a command with each of the supplied addresses, in parallel,
+and output the results as each task completes.
+Second,
+.Nm
+can be supplied a list of addresses in a listfile, one address per line,
+using the
+.Fl f
+option.
+Third,
+.Nm
+can be supplied a list of complete commands on the command line with the
+.Fl I
+option.
+Fourth,
+.Nm
+can be instructed to listen on an IP address and port specified with the
+.Fl P
+option, or on a unix domain socket specified with the
+.Fl U
+option, where it can take commands dynamically.
+Finally,
+.Nm
+can be instructed to connect to a remote host and port specified with the
+.Fl R
+option, where it will be supplied with commands dynamically.
+.Pp
+The options are as follows:
+.Bl -tag -width Ds
+.It Fl ?
+prints a list of command line options and a synopsis of each.
+.It Fl v
+causes
+.Nm
+to output version information and exit.
+.It Fl D
+With this option set,
+.Nm
+will detach and become a daemon.  Use with the
+.Fl P
+or
+.Fl U
+options.
+.It Fl c Ar command
+specifies the command for
+.Nm
+to use by default. The current choices for this option are:
+.Bl -dash -offset 2n -compact -width 1n
+.It
+.Sy dealias
+.It
+.Sy neighbourdisc
+.It
+.Sy ping
+.It
+.Sy trace
+.It
+.Sy tracelb
+.It
+.Sy sniff
+.It
+.Sy sting
+.It
+.Sy tbit
+.El
+.Nm
+uses trace by default.
+The available commands and their options are documented below.
+.It Fl p Ar pps
+specifies the target packets-per-second rate for
+.Nm
+to reach.  By default, this value is 20.
+.It Fl w Ar window
+specifies the maximum number of tasks that may be probed in parallel.
+A value of zero places no upper limit.
+By default, zero is used.
+.It Fl M Ar monitorname
+specifies the canonical name of machine where
+.Nm
+is run.
+This value is used when recording the output in a warts output file.
+.It Fl l Ar listname
+specifies the name of the list when run from the command line.
+This value is used when recording the output in a warts output file.
+.It Fl L Ar listid
+specifies the numerical id of the list when run from the command line.
+This value is used when recording the output in a warts output file.
+.It Fl C Ar cycleid
+specifies the numerical cycle id to begin with when run from the command line.
+This value is used when recording the output in a warts output file.
+.It Fl o Ar outfile
+specifies the default output file to write measurement results to.  By
+default, stdout is used.
+.It Fl F Ar firewall
+specifies that
+.Nm
+may use the firewall in measurements that require it
+(tbit and sting).
+.Nm
+supports two firewall types: IPFW, and PF.
+To use the IPFW firewall, pass ipfw:<start>-<end>, where <start> is
+the first rule
+.Nm
+can use, and <end> is the last.
+To use the PF firewall, pass pf:<anchor>:<num>, where <anchor> is the
+anchor for
+.Nm
+to use, and <num> specifies the number of rules
+.Nm
+is allowed to use.
+.It Fl d Ar debugfile
+specifies a filename to write debugging messages to.  By default, no
+debugfile is used, though debugging output is sent to stderr if scamper is
+built for debugging.
+.It Fl e Ar pidfile
+specifies a file to write scamper's process ID to.
+If scamper is built with privilege separation, the ID of the unprivileged
+process is written.
+.It Fl O Ar options
+allows scamper's behaviour to be further tailored.
+The current choices for this option are:
+.Bl -dash -offset 2n -compact -width 1n
+.It
+.Sy text:
+output results in plain text.  Suitable for interactive use.
+.It
+.Sy warts:
+output results in warts format.  Suitable for archiving measurement
+results and for use by researchers as it records details that cannot be
+easily represented with the text option.
+.It
+.Sy json:
+output results in json format.  Suitable for processing measurement
+results with a scripting language.  A better approach is to output
+results in warts format, and to use
+.Xr sc_warts2json 1 .
+.It
+.Sy planetlab:
+tell scamper it is running on a planetlab system.  Necessary to use
+planetlab's safe raw sockets.
+.It
+.Sy rawtcp:
+tell scamper to use IPPROTO_RAW socket to send IPv4 TCP probes, rather than
+a datalink socket.
+.It
+.Sy select:
+tell scamper to use
+.Xr select 2
+rather than
+.Xr poll 2
+.It
+.Sy kqueue:
+tell scamper to use
+.Xr kqueue 2
+rather than
+.Xr poll 2
+on systems where
+.Xr kqueue 2
+is available.
+.It
+.Sy epoll:
+tell scamper to use
+.Xr epoll 7
+rather than
+.Xr poll 2
+on systems where
+.Xr epoll 7
+is available.
+.It
+.Sy tsps:
+the input file consists of a sequence of IP addresses for pre-specified
+IP timestamps.
+.It
+.Sy cmdfile:
+the input file consists of complete commands.
+.It
+.Sy noinitndc:
+do not initialise the neighbour discovery cache.
+.It
+.Sy outcopy:
+write a copy of all data written by scamper with the default output method.
+.It
+.Sy debugfileappend:
+append to the debugfile specified with the
+.Fl d
+option.  The default is to truncate the debugfile.
+.It
+.Sy tls:
+require the use of TLS with the remove controller specified with the
+.Fl R
+option.
+.It
+.Sy notls:
+do not use TLS anywhere in scamper, including tbit.
+.El
+.It Fl i Ar IP 1..N
+specifies the addresses to probe, on the command line, using the command
+specified with the
+.Fl c
+option.
+.It Fl f Ar listfile
+specifies the input file to read for target addresses, one per line, and
+uses the command specified with the
+.Fl c
+option on each.
+.It Fl I Ar cmds.
+specifies complete commands, including target addresses, for scamper to
+execute.
+.It Fl P Ar [ip:]port
+specifies that
+.Nm
+provide a control socket listening on the specified IP address and port on
+the local host.  If an IP address is not specified,
+.Nm
+will bind to the port specified on the loopback address.
+.It Fl R Ar name:port
+specifies that
+.Nm
+connects to a specified remote host and port to receive commands.
+.It Fl U Ar unix domain socket
+specifies that
+.Nm
+provide a control socket listening on the specified socket in the unix
+domain.
+.El
+.\""""""""""""
+.Sh TRACE OPTIONS
+The trace command is used for conducting traceroute.
+The following variations of the
+.Xr traceroute 8
+options are available:
+.Pp
+trace
+.Bk -words
+.Op Fl MQT
+.Op Fl c Ar confidence
+.Op Fl d Ar dport
+.Op Fl f Ar firsthop
+.Op Fl g Ar gaplimit
+.Op Fl G Ar gapaction
+.Op Fl l Ar loops
+.Op Fl m Ar maxttl
+.Op Fl o Ar offset
+.Op Fl O Ar option
+.Op Fl p Ar payload
+.Op Fl P Ar method
+.Op Fl q Ar attempts
+.Op Fl r Ar rtr-addr
+.Op Fl s Ar sport
+.Op Fl S Ar srcaddr
+.Op Fl t Ar tos
+.Op Fl U Ar userid
+.Op Fl w Ar wait
+.Op Fl W Ar wait-probe
+.Op Fl z Ar gss-entry
+.Op Fl Z Ar lss-name
+.Ek
+.Bl -tag -width Ds
+.It Fl c Ar confidence
+specifies that a hop should be probed to a specified confidence level
+(95% or 99%) to be sure the trace has seen all interfaces that will reply
+for that hop.
+.It Fl d Ar dport
+specifies the base destination port value to use for UDP-based and TCP-based
+traceroute methods.  For ICMP-paris, this option sets the ICMP checksum
+value.
+.It Fl f Ar firsthop
+specifies the TTL or HLIM value to begin probing with.  By default,
+a first hop of one is used.
+.It Fl g Ar gaplimit
+specifies the number of unresponsive hops permitted until a check is made to
+see if the destination will respond.  By default, a gap limit of 5 hops is
+used.  Setting the gap limit to 0 disables the gap limit, but doing this is
+not recommended.
+.It Fl G Ar gapaction
+specifies what should happen if the gaplimit condition is met.  A value of
+1 (default) means halt probing, while a value of 2 means send last-ditch
+probes.
+.It Fl m Ar maxttl
+specifies the maximum TTL or HLIM value that will be probed.  By default,
+there is no restriction, apart from the 255 hops that the Internet protocols
+allow.
+.It Fl M
+specifies that path MTU discovery (PMTUD) should be attempted for the path
+when the initial traceroute completes.
+.Nm
+will not conduct PMTUD unless it is probing a responsive destination, as
+otherwise there is no way to distinguish all packets being lost from just
+big packets (larger than MTU) being lost.
+.It Fl l Ar loops
+specifies the maximum number of loops permitted until probing stops.  By
+default, a value of one is used.  A value of zero disables loop checking.
+.It Fl o Ar offset
+specifies the fragmentation offset to use in probes.  By default, no
+offset is used.
+.It Fl O Ar option
+specifies optional arguments to use.
+The current choices for this option are:
+.Bl -dash -offset 2n -compact -width 1n
+.It
+.Sy dl
+specifies that the datalink socket should be used to timestamp packets,
+and to receive certain packets.
+.It
+.Sy dtree-noback
+specifies that the traceroute should not do backwards probing when using
+doubletree.
+.El
+.It Fl p Ar payload
+specifies the payload of the probe to use as a base.
+The payload is specified in hexadecimal.
+Note that the payload supplied is merely a base; the first 2 bytes may be
+modified to accomplish ICMP-Paris and UDP-Paris traceroute.
+.It Fl P Ar method
+specifies the traceroute method to use.
+.Nm
+currently supports five different probe methods: UDP, ICMP, UDP-paris,
+ICMP-paris, TCP, and TCP-ACK.  By default, UDP-paris is used.
+.It Fl q Ar attempts
+specifies the maximum number of attempts to obtain a response per hop.  By
+default, a value of two is used.
+.It Fl Q
+specifies that all allocated probes are sent, regardless of how many responses
+have been received.
+.It Fl r Ar rtr-addr
+specifies the IP address of the router to use.
+.It Fl s Ar sport
+specifies the source port value to use.  For ICMP-based methods, this option
+specifies the ICMP identifier to use.
+.It Fl S Ar srcaddr
+specifies the source address to use in probes.
+The address cannot be spoofed.
+.It Fl t Ar tos
+specifies the value to set in the IP ToS/DSCP + ECN byte.  By default, this
+byte is set to zero.
+.It Fl T
+specifies that time exceeded messages from the destination do not cause the
+trace to be defined as reaching the destination.
+.It Fl U Ar userid
+specifies an unsigned integer to include with the data collected; the meaning
+of the user-id is entirely up to the user and has no effect on the behaviour
+of traceroute.
+.It Fl w Ar wait
+specifies how long to wait, in seconds, for a reply.  By default, a value
+of 5 is used.
+.It Fl W Ar wait-probe
+specifies the minimum time to wait, in 10s of milliseconds, between sending
+consecutive probes.  By default the next probe is sent as soon as possible.
+.It Fl z Ar gss-entry
+specifies an IP address to halt probing when encountered; used with the
+double-tree algorithm.
+.It Fl Z Ar lss-name
+specifies the name of the local stop set to use when determining when to
+halt probing backwards; used with the double-tree algorithm.
+.El
+.\""""""""""""
+.Sh PING OPTIONS
+The ping command is used for conducting ping.
+The following variations of the
+.Xr ping 8
+options are available:
+.Pp
+ping
+.Bk -words
+.Op Fl R
+.Op Fl A Ar tcp-ack
+.Op Fl B Ar payload
+.Op Fl c Ar probecount
+.Op Fl C Ar icmp-sum
+.Op Fl d Ar dport
+.Op Fl F Ar sport
+.Op Fl i Ar wait
+.Op Fl m Ar ttl
+.Op Fl M Ar MTU
+.Op Fl o Ar replycount
+.Op Fl O Ar options
+.Op Fl p Ar pattern
+.Op Fl P Ar method
+.Op Fl s Ar size
+.Op Fl S Ar srcaddr
+.Op Fl T Ar timestamp
+.Op Fl U Ar userid
+.Op Fl W Ar timeout
+.Op Fl z Ar tos
+.Ek
+.Bl -tag -width Ds
+.It Fl A Ar tcp-ack
+specifies the number to use in the acknowledgement field of the TCP header,
+or the sequence number field of the TCP header when sending reset probes.
+.It Fl B Ar payload
+specifies, in a hexadecimal string, the payload to include in each probe.
+.It Fl c Ar probecount
+specifies the number of probes to send before exiting.  By default, a value
+of 4 is used.
+.It Fl C Ar icmp-sum
+specifies the ICMP checksum to use when sending a probe.
+The payload of each probe will be manipulated so that the checksum is valid.
+.It Fl d Ar dport
+specifies the destination port to use in each TCP/UDP probe, and the first
+ICMP sequence number to use in ICMP probes.
+.It Fl F Ar sport
+specifies the source port to use in each TCP/UDP probe, and the ICMP ID to
+use in ICMP probes.
+.It Fl i Ar wait
+specifies the length of time to wait, in seconds, between probes.  By default,
+a value of 1 is used.
+.It Fl m Ar ttl
+specifies the TTL value to use for outgoing packets.  By default, a value of
+64 is used.
+.It Fl M Ar MTU
+specifies a pseudo MTU value.  If the response packet is larger than the
+pseudo MTU, an ICMP packet too big (PTB) message is sent.
+.It Fl o Ar replycount
+specifies the number of replies required at which time probing may cease.  By
+default, all probes are sent.
+.It Fl O Ar options
+The current choices for this option are:
+.Bl -dash -offset 2n -compact -width 1n
+.It
+.Sy dl
+specifies that the ping should use datalink sockets, rather than raw sockets.
+.It
+.Sy nosrc
+specifies that the real address of the host should not be embedded in
+the payload of the packet when the spoof option is used.
+.It
+.Sy spoof
+specifies that the source address is to be spoofed according to the address
+specified with the
+.Fl S
+option.  The address scamper would otherwise use as the source address is
+embedded in the payload of the probe unless the nosrc option is used.
+.It
+.Sy tbt
+specifies that the goal of the ping is to obtain fragmented responses, so that
+the
+.Fl c
+option specifies how many packets to send, and the
+.Fl o
+option specifies how many fragmented responses are desired.
+.El
+.It Fl p Ar pattern
+specifies the pattern, in hex, to use in probes.  Up to 16 bytes may be
+specified.  By default, each probe's bytes are zeroed.
+.It Fl P Ar method
+specifies the type of ping packets to send.
+By default, ICMP echo requests are sent.
+Choices are: icmp-echo, icmp-time, tcp-syn, tcp-ack, tcp-ack-sport,
+tcp-synack, tcp-rst, udp, and udp-dport.
+.It Fl R
+specifies that the record route IP option should be used.
+.It Fl s Ar size
+specifies the size of the probes to send.
+The probe size includes the length of the IP and ICMP headers.
+By default, a probe size of 84 bytes is used for IPv4 pings, and 56 bytes for
+IPv6 pings.
+.It Fl S Ar srcaddr
+specifies the source address to use in probes.
+The address can be spoofed if -O spoof is included.
+.It Fl T Ar timestamp
+specifies that an IP timestamp option be included.
+The timestamp option can either be: tsprespec where IP addresses of devices
+of interest can be specified; tsonly, where timestamps are embedded by
+devices but no IP addresses are included; and tsandaddr, where timestamps
+and IP addresses are included by devices in the path.
+See the examples section for more information.
+.It Fl U Ar userid
+specifies an unsigned integer to include with the data collected; the meaning
+of the user-id is entirely up to the user and has no effect on the behaviour
+of ping.
+.It Fl W Ar timeout
+specifies how long to wait for responses after the last ping is sent.  By
+default this is one second.
+.It Fl z Ar tos
+specifies the value to use in the IPv4 ToS/DSCP + ECN byte.  By default, this
+byte is set to zero.
+.El
+.\""""""""""""
+.Sh DEALIAS OPTIONS
+The dealias command is used to send probes for the purpose of alias resolution.
+It supports the mercator technique, where aliases are inferred if a router
+uses a different address when sending an ICMP response; the ally technique,
+where aliases are inferred if a sequence of probes sent to alternating
+IP addresses yields responses with incrementing, interleaved IP-ID values;
+radargun, where probes are sent to a set of IP addresses in multiple rounds
+and aliases are inferred by post-processing the results; prefixscan, where
+an alias is searched in a prefix for a specified IP address; and bump,
+where two addresses believed to be aliases are probed in an effort to force
+their IP-ID values out of sequence.
+The following options are available for the
+.Nm
+dealias command:
+.Pp
+dealias
+.\"dealias [-d dport] [-f fudge] [-m method] [-o replyc] [-O option]\n"
+.\"        [-p '[-c sum] [-d dp] [-F sp] [-i ip] [-M mtu] [-P meth] [-s size] [-t ttl]']\n"
+.\"        [-q attempts] [-r wait-round] [-s sport] [-t ttl]\n"
+.\"        [-U userid] [-w wait-timeout] [-W wait-probe] [-x exclude]\n"
+.Bk -words
+.Op Fl d Ar dport
+.Op Fl f Ar fudge
+.Op Fl m Ar method
+.Op Fl o Ar replyc
+.Op Fl O Ar option
+.Op Fl p Ar probe-options
+.Op Fl q Ar attempts
+.Op Fl r Ar wait-round
+.Op Fl s Ar sport
+.Op Fl t Ar ttl
+.Op Fl U Ar userid
+.Op Fl w Ar wait-timeout
+.Op Fl W Ar wait-probe
+.Op Fl x Ar exclude
+.Ek
+.Bl -tag -width Ds
+.It Fl d Ar dport
+specifies the destination port to use when sending probes.
+Only valid for the mercator technique; destination ports can be specified
+in probedefs defined with
+.Fl p
+for other alias resolution methods.
+.It Fl f Ar fudge
+specifies a fudge factor for alias matching. Defaults to 200. Only valid for
+ally and bump.
+.It Fl m Ar method
+specifies which method to use for alias resolution.
+Valid options are: ally, bump, mercator, prefixscan, and radargun.
+.It Fl o Ar replyc
+specifies how many replies to wait for. Only valid for prefixscan.
+.It Fl O Ar option
+allows alias resolution behaviour to be further tailored.
+The current choices for this option are:
+.Bl -dash -offset 2n -compact -width 1n
+.It
+.Sy inseq
+where IP-ID values are required to be strictly in sequence (with no tolerance
+for packet reordering)
+.It
+.Sy shuffle
+randomise the order of probes sent each round; only valid for radargun
+probing.
+.It
+.Sy nobs
+do not allow for byte swapped IP-ID values in responses.
+Valid for ally and prefixscan.
+.El
+.It Fl p Ar probedef
+specifies a definition for a probe. Possible options are:
+.Bl -tag -width Ds
+.It Fl c Ar sum
+specifies what ICMP checksum to use for ICMP probes.
+The payload of the probe will be altered appropriately.
+.It Fl d Ar dst-port
+specifies the destination port of the probe.
+Defaults to 33435.
+.It Fl F Ar src-port
+specifies the source port of the probe.
+Defaults to (pid & 0x7fff) + 0x8000.
+.It Fl i Ar IP
+specifies the destination IP address of the probe.
+.It Fl M Ar mtu
+specifies the pseudo MTU to use when soliciting fragmented responses.
+.It Fl P Ar method
+specifies which method to use for the probe.
+Valid options are: udp, udp-dport, tcp-ack, tcp-ack-sport, tcp-syn-sport,
+and icmp-echo.
+.It Fl s Ar size
+specifies the size of the probes to send.
+.It Fl t Ar ttl
+specifies the IP time to live of the probe.
+.El
+The ally method accepts up to two probe definitions; the prefixscan
+method expects one probe definition; radargun expects at least one probe
+definition; bump expects two probe definitions.
+.It Fl q Ar attempts
+specifies how many times a probe should be retried if it does not obtain
+a useful response.
+.It Fl r Ar wait-round
+specifies how many milliseconds to wait between probing rounds with radargun.
+.It Fl s Ar sport
+specifies the source port to use when sending probes. Only valid for mercator.
+.It Fl t Ar ttl
+specifies the time-to-live of probes sent. Only valid for mercator.
+.It Fl U Ar userid
+specifies an unsigned integer to include with the data collected; the meaning
+of the user-id is entirely up to the user and has no effect on the behaviour
+of dealias.
+.It Fl w Ar wait-timeout
+specifies how long to wait in seconds for a reply from the remote host.
+.It Fl W Ar wait-probe
+specifies how long to wait in milliseconds between probes.
+.It Fl x Ar exclude
+specifies an IP address to exclude when using the prefixscan method.
+May be specified multiple times to exclude multiple addresses.
+.El
+.\""""""""""""
+.Sh NEIGHBOUR DISCOVERY OPTIONS
+The neighbourdisc command attempts to find the layer-2 address of a given
+IP address using IPv4 ARP or IPv6 Neighbour Discovery.
+The following options are available for the
+.Nm
+neighbourdisc command:
+.Pp
+neighbourdisc
+.Bk -words
+.Op Fl FQ
+.Op Fl i Ar interface
+.Op Fl o Ar reply-count
+.Op Fl q Ar attempts
+.Op Fl w Ar wait
+.Ek
+.Bl -tag -width Ds
+.It Fl F
+specifies that we only want the first response.
+.It Fl Q
+specifies that we want to send all attempts.
+.It Fl i Ar interface
+specifies the name of the interface to use for neighbour discovery.
+.It Fl o Ar reply-count
+specifies how many replies we wait for.
+.It Fl q Ar attempts
+specifies how many probes we send out.
+.It Fl w Ar wait
+specifies how long to wait between probes in milliseconds.
+Defaults to 1000.
+.El
+.\""""""""""""
+.Sh TBIT OPTIONS
+The tbit command can be used to infer TCP behaviour of a specified host.
+At present, it implements tests to check the ability of the host to respond
+to ICMP Packet Too Big messages, respond to Explicit Congestion Notification,
+test Selective Acknowledgement behaviour, the
+Initial Congestion Window, and resilience to Blind Attacks.
+The following options are available for the
+.Nm
+tbit command:
+.Pp
+tbit
+.\"tbit [-t type] [-p app] [-d dport] [-s sport] [-b asn] [-f cookie]\n"
+.\"     [-i icw] [-L abclimit] [-m mss] [-M mtu] [-o offset] [-O option]\n"
+.\"     [-P ptbsrc] [-q attempts] [-S srcaddr] [-T ttl] [-u url]";
+.Bk -words
+.Op Fl t Ar type
+.Op Fl p Ar app
+.Op Fl d Ar dport
+.Op Fl s Ar sport
+.Op Fl a Ar acks
+.Op Fl b Ar ASN
+.Op Fl i Ar ICW
+.Op Fl f Ar cookie
+.Op Fl L Ar limit
+.Op Fl m Ar mss
+.Op Fl M Ar mtu
+.Op Fl o Ar offset
+.Op Fl O Ar option
+.Op Fl P Ar ptbsrc
+.Op Fl q Ar attempts
+.Op Fl S Ar srcaddr
+.Op Fl T Ar ttl
+.Op Fl u Ar url
+.Op Fl U Ar userid
+.Op Fl w Ar wscale
+.Ek
+.Bl -tag -width Es
+.It Fl t Ar type
+specifies which type of testing to use.
+Valid options are: pmtud, ecn, null, sack-rcvr, icw, abc, blind-rst,
+blind-syn, blind-data.
+.It Fl p Ar app
+specifies what kind of traffic to generate for testing.
+Destination port defaults the application standard port.
+Valid applications are: http, bgp.
+.It Fl d Ar dport
+specifies the destination port for the packets being sent.
+Defaults are application-specific.
+.It Fl s Ar sport
+specifies the source port for the packets being sent.
+Default is based of the
+.Nm
+process id.
+.It Fl a Ar acks
+specifies the sequence of packets that should be acknowledged as part of
+the ABC test.
+.It Fl b Ar ASN
+specifies the autonomous system number (ASN) that should be used when
+establishing a BGP session.
+.It Fl i Ar ICW
+specifies the initial congestion window (ICW) that we expect from the peer
+when conducting the ABC test.
+.It Fl f Ar cookie
+specifies the TCP fast open cookie that should be used when establishing
+a TCP connection.
+.It Fl L Ar limit
+test the response to a theoretical limit (L) value with ABC.
+.It Fl m Ar mss
+specifies the maximum segment size to advertise to the remote host.
+.It Fl M Ar mtu
+specifies the MTU to use in a Packet Too Big message.
+.It Fl o Ar offset
+specifies the sequence number offset to use when conducting blind-syn and
+blind-rst tests, and the acknowledgement number offset to use when conducting
+a blind-data test.
+.It Fl O Ar option
+allows tbit behaviour to be further tailored.
+The current choices for this option are:
+.Bl -dash -offset 2n -compact -width 1n
+.It
+.Sy blackhole:
+for PMTUD testing, do not send Packet Too Big messages; this tests to
+ability of a host to infer a PMTUD blackhole and work around it.
+.It
+.Sy tcpts:
+advertise support for TCP timestamps when establishing a TCP connection.
+If the peer supports TCP timestamps, embed timestamps in data packets.
+.It
+.Sy ipts-syn:
+use the timestamp IP option in a SYN packet when attempting to establish
+a TCP connection.
+.It
+.Sy iprr-syn:
+use the record-route IP option in a SYN packet when attempting to establish
+a TCP connection.
+.It
+.Sy ipqs-syn:
+use the quick-start IP option in a SYN packet when attempting to establish
+a TCP connection.
+.It
+.Sy sack:
+advertise support for TCP selective acknowledgements (SACK) when establishing
+a TCP connection.
+.It
+.Sy fo:
+advertise support for TCP fast open using the official IANA number assigned
+for fast open.
+.It
+.Sy fo-exp:
+advertise support for TCP fast open using the testing number assigned by
+IANA for fast open.
+.El
+.It Fl P Ar ptbsrc
+specifies the source address that should be used to send Packet Too Big
+messages in the pmtud test.
+.It Fl q Ar attempts
+specifies the number of attempts to make with each packet to reduce false
+inferences caused by packet loss.
+.It Fl S Ar srcaddr
+specifies the source address that should be used in TCP packets sent by
+the tbit test.
+.It Fl T Ar ttl
+specifies the IP time-to-live value that should be used in TCP packets sent
+by the tbit test.
+.It Fl u Ar url
+specifies a url to use when using the http application method.
+If the url starts with https, the tbit test begins with a TLS
+handshake.
+.It Fl U Ar userid
+specifies an unsigned integer to include with the data collected; the meaning
+of the user-id is entirely up to the user and has no effect on the behaviour
+of tbit.
+.It Fl w Ar wscale
+specifies the window scale option to use when establishing the TCP connection.
+.El
+.\""""""""""""
+.Sh TRACELB OPTIONS
+The tracelb command is used to infer all per-flow load-balanced paths
+between a source and destination.
+The following options are available for the
+.Nm
+tracelb command:
+.Pp
+tracelb
+.\"tracelb [-c confidence] [-d dport] [-f firsthop] [-g gaplimit]\n"
+.\"        [-O option] [-P method] [-q attempts] [-Q maxprobec] [-s sport]\n"
+.\"        [-t tos] [-U userid] [-w wait-timeout] [-W wait-probe]";
+.Bk -words
+.Op Fl c Ar confidence
+.Op Fl d Ar dport
+.Op Fl f Ar firsthop
+.Op Fl g Ar gaplimit
+.Op Fl O Ar option
+.Op Fl P Ar method
+.Op Fl q Ar attempts
+.Op Fl Q Ar maxprobec
+.Op Fl s Ar sport
+.Op Fl t Ar tos
+.Op Fl U Ar userid
+.Op Fl w Ar wait-timeout
+.Op Fl W Ar wait-probe
+.Ek
+.Bl -tag -width Es
+.It Fl c Ar confidence
+specifies the level of confidence we want to attain that there are no more
+parallel load balanced paths at a given hop.
+Valid values are 95 (default) and 99, for 95% confidence and 99% confidence
+respectively.
+.It Fl d Ar dport
+specifies the base destination port to use. Defaults to 33435, the default
+used by traceroute(8).
+.It Fl f Ar firsthop
+specifies how many hops away we should start probing.
+.It Fl g Ar gaplimit
+specifies how many consecutive unresponsive hops are permitted before
+probing down a branch halts.  Defaults to three.
+.It Fl O Ar option
+allows tracelb behaviour to be further tailored.
+The current choices for this option are:
+.Bl -dash -offset 2n -compact -width 1n
+.It
+.Sy ptr:
+do Domain Name System pointer (PTR) record lookups for IP addresses.
+.El
+.It Fl P Ar method
+specifies which method we should use to do the probing.
+Valid options are: "udp-dport", "icmp-echo", "udp-sport", "tcp-sport", and
+"tcp-ack-sport".
+Defaults to "udp-dport".
+.It Fl q Ar attempts
+specifies how many probes we should send in an attempt to receive a reply.
+Defaults to 2.
+.It Fl Q Ar maxprobec
+specifies the maximum number of probes we ever want to send.
+Defaults to 3000.
+.It Fl s Ar sport
+specifies to the source port to use when sending probes.
+Default based on process ID.
+.It Fl t Ar tos
+specifies the value for the IP Type-of-service field for outgoing probes.
+Defaults to 0.
+.It Fl U Ar userid
+specifies an unsigned integer to include with the data collected; the meaning
+of the user-id is entirely up to the user and has no effect on the behaviour
+of tracelb.
+.It Fl w Ar wait-timeout
+specifies in seconds how long to wait for a reply to a probe. Defaults to 5.
+.It Fl W Ar wait-probe
+specifies in 1/100ths of seconds how long to wait between probes.
+Defaults to 25 (i.e. 250ms).
+.El
+.\""""""""""""
+.Sh STING OPTIONS
+The sting command is used to infer one-way loss using an algorithm with
+TCP probes.
+It requires the firewall be enabled in scamper using the
+.Fl F
+option.
+The following options are available for the
+.Nm
+sting command:
+.Pp
+sting
+.\"sting [-c count] [-d dport] [-f distribution] [-h request]\n"
+.\"      [-H hole] [-i inter] [-m mean] [-s sport]";
+.Bk -words
+.Op Fl c Ar count
+.Op Fl d Ar dport
+.Op Fl f Ar distribution
+.Op Fl h Ar request
+.Op Fl H Ar hole
+.Op Fl i Ar inter
+.Op Fl m Ar mean
+.Op Fl s Ar sport
+.Ek
+.Bl -tag -width Es
+.It Fl c Ar count
+specifies the number of samples to make.
+By default 48 samples are sent, as this value is the current default
+of the FreeBSD TCP reassembly queue length.
+Sting 0.7 uses 100 samples.
+.It Fl d Ar dport
+specifies the base destination port to use.
+Defaults to 80, the default port used by the HTTP protocol.
+.It Fl f Ar distribution
+specifies the delay distribution of samples.
+By default a uniform distribution is constructed.
+Other distributions are currently not implemented in scamper's implementation
+of sting.
+.It Fl h Ar request
+specifies the default request to make.
+Currently not implemented.
+.It Fl H Ar hole
+specifies the size of the initial hole left in the request.
+The default is 3 bytes, the same as sting-0.7.
+.It Fl i Ar inter
+specifies the inter-phase delay between data seeding and hole filling, in
+milliseconds.
+By default, sting waits 2000ms between phases.
+.It Fl m Ar mean
+specifies the mean rate to send packets in the data phase, in milliseconds.
+By default, sting waits 100ms between probes.
+.It Fl s Ar sport
+specifies to the source port to use when sending probes.
+Default is based on the process ID.
+.El
+.\""""""""""""
+.Sh SNIFF OPTIONS
+The sniff command is used to capture packets matching a specific
+signature.  At present, the only supported signature is ICMP echo
+packets with a specific ID value, or packets containing such a
+quote.
+The following options are available for the
+.Nm
+sniff command:
+.Pp
+sting
+.Bk -words
+.Op Fl c Ar limit-pktc
+.Op Fl G Ar limit-time
+.Op Fl S Ar ipaddr
+.Op Fl U Ar userid
+.Ek
+<expression>
+.Bl -tag -width Es
+.It Fl c Ar limit-pktc
+specifies the maximum number of packets to capture.
+.It Fl G Ar limit-time
+specifies the maximum time, in seconds, to capture packets.
+.It Fl S Ar ipaddr
+specifies the IP address that packets must arrive using.
+scamper uses the IP address to identify the appropriate interface
+to listen for packets.
+.It Fl U Ar userid
+specifies an unsigned integer to include with the data collected;
+the meaning of the user-id is entirely up to the user and has no
+effect on the behaviour of sniff.
+.El
+.Pp
+The sole supported expression is icmp[icmpid] == X, where X is the
+ICMP-ID to select.
+.\""""""""""""
+.Sh DATA COLLECTION FEATURES
+.Nm
+has two data output formats.
+The first is a human-readable format suitable for one-off data collection and
+measurement.
+The second, known as
+.Ic warts ,
+is a binary format that records much more meta-data and is more precise than
+the human-readable format.
+.Pp
+.Nm
+is designed for Internet-scale measurement, where large lists of targets
+are supplied for probing.
+.Nm
+has the ability to probe multiple lists simultaneously, with each having a
+mix rate that specifies the priority of the list.
+.Nm
+can also make multiple cycles over a list of addresses.
+.Pp
+When writing output to a
+.Ic warts
+file,
+.Nm
+records details of the list and cycle that each measurement task belongs
+to.
+.\""""""""""""
+.Sh CONTROL SOCKET
+When started with the
+.Fl P
+option,
+.Nm
+allows inter-process communication via a TCP socket bound to the supplied
+port on the local host.
+This socket is useful for controlling the operation of a long-lived
+.Nm
+process.
+A client may interact with scamper by using
+.Xr telnet 1
+to open a connection to the supplied port.
+.Pp
+The following control socket commands are available.
+.Pp
+.Bl -tag -width "   "
+.It Ic exit
+The exit command closes the current control socket connection.
+.It Ic attach
+The attach command changes how
+.Nm
+accepts and replies to commands, returning results straight over the control socket. See
+.Sy ATTACH
+section below for details on which commands are accepted.
+.It Ic get Ar argument
+The get command returns the current setting for the supplied argument.
+Valid argument values are: holdtime, monitorname, pid, pps, sport, version.
+.It Ic set Ar argument ...
+The set command sets the current setting for the supplied argument.
+Valid argument values are: holdtime, monitorname, pps.
+.It Ic source Ar argument ...
+.Bl -tag -width "   "
+.It Ic add Ar arguments
+The
+.Ic source add
+command allows a new input source to be added.
+It accepts the following arguments:
+.Bl -tag -width "   "
+.It Ic name Ar string
+The name of the source.  This parameter is mandatory.
+.It Ic descr Ar string
+An optional string describing the source.
+.It Ic command Ar string
+The command to execute for each address supplied.
+If not supplied, the default command is used.
+.It Ic list_id Ar uint32_t
+An optional numeric list identifier, assigned by a human.
+If not supplied, a value of zero is used.
+.It Ic cycle_id Ar uint32_t
+An optional numeric initial cycle identifier to use, assigned by a human.
+If not supplied, a value of one is used.
+.It Ic priority Ar uint32_t
+An optional numeric value that specifies the mix rate of measurements from
+the source compared to other sources.
+If not supplied, a mix rate of one is used.
+A value of zero causes the source to be created, but not actively used.
+.It Ic outfile Ar string
+The name of the output file to write results to, previously defined with
+.Ic outfile open .
+If not supplied, the default output file is used.
+.It Ic file Ar string
+The name of the input file to read target addresses from.
+This parameter is mandatory if the source is a managed source.
+.It Ic cycles Ar integer
+The number of cycles to make over the target address file.
+If zero,
+.Nm
+will loop indefinitely over the file.
+This parameter is ignored unless a managed source is defined.
+.It Ic autoreload Xo
+.Op Cm on | off
+.Xc
+This parameter specifies if the target address file should be re-read whenever
+a cycle is completed, or if the same set of target addresses as the previous
+cycle should be used.
+If not specified, the file is not automatically reloaded at cycle time.
+.El
+.It Ic update Ar name arguments
+The
+.Ic source update
+command allows some properties of an existing source to be modified.
+The source to update is specified with the
+.Ar name
+parameter.
+Valid parameters are: autoreload, cycles, and priority.
+.It Ic list Ar ...
+The
+.Ic source list
+command provides a listing of all currently defined sources.
+The optional third
+.Ar name
+parameter restricts the listing to the source specified.
+.It Ic cycle Ar name
+The
+.Ic source cycle
+command manually inserts a cycle marker in an adhoc source.
+.It Ic delete Ar name
+The
+.Ic source delete
+command deletes the named source, if possible.
+.El
+.It Ic outfile Ar argument ...
+The outfile commands provide the ability to manage output files.
+It accepts the following arguments:
+.Bl -tag -width "   "
+.It Ic open Ar ...
+The
+.Ic outfile open
+command allows a new output file to be defined.
+It accepts the following parameters:
+.Bl -tag -width "   "
+.It Ic name Ar alias
+The alias of the output file.  This parameter is mandatory.
+.It Ic file Ar string
+The filename of the output file.  This parameter is mandatory.
+.It Ic mode Xo
+.Op Cm truncate | append
+.Xc
+How the file will be opened.
+If the append mode is used, any existing file with the specified name will
+be appended to.
+If the truncate mode is used, any existing file will be truncated when it is
+opened.
+.El
+.It Ic close Ar alias
+The
+.Ic outfile close
+command allows an existing output file to be closed.
+The mandatory
+.Ar alias
+parameter specifies which output file to close.
+An output file that is currently referenced is not able to be closed.
+To close a file that is currently referenced, a new outfile must be opened,
+and then the
+.Ic outfile swap
+command be used.
+.It Ic swap Ar alias1 alias2
+The
+.Ic outfile swap
+command swaps the file associated with each output file.
+.It Ic list
+The
+.Ic outfile list
+command outputs a list of the existing outfiles.
+.El
+.It Ic observe sources
+This command allows for monitoring of source events.
+When executed, the control socket will then supply event notices
+whenever a source is added, updated, deleted, finished, or cycled.
+Each event is prefixed with a count of the number of seconds elapsed since
+the Unix epoch.
+The following examples illustrate the event monitoring capabilities:
+.Pp
+.Dl EVENT 1169065640 source add name 'foo' list_id 5 priority 1
+.Dl EVENT 1169065641 source update 'foo' priority 15
+.Dl EVENT 1169065642 source cycle 'bar' id 2
+.Dl EVENT 1169065650 source finish 'bar'
+.Dl EVENT 1169065661 source delete 'foo'
+.It Ic shutdown Ar argument
+The shutdown argument allows the
+.Nm
+process to be exited cleanly.  The following arguments are supported
+.Bl -tag -width "   "
+.It Ic done
+The
+.Ic shutdown done
+command requests that
+.Nm
+shuts down when the current tasks, as well as all remaining cycles, have
+completed.
+.It Ic flush
+The
+.Ic shutdown flush
+command requests that
+.Nm
+flushes all remaining tasks queued with each list, finishes all current
+tasks, and then shuts down.
+.It Ic now
+The
+.Ic shutdown now
+command causes
+.Nm
+to shutdown immediately.
+Unfinished tasks are purged.
+.It Ic cancel
+The
+.Ic shutdown cancel
+command cancels any pending shutdown.
+.El
+.El
+.\""""""""""
+.Sh ATTACH MODE
+In attach mode, none of the usual interactive mode commands are usable.
+Instead, commands may be entered directly and results will be sent back
+directly over the control socket.
+Commands are specified just as they would be with the -I flag for a
+command-line invocation of
+.Nm .
+Replies are split into lines by single \\n characters and have one of the
+following formats:
+.Bl -tag -width "   "
+.It Ic ERR Ar ...
+A line starting with the 3 characters "ERR" indicates an error has occurred.
+The rest of the line will contain an error message.
+.It Ic OK Ar id-num
+A line with the 2 characters "OK" indicates that scamper has accepted
+the command.
+.Nm
+versions after 20110623 return an id number associated with the command,
+which allow the task to be halted by subsequently issuing a "halt"
+instruction.
+.It Ic MORE
+A line with just the 4 characters "MORE" indicates that scamper has the
+capacity to accept more probing commands to run in parallel.
+.It Ic DATA Ar length
+A line starting with the 4 characters "DATA" follow by a space then a base-10
+number indicates the start of result.
+.Ar length
+specifies the number of characters of the data, including newlines. The data
+is in binary warts format and uuencoded before transmission.
+.El
+.Pp
+To exit attached mode the client must send a single line containing "done".
+To halt a command that has not yet completed, issue a "halt" instruction with
+the id number returned when the command was accepted as the sole parameter.
+.\""""""""""
+.Sh EXAMPLES
+To use the default traceroute command to trace the path to 192.0.2.1:
+.Pp
+.in +.5i
+scamper -i 192.0.2.1
+.in -.5i
+.Pp
+To infer Path MTU changes in the network and associate them with a traceroute
+path:
+.Pp
+.in +.5i
+scamper -I "trace -P udp-paris -M 192.0.2.1"
+.in -.5i
+.Pp
+To use paris traceroute with ICMP probes, using 3 probes per hop, sending
+all probes, writing to a specified warts file:
+.Pp
+.in +.5i
+scamper -O warts -o file.warts -I "trace -P icmp-paris -q 3 -Q 192.0.2.1"
+.in -.5i
+.Pp
+To ping a series of addresses defined in
+.Ar filename ,
+probing each address 10 times:
+.Pp
+.in +.5i
+scamper -c "ping -c 10"
+.Ar filename
+.in -.5i
+.Pp
+Care must be taken with shell quoting when using commands with multiple levels
+of quoting, such as when giving a probe description with a dealias command.
+The following sends UDP probes to alternating IP addresses, one second apart,
+and requires the IP-ID values returned to be strictly in sequence.
+.Pp
+.in +.5i
+scamper -O warts -o ally.warts -I "dealias -O inseq -W 1000 -m ally -p '-P udp -i 192.0.2.1' -p '-P udp -i 192.0.2.4'"
+.in -.5i
+.Pp
+Alternatively, the following accomplishes the same, but without specifying the
+UDP probe method twice.
+.Pp
+.in +.5i
+scamper -O warts -o ally.warts -I "dealias -O inseq -W 1000 -m ally -p '-P udp' 192.0.2.1 192.0.2.4"
+.in -.5i
+.Pp
+The following command scans 198.51.100.0/28 for a matching alias to 192.0.2.4,
+but skips 198.51.100.3.
+.Pp
+.in +.5i
+scamper -O warts -o prefixscan.warts -I "dealias -O inseq -W 1000 -m prefixscan -p '-P udp' -x 198.51.100.3 192.0.2.4 198.51.100.0/28"
+.in -.5i
+.Pp
+The following uses UDP probes to enumerate all per-flow load-balanced paths
+towards 192.0.2.6 to 99% confidence; it varies the source port with each
+probe.
+.Pp
+.in +.5i
+scamper -I "tracelb -P udp-sport -c 99 192.0.2.6"
+.in -.5i
+.Sh SEE ALSO
+.Xr ping 8 ,
+.Xr traceroute 8 ,
+.Xr libscamperfile 3 ,
+.Xr sc_ally 1 ,
+.Xr sc_analysis_dump 1 ,
+.Xr sc_attach 1 ,
+.Xr sc_ipiddump 1 ,
+.Xr sc_filterpolicy 1 ,
+.Xr sc_remoted 1 ,
+.Xr sc_speedtrap 1 ,
+.Xr sc_tbitblind 1 ,
+.Xr sc_tracediff 1 ,
+.Xr sc_uptime 1 ,
+.Xr sc_wartscat 1 ,
+.Xr sc_wartsdump 1 ,
+.Xr sc_warts2json 1 ,
+.Xr sc_warts2pcap 1 ,
+.Xr sc_warts2text 1 ,
+.Rs
+.%A "S. Savage"
+.%T "Sting: a TCP-based Network Measurement Tool"
+.%O "1999 USENIX Symposium on Internet Technologies and Systems"
+.Re
+.Rs
+.%A "R. Govindan"
+.%A "H. Tangmunarunkit"
+.%T "Heuristics for Internet Map Discovery"
+.%O "Proc. IEEE INFOCOM 2000"
+.Re
+.Rs
+.%A "N. Spring"
+.%A "R. Mahajan"
+.%A "D. Wetherall"
+.%T "Measuring ISP topologies with Rocketfuel"
+.%O "Proc. ACM SIGCOMM 2002"
+.Re
+.Rs
+.%A "A. Medina"
+.%A "M. Allman"
+.%A "S. Floyd"
+.%T "Measuring the evolution of transport protocols in the Internet"
+.%O "ACM/SIGCOMM Computer Communication Review"
+.Re
+.Rs
+.%A "M. Luckie"
+.%A "K. Cho"
+.%A "B. Owens"
+.%T "Inferring and Debugging Path MTU Discovery Failures"
+.%O "Proc. ACM/SIGCOMM Internet Measurement Conference 2005"
+.Re
+.Rs
+.%A "B. Donnet"
+.%A "P. Raoult"
+.%A "T. Friedman"
+.%A "M. Crovella"
+.%T "Efficient algorithms for large-scale topology discovery"
+.%O "Proc. ACM SIGMETRICS 2005"
+.Re
+.Rs
+.%A "B. Augustin"
+.%A "X. Cuvellier"
+.%A "B. Orgogozo"
+.%A "F. Viger"
+.%A "T. Friedman"
+.%A "M. Latapy"
+.%A "C. Magnien"
+.%A "R. Teixeira"
+.%T "Avoiding traceroute anomalies with Paris traceroute"
+.%O "Proc. ACM/SIGCOMM Internet Measurement Conference 2006"
+.Re
+.Rs
+.%A "B. Augustin"
+.%A "T. Friedman"
+.%A "R. Teixeira"
+.%T "Measuring Load-balanced Paths in the Internet"
+.%O "Proc. ACM/SIGCOMM Internet Measurement Conference 2007"
+.Re
+.Rs
+.%A "A. Bender"
+.%A "R. Sherwood"
+.%A "N. Spring"
+.%T "Fixing Ally's growing pains with velocity modeling"
+.%O "Proc. ACM/SIGCOMM Internet Measurement Conference 2008"
+.Re
+.Rs
+.%A "M. Luckie"
+.%T "Scamper: a Scalable and Extensible Packet Prober for Active Measurement of the Internet"
+.%O "Proc. ACM/SIGCOMM Internet Measurement Conference 2010"
+.Re
+.Rs
+.%A "R. Beverly"
+.%A "W. Brinkmeyer"
+.%A "M. Luckie"
+.%A "J.P. Rohrer"
+.%T "IPv6 Alias Resolution via Induced Fragmentation"
+.%O "Proc. Passive and Active Measurement Conference 2013"
+.Re
+.Rs
+.%A "M. Luckie"
+.%A "R. Beverly"
+.%A "W. Brinkmeyer"
+.%A "k claffy"
+.%T "Speedtrap: Internet-scale IPv6 Alias Resolution"
+.%O "Proc. ACM/SIGCOMM Internet Measurement Conference 2013"
+.Re
+.Rs
+.%A "M. Luckie"
+.%A "R. Beverly"
+.%A "T. Wu"
+.%A "M. Allman"
+.%A "k. claffy"
+.%T "Resilience of Deployed TCP to Blind Attacks"
+.%O "Proc. ACM/SIGCOMM Internet Measurement Conference 2015"
+.Re
+.Rs
+.%A "J. Czyz"
+.%A "M. Luckie"
+.%A "M. Allman"
+.%A "M. Bailey"
+.%T "Don't Forget to Lock the Back Door! A Characterization of IPv6 Network Security Policy"
+.%O "Proc. Network and Distributed Systems Security (NDSS) Conference 2016"
+.Re
+.Rs
+.%A "M. Luckie"
+.%A "A. Dhamdhere"
+.%A "B. Huffaker"
+.%A "D. Clark"
+.%A "k. claffy"
+.%T "bdrmap: Inference of Borders Between IP Networks"
+.%O "Proc. ACM/SIGCOMM Internet Measurement Conference 2016"
+.Re
+.Rs
+.%A "M. Luckie"
+.%A "R. Beverly"
+.%T "The Impact of Router Outages on the AS-level Internet"
+.%O "Proc. ACM/SIGCOMM Conference 2017"
+.Re
+.\""""""""""""
+.Sh AUTHORS
+.Nm
+was written by Matthew Luckie <mjl@luckie.org.nz>.
+Alistair King contributed an initial implementation of Doubletree;
+Ben Stasiewicz contributed an initial implementation of TBIT's PMTUD test;
+Stephen Eichler contributed an initial implementation of TBIT's ECN test;
+Boris Pfahringer adapted
+.Nm
+to use GNU autotools, modularised the tests, and updated this man page.
+Brian Hammond of Internap Network Services Corporation provided an initial
+implementation of scamper's json output format.
+Tiange Wu contributed an initial implementation of the blind in-window TBIT
+test, and Robert Beverly contributed BGP protocol support for TBIT.
+.\""""""""""""
+.Sh ACKNOWLEDGEMENTS
+.Nm
+development was initially funded by the WIDE project in association with
+CAIDA.
+Boris' work was funded by the University of Waikato's Centre for Open
+Source Innovation.

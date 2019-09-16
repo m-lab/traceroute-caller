@@ -1,0 +1,123 @@
+.\"
+.\" sc_erosprober.1
+.\"
+.\" Author: Matthew Luckie <mjl@luckie.org.nz>
+.\"
+.\" Copyright (c) 2019 Matthew Luckie
+.\"                    All rights reserved
+.\"
+.\" $Id: sc_erosprober.1,v 1.2 2019/09/08 00:34:01 mjl Exp $
+.\"
+.Dd September 8, 2019
+.Dt SC_EROSPROBER 1
+.Os
+.Sh NAME
+.Nm sc_erosprober
+.Nd scamper driver to periodically probe addresses and rotate output files.
+.Sh SYNOPSIS
+.Nm
+.Bk -words
+.Op Fl a Ar addrfile
+.Op Fl c Ar command
+.Op Fl I Ar interval
+.Op Fl l Ar logfile
+.Op Fl o Ar outfile
+.Op Fl O Ar option
+.Op Fl p Ar port
+.Op Fl R Ar rotation
+.Op Fl U Ar unix
+.Ek
+.\""""""""""""
+.Sh DESCRIPTION
+The
+.Nm
+utility provides the ability to connect to a running
+.Xr scamper 1
+instance and use it to periodically probe a set of addresses at a
+defined interval, and periodically rotate the output file at a defined
+interval.
+The supported options to
+.Nm
+are as follows:
+.Bl -tag -width Ds
+.It Fl a Ar addrfile
+specifies the name of the input file which consists of a sequence of
+IP addresses to probe, one address per line.
+.It Fl c Ar command
+specifies the command to use with each address.
+.Nm
+supports the trace and ping commands, and their options, in scamper.
+.Xr scamper 1
+documents the options available in trace and ping.
+.It Fl I Ar interval
+specifies the probe interval, in seconds, between probing each address.
+.Nm
+will spread the probing of the addresses across the interval.
+If there are 10 addresses to probe at an interval of 20 seconds, then
+.Nm
+will issue a command every two seconds.
+.It Fl l Ar logfile
+specifies the name of a file to log progress output from
+.Nm
+generated at run time.
+.It Fl o Ar outfile
+specifies the prefix of the name of the output file to be written.
+The output file will use the
+.Xr warts 5
+format.
+.Nm
+will create a sequence of files named using the prefix and a timestamp.
+.It Fl O Ar options
+allows the behavior of
+.Nm
+to be further tailored.
+The current choices for this option are:
+.Bl -dash -offset 2n -compact -width 1n
+.It
+.Sy noshuffle:
+do not shuffle the order of addresses before probing starts.
+.It
+.Sy nooutfile:
+do not write to warts files, just do the probing.
+.El
+.It Fl p Ar port
+specifies the port on the local host where
+.Xr scamper 1
+is accepting control socket connections.
+.It Fl R Ar rotation
+specifies the rotation interval, in seconds, between rotating output
+files.
+.It Fl U Ar unix
+specifies the name of a unix domain socket where
+.Xr scamper 1
+is accepting control socket connections.
+.El
+.\""""""""""""
+.Sh EXAMPLES
+Given a set of IPv4 and IPv6 addresses contained in a file named
+addrs and a scamper process listening at sock
+configured to probe at 100 packets per second started as follows:
+.Pp
+.Dl scamper -U sock -p 100
+.Pp
+the following command will ping the addresses every two minutes using
+one packet, and create an output file every thirty seconds prefixed
+with foo:
+.Pp
+.Dl sc_erosprober -U sock -a addrs -o foo -I 120 -R 30 -c 'ping -c 1'
+.Pp
+The following command will traceroute towards the addresses every 15
+minutes, creating an output file every minute:
+.Pp
+.Dl sc_erosprober -U sock -a addrs -o foo -I 900 -R 60 -c 'trace'
+.Pp
+.\""""""""""""
+.Sh SEE ALSO
+.Xr scamper 1 ,
+.Xr sc_wartsdump 1 ,
+.Xr sc_warts2text 1 ,
+.Xr sc_warts2json 1 ,
+.Xr warts 5
+.Sh AUTHORS
+.Nm
+was written by Matthew Luckie.
