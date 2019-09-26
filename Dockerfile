@@ -11,8 +11,11 @@ RUN chmod -R a+rx /go/bin/traceroute-caller
 
 
 FROM ubuntu:latest
-# Install all the standard packages we need
-RUN apt-get update && apt-get install -y python python-pip make iproute2 coreutils
+# Install all the standard packages we need and then remove the ap-get lists.
+RUN apt-get update && \
+    apt-get install -y python python-pip make iproute2 coreutils && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
 RUN ls -l
 RUN mkdir /source
@@ -20,7 +23,7 @@ ADD ./vendor/scamper/ /source
 RUN chmod +x /source/scamper-cvs-20190916/configure
 WORKDIR /source/scamper-cvs-20190916/
 RUN ./configure
-RUN make
+RUN make -j 8
 RUN make install
 RUN ldconfig
 
