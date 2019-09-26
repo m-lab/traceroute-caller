@@ -32,6 +32,11 @@ func TestParseIPAndPort(t *testing.T) {
 	if err == nil {
 		log.Println("Should have had an error on bad input")
 	}
+
+	_, _, err = parseIPAndPort("127.0.0.1:1")
+	if err == nil {
+		log.Println("Should have had an error on an ignored IP")
+	}
 }
 
 func TestParseCookie(t *testing.T) {
