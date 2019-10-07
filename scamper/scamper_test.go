@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/m-lab/go/prometheusx"
 	"github.com/m-lab/go/rtx"
 	"github.com/m-lab/traceroute-caller/connection"
 	"github.com/m-lab/uuid/prefix"
@@ -90,7 +91,7 @@ func TestExistingFileStopsDaemonCreation(t *testing.T) {
 	d.MustStart(context.Background())
 }
 
-func TestTraceWritesUUID(t *testing.T) {
+func TestTraceWritesMeta(t *testing.T) {
 	tempdir, err := ioutil.TempDir("", "TestTraceWritesUUID")
 	rtx.Must(err, "Could not create tempdir")
 	defer os.RemoveAll(tempdir)
@@ -113,7 +114,7 @@ func TestTraceWritesUUID(t *testing.T) {
 	}
 
 	faketime := time.Date(2019, time.April, 1, 3, 45, 51, 0, time.UTC)
-
+	prometheusx.GitShortCommit = "Fake Version"
 	d.Trace(c, faketime)
 
 	// Unmarshal the first line of the output file.
@@ -121,7 +122,8 @@ func TestTraceWritesUUID(t *testing.T) {
 	rtx.Must(err, "Could not read file")
 
 	type metadata struct {
-		UUID string
+		UUID                    string
+		TracerouteCallerVersion string
 	}
 	m := metadata{}
 	lines := strings.Split(string(b), "\n")
@@ -131,8 +133,13 @@ func TestTraceWritesUUID(t *testing.T) {
 	rtx.Must(json.Unmarshal([]byte(lines[0]), &m), "Could not unmarshal")
 
 	uuidChunks := strings.Split(m.UUID, "_")
+
 	if uuidChunks[len(uuidChunks)-1] != "0000000000000001" {
 		t.Error("Bad uuid:", m.UUID)
+	}
+
+	if m.TracerouteCallerVersion != "Fake Version" {
+		t.Error("Bad traceroute caller version:", m.TracerouteCallerVersion)
 	}
 }
 

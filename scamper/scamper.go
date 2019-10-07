@@ -4,6 +4,7 @@ package scamper
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
@@ -15,6 +16,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 
+	"github.com/m-lab/go/prometheusx"
 	"github.com/m-lab/go/rtx"
 	"github.com/m-lab/traceroute-caller/connection"
 	"github.com/m-lab/uuid"
@@ -144,7 +146,10 @@ func (d *Daemon) trace(conn connection.Connection, t time.Time) {
 	// into proper json.Marshal calls.
 	uuid, err := conn.UUID()
 	rtx.PanicOnError(err, "Could not parse UUID - this should never happen")
-	_, err = buff.WriteString("{\"UUID\": \"" + uuid + "\"}\n")
+
+	// Add github version number of traceroute caller for tracking purpose.
+	metaString := fmt.Sprintf("{\"UUID\": \"%s\", \"TracerouteCallerVersion\": \"%s\"}\n", uuid, prometheusx.GitShortCommit)
+	_, err = buff.WriteString(metaString)
 	rtx.PanicOnError(err, "Could not write to buffer")
 
 	cmd := pipe.Line(
