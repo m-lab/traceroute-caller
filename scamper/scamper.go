@@ -161,3 +161,7 @@ func (d *Daemon) trace(conn connection.Connection, t time.Time) {
 	rtx.PanicOnError(pipe.Run(cmd), "Command %v failed", cmd)
 	rtx.PanicOnError(ioutil.WriteFile(filename, buff.Bytes(), 0666), "Could not save output to file")
 }
+
+type Tracer interface {
+	Trace(conn connection.Connection, t time.Time)
+}

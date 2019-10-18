@@ -9,9 +9,12 @@ import (
 
 	"github.com/m-lab/go/flagx"
 	"github.com/m-lab/go/rtx"
+	"github.com/m-lab/tcp-info/eventsocket"
 
 	"github.com/m-lab/go/prometheusx"
+	"github.com/m-lab/traceroute-caller/connectionlistener"
 	"github.com/m-lab/traceroute-caller/connectionpoller"
+	"github.com/m-lab/traceroute-caller/ipcache"
 	"github.com/m-lab/traceroute-caller/scamper"
 )
 
@@ -22,6 +25,7 @@ var (
 	scamperCtrlSocket = flag.String("scamper.unixsocket", "/tmp/scamperctrl", "The name of the UNIX-domain socket that the scamper daemon should listen on")
 	outputPath        = flag.String("outputPath", "/var/spool/scamper", "path of output")
 	waitTime          = flag.Duration("waitTime", 5*time.Second, "how long to wait between subsequent listings of open connections")
+	tcpinfoSocket     = flag.String("tcpinfo.socket", "", "The filename of the unix domain socket served by tcpinfo. If this argument is set, then tcpinfo will be used instead of the `ss` command.")
 
 	ctx, cancel = context.WithCancel(context.Background())
 )
@@ -47,15 +51,21 @@ func main() {
 	}
 	go daemon.MustStart(ctx)
 
-	connPoller := connectionpoller.New()
-	for ctx.Err() == nil {
-		closedConnections := connPoller.GetClosedConnections()
-		fmt.Printf("length of closed connections: %d\n", len(closedConnections))
-		daemon.TraceAll(closedConnections)
+	cache := ipcache.New(ctx)
+	if *tcpinfoSocket == "" {
+		connPoller := connectionpoller.New(cache)
+		for ctx.Err() == nil {
+			closedConnections := connPoller.GetClosedConnections()
+			fmt.Printf("length of closed connections: %d\n", len(closedConnections))
+			daemon.TraceAll(closedConnections)
 
-		select {
-		case <-time.After(*waitTime):
-		case <-ctx.Done():
+			select {
+			case <-time.After(*waitTime):
+			case <-ctx.Done():
+			}
 		}
+	} else {
+		connListener := connectionlistener.New(&daemon, cache)
+		eventsocket.MustRun(ctx, *tcpinfoSocket, connListener)
 	}
 }

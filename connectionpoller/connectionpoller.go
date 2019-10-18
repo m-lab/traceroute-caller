@@ -4,7 +4,6 @@ package connectionpoller
 
 import (
 	"bytes"
-	"context"
 	"errors"
 	"flag"
 	"fmt"
@@ -127,22 +126,22 @@ type finder interface {
 	GetConnections() map[connection.Connection]struct{}
 }
 
-type connectionWatcher struct {
+type connectionPoller struct {
 	finder
-	recentIPCache  ipcache.RecentIPCache
+	recentIPCache  *ipcache.RecentIPCache
 	connectionPool map[connection.Connection]struct{}
 }
 
-// ConnectionWatcher is in interface for an object that returns a list of all
+// ConnectionPoller is in interface for an object that returns a list of all
 // connections which it previously measured to be open, but it can no longer
 // measure to be open.
-type ConnectionWatcher interface {
+type ConnectionPoller interface {
 	GetClosedConnections() []connection.Connection
 }
 
 // GetClosedConnections returns the list of connections which were previously
 // measured to be open but were not measured to be open this time..
-func (c *connectionWatcher) GetClosedConnections() []connection.Connection {
+func (c *connectionPoller) GetClosedConnections() []connection.Connection {
 	oldConn := c.connectionPool
 	fmt.Printf("old connection size %d\n", len(oldConn))
 	c.connectionPool = c.GetConnections()
@@ -158,11 +157,11 @@ func (c *connectionWatcher) GetClosedConnections() []connection.Connection {
 	return closed
 }
 
-// New creates and returns a new ConnectionWatcher.
-func New() ConnectionWatcher {
-	c := &connectionWatcher{
+// New creates and returns a new ConnectionPoller.
+func New(cache *ipcache.RecentIPCache) ConnectionPoller {
+	c := &connectionPoller{
 		finder:         &ssFinder{},
-		recentIPCache:  *ipcache.New(context.Background()),
+		recentIPCache:  cache,
 		connectionPool: make(map[connection.Connection]struct{}),
 	}
 	c.GetConnections()

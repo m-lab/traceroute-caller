@@ -4,6 +4,8 @@ package connection
 import (
 	"strconv"
 
+	"github.com/m-lab/tcp-info/inetdiag"
+
 	"github.com/m-lab/uuid"
 )
 
@@ -23,4 +25,14 @@ func (c *Connection) UUID() (string, error) {
 	// cookie is a hexdecimal string
 	result, err := strconv.ParseUint(c.Cookie, 16, 64)
 	return uuid.FromCookie(result), err
+}
+
+func FromSockID(sockid inetdiag.SockID) Connection {
+	return Connection{
+		RemoteIP:   sockid.SrcIP,
+		RemotePort: int(sockid.SPort),
+		LocalIP:    sockid.DstIP,
+		LocalPort:  int(sockid.DPort),
+		Cookie:     strconv.FormatUint(sockid.CookieUint64(), 16),
+	}
 }
