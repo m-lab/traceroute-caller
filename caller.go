@@ -11,7 +11,7 @@ import (
 	"github.com/m-lab/go/rtx"
 
 	"github.com/m-lab/go/prometheusx"
-	"github.com/m-lab/traceroute-caller/connectionwatcher"
+	"github.com/m-lab/traceroute-caller/connectionpoller"
 	"github.com/m-lab/traceroute-caller/scamper"
 )
 
@@ -47,9 +47,9 @@ func main() {
 	}
 	go daemon.MustStart(ctx)
 
-	connWatcher := connectionwatcher.New()
+	connPoller := connectionpoller.New()
 	for ctx.Err() == nil {
-		closedConnections := connWatcher.GetClosedConnections()
+		closedConnections := connPoller.GetClosedConnections()
 		fmt.Printf("length of closed connections: %d\n", len(closedConnections))
 		daemon.TraceAll(closedConnections)
 

@@ -1,6 +1,6 @@
-// Package connectionwatcher provides a way of discovering what connections are
+// Package connectionpoller provides a way of discovering what connections are
 // currently open, and what connections have recently disappeared.
-package connectionwatcher
+package connectionpoller
 
 import (
 	"bytes"

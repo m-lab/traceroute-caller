@@ -1,5 +1,5 @@
-// The package is not connectionwatcher_test for test unexported funcs
-package connectionwatcher
+// The package is not connectionpoller_test for test unexported funcs
+package connectionpoller
 
 import (
 	"io/ioutil"
