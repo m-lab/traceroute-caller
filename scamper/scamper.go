@@ -162,6 +162,7 @@ func (d *Daemon) trace(conn connection.Connection, t time.Time) {
 	rtx.PanicOnError(ioutil.WriteFile(filename, buff.Bytes(), 0666), "Could not save output to file")
 }
 
+// Tracer allows users of the scamper.Daemon struct to create their own mocks.
 type Tracer interface {
 	Trace(conn connection.Connection, t time.Time)
 }

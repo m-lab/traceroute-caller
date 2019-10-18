@@ -27,6 +27,7 @@ func (c *Connection) UUID() (string, error) {
 	return uuid.FromCookie(result), err
 }
 
+// FromSockID converts a SockID into a Connection.
 func FromSockID(sockid inetdiag.SockID) Connection {
 	return Connection{
 		RemoteIP:   sockid.SrcIP,
