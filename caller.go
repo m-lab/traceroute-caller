@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/m-lab/traceroute-caller/connection"
+
 	"github.com/m-lab/go/flagx"
 	"github.com/m-lab/go/rtx"
 	"github.com/m-lab/tcp-info/eventsocket"
@@ -65,7 +67,9 @@ func main() {
 			}
 		}
 	} else {
-		connListener := connectionlistener.New(&daemon, cache)
+		connCreator, err := connection.NewCreator()
+		rtx.Must(err, "Could not discover local IPs")
+		connListener := connectionlistener.New(&daemon, connCreator, cache)
 		eventsocket.MustRun(ctx, *tcpinfoSocket, connListener)
 	}
 }

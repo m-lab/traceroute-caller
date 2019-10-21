@@ -1,6 +1,7 @@
 package connectionlistener
 
 import (
+	"log"
 	"sync"
 	"time"
 
@@ -15,17 +16,23 @@ import (
 // to build a simple client for that service using the libraries from the
 // service itself.
 type connectionListener struct {
-	mutex  sync.Mutex
-	conns  map[string]connection.Connection
-	tracer scamper.Tracer
-	cache  *ipcache.RecentIPCache
+	mutex   sync.Mutex
+	conns   map[string]connection.Connection
+	tracer  scamper.Tracer
+	cache   *ipcache.RecentIPCache
+	creator connection.Creator
 }
 
 func (cl *connectionListener) Open(timestamp time.Time, uuid string, id *inetdiag.SockID) {
 	cl.mutex.Lock()
 	defer cl.mutex.Unlock()
 	if id != nil {
-		cl.conns[uuid] = connection.FromSockID(*id)
+		conn, err := cl.creator.FromSockID(*id)
+		if err == nil {
+			cl.conns[uuid] = conn
+		} else {
+			log.Printf("Could not create connection from SockID %+v\n", *id)
+		}
 	}
 }
 
@@ -47,10 +54,11 @@ func (cl *connectionListener) Close(timestamp time.Time, uuid string) {
 
 // New returns an eventsocket.Handler that will call the passed-in scamper
 // daemon on every closed connection.
-func New(tracer scamper.Tracer, cache *ipcache.RecentIPCache) eventsocket.Handler {
+func New(tracer scamper.Tracer, creator connection.Creator, cache *ipcache.RecentIPCache) eventsocket.Handler {
 	return &connectionListener{
-		conns:  make(map[string]connection.Connection),
-		tracer: tracer,
-		cache:  cache,
+		conns:   make(map[string]connection.Connection),
+		tracer:  tracer,
+		cache:   cache,
+		creator: creator,
 	}
 }

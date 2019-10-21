@@ -4,6 +4,7 @@ import (
 	"context"
 	"io/ioutil"
 	"log"
+	"net"
 	"os"
 	"sort"
 	"sync"
@@ -52,7 +53,9 @@ func TestListener(t *testing.T) {
 	ft := &fakeTracer{}
 	ft.wg.Add(2)
 
-	cl := connectionlistener.New(ft, cache)
+	localIP := net.ParseIP("10.0.0.1")
+	creator := connection.NewFakeCreator([]*net.IP{&localIP})
+	cl := connectionlistener.New(ft, creator, cache)
 
 	// Connect the connectionlistener to the server
 	go eventsocket.MustRun(ctx, dir+"/tcpevents.sock", cl)
@@ -82,12 +85,21 @@ func TestListener(t *testing.T) {
 	thirdid := inetdiag.SockID{
 		SPort:  2,
 		DPort:  3,
-		SrcIP:  "192.168.0.2",
-		DstIP:  "10.0.0.1",
+		DstIP:  "192.168.0.2",
+		SrcIP:  "10.0.0.1",
 		Cookie: 3,
 	}
 	srv.FlowCreated(time.Now(), uuid.FromCookie(3), thirdid)
 	srv.FlowDeleted(time.Now(), uuid.FromCookie(3))
+
+	badid := inetdiag.SockID{
+		SPort:  2,
+		DPort:  3,
+		SrcIP:  "thisisnotanip",
+		DstIP:  "neitheristhis",
+		Cookie: 3,
+	}
+	srv.FlowCreated(time.Now(), uuid.FromCookie(4), badid)
 
 	// Verify that the right calls were made to the fake tracer.
 	ft.wg.Wait()
