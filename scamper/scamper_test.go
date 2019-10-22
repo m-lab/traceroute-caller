@@ -186,7 +186,7 @@ func TestGetMetaline(t *testing.T) {
 		Cookie:     "abc",
 	}
 	meta := GetMetaline(conn, 1, "00EF")
-	if !strings.Contains(meta, "0000000000000ABC\", \"TracerouteCallerVersion\": \"No commit specified\", \"isCached\":1, \"cachedUUID\": \"00EF\"") {
+	if !strings.Contains(meta, "0000000000000ABC\", \"TracerouteCallerVersion\": \"Fake Version\", \"isCached\":1, \"cachedUUID\": \"00EF\"") {
 		t.Error("Fail to generate meta ", meta)
 	}
 }
