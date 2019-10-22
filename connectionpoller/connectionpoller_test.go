@@ -8,6 +8,7 @@ import (
 	"os"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/m-lab/traceroute-caller/ipcache"
 
@@ -112,6 +113,19 @@ func TestGetConnectionsWithFakeSS(t *testing.T) {
 	}
 }
 
+type testTracer struct {
+	calls   int
+	answers []map[connection.Connection]struct{}
+}
+
+func (tf *testTracer) Trace(conn connection.Connection, t time.Time) string {
+	return "Fake Trace test"
+}
+
+func (tf *testTracer) CreateCacheTest(conn connection.Connection, t time.Time, cachedTest string) {
+	return
+}
+
 func TestConnectionPollerConstruction(t *testing.T) {
 	// The only thing we can verify by default is that the code does not crash.
 	// Which is not nothing, but it's not a lot.
@@ -119,42 +133,6 @@ func TestConnectionPollerConstruction(t *testing.T) {
 	defer cancel()
 	cache := ipcache.New(ctx)
 	connPoller := New(cache)
-	connPoller.GetClosedConnections()
-}
-
-type testFinder struct {
-	calls   int
-	answers []map[connection.Connection]struct{}
-}
-
-func (tf *testFinder) GetConnections() map[connection.Connection]struct{} {
-	calls := tf.calls
-	tf.calls++
-	return tf.answers[calls]
-}
-
-func TestGetClosedCollection(t *testing.T) {
-	// This setup causes both conn3 and conn2 to disappear, but because conn3 is in
-	// the ipcache, only conn2 should be returned.
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	cache := ipcache.New(ctx)
-	connPoller := New(cache).(*connectionPoller)
-	conn1 := connection.Connection{RemoteIP: "1.1.1.1"}
-	conn2 := connection.Connection{RemoteIP: "1.1.1.2"}
-	conn3 := connection.Connection{RemoteIP: "1.1.1.3"}
-	connPoller.recentIPCache.Add(conn3.RemoteIP)
-	connPoller.finder = &testFinder{
-		answers: []map[connection.Connection]struct{}{
-			{conn1: struct{}{}, conn2: struct{}{}, conn3: struct{}{}},
-			{conn1: struct{}{}},
-		},
-	}
-	connPoller.connectionPool = connPoller.GetConnections()
-
-	c := connPoller.GetClosedConnections()
-
-	if len(c) != 1 || c[0] != conn2 {
-		t.Errorf("Wanted %v but got %v", []connection.Connection{conn2}, c)
-	}
+	var tt testTracer
+	connPoller.TraceClosedConnections(&tt)
 }
