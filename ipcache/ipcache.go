@@ -27,6 +27,8 @@ type RecentIPCache struct {
 
 // New creates and returns a RecentIPCache. It also starts up a background
 // goroutine that scrubs the cache.
+//
+// TODO(https://github.com/m-lab/traceroute-caller/issues/30) Make this truly threadsafe
 func New(ctx context.Context) *RecentIPCache {
 	m := &RecentIPCache{}
 	m.mu.Lock()

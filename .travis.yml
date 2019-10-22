@@ -1,7 +1,5 @@
 language: go
 
-sudo: true
-
 before_install:
 - go get github.com/mattn/goveralls
 # Install dependencies, including test dependencies.
