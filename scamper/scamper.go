@@ -4,12 +4,14 @@ package scamper
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -113,7 +115,7 @@ func (d *Daemon) generateFilename(cookie string, t time.Time) string {
 // All checks inside of this function and its subfunctions should call
 // PanicOnError instead of Must because each trace is independent of the others,
 // so we should prevent a single failed trace from crashing everything.
-func (d *Daemon) Trace(conn connection.Connection, t time.Time) {
+func (d *Daemon) Trace(conn connection.Connection, t time.Time) string {
 	defer func() {
 		if r := recover(); r != nil {
 			log.Printf("Recovered (%v) a crashed trace for %v at %v\n", r, conn, t)
@@ -122,7 +124,7 @@ func (d *Daemon) Trace(conn connection.Connection, t time.Time) {
 	}()
 	tracesInProgress.Inc()
 	defer tracesInProgress.Dec()
-	d.trace(conn, t)
+	return d.trace(conn, t)
 }
 
 // TraceAll runs N independent traces on N passed-in connections.
@@ -133,11 +135,9 @@ func (d *Daemon) TraceAll(connections []connection.Connection) {
 	}
 }
 
-func (d *Daemon) trace(conn connection.Connection, t time.Time) {
-	filename := d.createTimePath(t) + d.generateFilename(conn.Cookie, t)
-	log.Println("Starting a trace to be put in", filename)
-	buff := bytes.Buffer{}
-
+// isCache indicates whether this meta line is for an orignial trace test or a cached test.
+// uuis is the original test if isCache is 1.
+func GetMetaline(conn connection.Connection, isCache int, cachedUUID string) string {
 	// Write the UUID as the first line of the file. If we want to add other
 	// metadata, this is the place to do it.
 	//
@@ -148,8 +148,45 @@ func (d *Daemon) trace(conn connection.Connection, t time.Time) {
 	rtx.PanicOnError(err, "Could not parse UUID - this should never happen")
 
 	// Add github version number of traceroute caller for tracking purpose.
-	metaString := fmt.Sprintf("{\"UUID\": \"%s\", \"TracerouteCallerVersion\": \"%s\"}\n", uuid, prometheusx.GitShortCommit)
-	_, err = buff.WriteString(metaString)
+	if isCache == 1 && uuid != "" {
+		return fmt.Sprintf("{\"UUID\": \"%s\", \"TracerouteCallerVersion\": \"%s\", \"isCached\":%d, \"cachedUUID\": \"%s\"}\n",
+			uuid, prometheusx.GitShortCommit, isCache, cachedUUID)
+	}
+	return fmt.Sprintf("{\"UUID\": \"%s\", \"TracerouteCallerVersion\": \"%s\", \"isCached\":%d}\n",
+		uuid, prometheusx.GitShortCommit, isCache)
+}
+
+func ExtractUUID(metaline string) string {
+	var metaResult map[string]interface{}
+	err := json.Unmarshal([]byte(metaline), &metaResult)
+	if err != nil {
+		return ""
+	}
+	_, ok := metaResult["UUID"]
+	if !ok {
+		return ""
+	}
+	return metaResult["UUID"].(string)
+}
+
+func (d *Daemon) CreateCacheTest(conn connection.Connection, t time.Time, cachedTest string) {
+	filename := d.createTimePath(t) + d.generateFilename(conn.Cookie, t)
+	log.Println("Starting a cached trace to be put in", filename)
+
+	// remove the first line of cachedTest
+	split := strings.Index(cachedTest, "\n")
+
+	// Get the uuid from the first line of cachedTest
+	newTest := GetMetaline(conn, 1, ExtractUUID(cachedTest[:split])) + cachedTest[split+1:]
+	rtx.PanicOnError(ioutil.WriteFile(filename, []byte(newTest), 0666), "Could not save output to file")
+}
+
+func (d *Daemon) trace(conn connection.Connection, t time.Time) string {
+	filename := d.createTimePath(t) + d.generateFilename(conn.Cookie, t)
+	log.Println("Starting a trace to be put in", filename)
+	buff := bytes.Buffer{}
+
+	_, err := buff.WriteString(GetMetaline(conn, 0, ""))
 	rtx.PanicOnError(err, "Could not write to buffer")
 
 	cmd := pipe.Line(
@@ -160,9 +197,10 @@ func (d *Daemon) trace(conn connection.Connection, t time.Time) {
 	)
 	rtx.PanicOnError(pipe.Run(cmd), "Command %v failed", cmd)
 	rtx.PanicOnError(ioutil.WriteFile(filename, buff.Bytes(), 0666), "Could not save output to file")
+	return string(buff.Bytes())
 }
 
-// Tracer allows users of the scamper.Daemon struct to create their own mocks.
 type Tracer interface {
-	Trace(conn connection.Connection, t time.Time)
+	Trace(conn connection.Connection, t time.Time) string
+	CreateCacheTest(conn connection.Connection, t time.Time, cachedTest string)
 }

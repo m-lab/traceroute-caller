@@ -169,3 +169,24 @@ func TestRecovery(t *testing.T) {
 	d.Trace(c, time.Now())
 	// If this doesn't crash, then the recovery process works!
 }
+
+func TestExtractUUID(t *testing.T) {
+	uuid := ExtractUUID("{\"UUID\": \"ndt-plh7v_1566050090_000000000004D64D\"}")
+	if uuid != "ndt-plh7v_1566050090_000000000004D64D" {
+		t.Error("Fail to extract uuid")
+	}
+}
+
+func TestGetMetaline(t *testing.T) {
+	conn := connection.Connection{
+		RemoteIP:   "1.1.1.2",
+		RemotePort: 123,
+		LocalIP:    "1.1.1.3",
+		LocalPort:  345,
+		Cookie:     "abc",
+	}
+	meta := GetMetaline(conn, 1, "00EF")
+	if !strings.Contains(meta, "0000000000000ABC\", \"TracerouteCallerVersion\": \"No commit specified\", \"isCached\":1, \"cachedUUID\": \"00EF\"") {
+		t.Error("Fail to generate meta ", meta)
+	}
+}

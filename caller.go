@@ -4,7 +4,6 @@ package main
 import (
 	"context"
 	"flag"
-	"fmt"
 	"time"
 
 	"github.com/m-lab/traceroute-caller/connection"
@@ -57,9 +56,7 @@ func main() {
 	if *tcpinfoSocket == "" {
 		connPoller := connectionpoller.New(cache)
 		for ctx.Err() == nil {
-			closedConnections := connPoller.GetClosedConnections()
-			fmt.Printf("length of closed connections: %d\n", len(closedConnections))
-			daemon.TraceAll(closedConnections)
+			connPoller.TraceClosedConnections(&daemon)
 
 			select {
 			case <-time.After(*waitTime):
