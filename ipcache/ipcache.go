@@ -7,6 +7,9 @@ import (
 	"fmt"
 	"sync"
 	"time"
+
+	"github.com/m-lab/traceroute-caller/connection"
+	"github.com/m-lab/traceroute-caller/scamper"
 )
 
 var (
@@ -17,12 +20,41 @@ var (
 	IPCacheUpdatePeriod = flag.Duration("IPCacheUpdatePeriod", 1*time.Second, "We run the cache eviction loop with this frequency")
 )
 
+type CacheTest struct {
+	timeStamp time.Time
+	data      string
+	done      chan struct{}
+}
+
 // RecentIPCache contains a list of all the IP addresses that we have traced to
 // recently. We keep this list to ensure that we don't traceroute to the same
 // location repeatedly at a high frequency.
 type RecentIPCache struct {
-	cache map[string]time.Time
+	cache map[string]*CacheTest
 	mu    sync.RWMutex
+}
+
+// GetTrace returns test content in []byte given a connection and tracer
+func (rc *RecentIPCache) GetTrace(conn connection.Connection, sc scamper.Tracer) {
+	rc.mu.Lock()
+	ip := conn.RemoteIP
+	_, ok := rc.cache[ip]
+	if !ok {
+		rc.cache[ip] = &CacheTest{
+			timeStamp: time.Now(),
+			done:      make(chan struct{}),
+		}
+		rc.mu.Unlock()
+
+		rc.cache[ip].data = sc.Trace(conn, rc.cache[ip].timeStamp)
+		close(rc.cache[ip].done)
+	} else {
+		rc.mu.Unlock()
+	}
+	<-rc.cache[ip].done
+	if ok {
+		sc.CreateCacheTest(conn, time.Now(), rc.cache[ip].data)
+	}
 }
 
 // New creates and returns a RecentIPCache. It also starts up a background
@@ -30,7 +62,7 @@ type RecentIPCache struct {
 func New(ctx context.Context) *RecentIPCache {
 	m := &RecentIPCache{}
 	m.mu.Lock()
-	m.cache = make(map[string]time.Time)
+	m.cache = make(map[string]*CacheTest)
 	m.mu.Unlock()
 	go func() {
 		ticker := time.NewTicker(*IPCacheUpdatePeriod)
@@ -40,7 +72,7 @@ func New(ctx context.Context) *RecentIPCache {
 				return
 			}
 			for k, v := range m.cache {
-				if now.Sub(v) > *IPCacheTimeout {
+				if now.Sub(v.timeStamp) > *IPCacheTimeout {
 					fmt.Println("try to delete " + k)
 					m.mu.Lock()
 					delete(m.cache, k)
@@ -67,8 +99,11 @@ func (m *RecentIPCache) Add(ip string) {
 	fmt.Printf("func Add: Now is %d\n", time.Now().Unix())
 	_, present := m.cache[ip]
 	if !present {
-		m.cache[ip] = time.Now()
-		fmt.Printf("just add %s %d\n", ip, m.cache[ip].Unix())
+		m.cache[ip] = &CacheTest{
+			timeStamp: time.Now(),
+			done:      make(chan struct{}),
+		}
+		fmt.Printf("just add %s %d\n", ip, m.cache[ip].timeStamp.Unix())
 	}
 }
 

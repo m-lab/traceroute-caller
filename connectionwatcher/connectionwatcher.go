@@ -16,6 +16,7 @@ import (
 
 	"github.com/m-lab/traceroute-caller/connection"
 	"github.com/m-lab/traceroute-caller/ipcache"
+	"github.com/m-lab/traceroute-caller/scamper"
 )
 
 var (
@@ -142,20 +143,17 @@ type ConnectionWatcher interface {
 
 // GetClosedConnections returns the list of connections which were previously
 // measured to be open but were not measured to be open this time..
-func (c *connectionWatcher) GetClosedConnections() []connection.Connection {
+func (c *connectionWatcher) TraceClosedConnections(tracer scamper.Tracer) {
 	oldConn := c.connectionPool
 	fmt.Printf("old connection size %d\n", len(oldConn))
 	c.connectionPool = c.GetConnections()
 	fmt.Printf("new connection size %d\n", len(c.connectionPool))
 	var closed []connection.Connection
 	for conn := range oldConn {
-		if _, hasConn := c.connectionPool[conn]; !hasConn && !c.recentIPCache.Has(conn.RemoteIP) {
-			closed = append(closed, conn)
-			log.Printf("Try to add " + conn.RemoteIP)
-			c.recentIPCache.Add(conn.RemoteIP)
+		if _, hasConn := c.connectionPool[conn]; !hasConn {
+			go c.recentIPCache.GetTrace(conn, tracer)
 		}
 	}
-	return closed
 }
 
 // New creates and returns a new ConnectionWatcher.
