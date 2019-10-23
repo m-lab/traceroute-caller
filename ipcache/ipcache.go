@@ -35,10 +35,10 @@ type RecentIPCache struct {
 }
 
 // GetTrace returns test content in []byte given a connection and tracer
-func (rc *RecentIPCache) GetTrace(conn connection.Connection, sc scamper.Tracer) {
-	rc.mu.Lock()
+func (rc *RecentIPCache) Trace(conn connection.Connection, sc scamper.Tracer) {
 	ip := conn.RemoteIP
-	_, ok := rc.cache[ip]
+	rc.mu.Lock()
+	c, ok := rc.cache[ip]
 	if !ok {
 		rc.cache[ip] = &CacheTest{
 			timeStamp: time.Now(),
@@ -51,9 +51,12 @@ func (rc *RecentIPCache) GetTrace(conn connection.Connection, sc scamper.Tracer)
 	} else {
 		rc.mu.Unlock()
 	}
-	<-rc.cache[ip].done
+	<-c.done
 	if ok {
-		sc.CreateCacheTest(conn, time.Now(), rc.cache[ip].data)
+		rc.mu.RLock()
+		cachedData := c.data
+		rc.mu.RUnlock()
+		sc.CreateCacheTest(conn, time.Now(), cachedData)
 	}
 }
 
@@ -61,9 +64,7 @@ func (rc *RecentIPCache) GetTrace(conn connection.Connection, sc scamper.Tracer)
 // goroutine that scrubs the cache.
 func New(ctx context.Context) *RecentIPCache {
 	m := &RecentIPCache{}
-	m.mu.Lock()
 	m.cache = make(map[string]*CacheTest)
-	m.mu.Unlock()
 	go func() {
 		ticker := time.NewTicker(*IPCacheUpdatePeriod)
 		defer ticker.Stop()

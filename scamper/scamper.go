@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
@@ -135,6 +134,13 @@ func (d *Daemon) TraceAll(connections []connection.Connection) {
 	}
 }
 
+type Metadata struct {
+	UUID                    string
+	TracerouteCallerVersion string
+	CachedResult            bool
+	CachedUUID              string `json:ignoremissing`
+}
+
 // isCache indicates whether this meta line is for an orignial trace test or a cached test.
 // uuis is the original test if isCache is 1.
 func GetMetaline(conn connection.Connection, isCache int, cachedUUID string) string {
@@ -147,13 +153,16 @@ func GetMetaline(conn connection.Connection, isCache int, cachedUUID string) str
 	uuid, err := conn.UUID()
 	rtx.PanicOnError(err, "Could not parse UUID - this should never happen")
 
-	// Add github version number of traceroute caller for tracking purpose.
-	if isCache == 1 && uuid != "" {
-		return fmt.Sprintf("{\"UUID\": \"%s\", \"TracerouteCallerVersion\": \"%s\", \"isCached\":%d, \"cachedUUID\": \"%s\"}\n",
-			uuid, prometheusx.GitShortCommit, isCache, cachedUUID)
+	meta := Metadata{
+		UUID:                    uuid,
+		TracerouteCallerVersion: prometheusx.GitShortCommit,
+		CachedResult:            bool(isCache == 1),
+		CachedUUID:              cachedUUID,
 	}
-	return fmt.Sprintf("{\"UUID\": \"%s\", \"TracerouteCallerVersion\": \"%s\", \"isCached\":%d}\n",
-		uuid, prometheusx.GitShortCommit, isCache)
+
+	metaJSON, _ := json.Marshal(meta)
+
+	return string(metaJSON) + "\n"
 }
 
 func ExtractUUID(metaline string) string {

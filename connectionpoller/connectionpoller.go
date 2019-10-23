@@ -148,7 +148,7 @@ func (c *connectionPoller) TraceClosedConnections(tracer scamper.Tracer) {
 	fmt.Printf("new connection size %d\n", len(c.connectionPool))
 	for conn := range oldConn {
 		if _, hasConn := c.connectionPool[conn]; !hasConn {
-			go c.recentIPCache.GetTrace(conn, tracer)
+			go c.recentIPCache.Trace(conn, tracer)
 		}
 	}
 }
