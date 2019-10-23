@@ -46,18 +46,37 @@ func (rc *RecentIPCache) Trace(conn connection.Connection, sc scamper.Tracer) {
 		}
 		rc.mu.Unlock()
 
-		rc.cache[ip].data = sc.Trace(conn, rc.cache[ip].timeStamp)
+		data := sc.Trace(conn, rc.cache[ip].timeStamp)
+		rc.mu.Lock()
+		rc.cache[ip].data = data
 		close(rc.cache[ip].done)
+		rc.mu.Unlock()
 	} else {
 		rc.mu.Unlock()
 	}
-	<-c.done
+
 	if ok {
+		<-c.done
 		rc.mu.RLock()
 		cachedData := c.data
 		rc.mu.RUnlock()
 		sc.CreateCacheTest(conn, time.Now(), cachedData)
 	}
+}
+
+func (rc *RecentIPCache) GetCacheLenght() int {
+	return len(rc.cache)
+}
+
+func (rc *RecentIPCache) GetTestContent(ip string) string {
+	rc.mu.RLock()
+	c, ok := rc.cache[ip]
+	if ok {
+		rc.mu.RUnlock()
+		return c.data
+	}
+	rc.mu.RUnlock()
+	return ""
 }
 
 // New creates and returns a RecentIPCache. It also starts up a background
