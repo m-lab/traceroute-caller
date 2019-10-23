@@ -76,7 +76,7 @@ func TestTrace(t *testing.T) {
 
 	time.Sleep(200 * time.Millisecond)
 
-	if testCache.GetCacheLenght() != 2 {
+	if testCache.GetCacheLength() != 2 {
 		t.Error("cache not working correctly ")
 	}
 }

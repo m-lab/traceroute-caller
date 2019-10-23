@@ -40,17 +40,15 @@ func (rc *RecentIPCache) Trace(conn connection.Connection, sc scamper.Tracer) {
 	rc.mu.Lock()
 	c, ok := rc.cache[ip]
 	if !ok {
-		rc.cache[ip] = &CacheTest{
+		nc := &CacheTest{
 			timeStamp: time.Now(),
 			done:      make(chan struct{}),
 		}
+		rc.cache[ip] = nc
 		rc.mu.Unlock()
 
-		data := sc.Trace(conn, rc.cache[ip].timeStamp)
-		rc.mu.Lock()
-		rc.cache[ip].data = data
-		close(rc.cache[ip].done)
-		rc.mu.Unlock()
+		nc.data = sc.Trace(conn, nc.timeStamp)
+		close(nc.done)
 	} else {
 		rc.mu.Unlock()
 	}
@@ -64,18 +62,17 @@ func (rc *RecentIPCache) Trace(conn connection.Connection, sc scamper.Tracer) {
 	}
 }
 
-func (rc *RecentIPCache) GetCacheLenght() int {
+func (rc *RecentIPCache) GetCacheLength() int {
 	return len(rc.cache)
 }
 
 func (rc *RecentIPCache) GetTestContent(ip string) string {
 	rc.mu.RLock()
+	defer rc.mu.RUnlock()
 	c, ok := rc.cache[ip]
 	if ok {
-		rc.mu.RUnlock()
 		return c.data
 	}
-	rc.mu.RUnlock()
 	return ""
 }
 

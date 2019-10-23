@@ -118,12 +118,20 @@ type testTracer struct {
 	answers []map[connection.Connection]struct{}
 }
 
-func (tf *testTracer) Trace(conn connection.Connection, t time.Time) string {
+func (tt *testTracer) Trace(conn connection.Connection, t time.Time) string {
 	return "Fake Trace test"
 }
 
-func (tf *testTracer) CreateCacheTest(conn connection.Connection, t time.Time, cachedTest string) {
+func (tt *testTracer) CreateCacheTest(conn connection.Connection, t time.Time, cachedTest string) {
 	return
+}
+
+type testFinder struct {
+}
+
+func (tf *testFinder) GetConnections() map[connection.Connection]struct{} {
+	conns := make(map[connection.Connection]struct{})
+	return conns
 }
 
 func TestConnectionPollerConstruction(t *testing.T) {
@@ -132,7 +140,24 @@ func TestConnectionPollerConstruction(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	cache := ipcache.New(ctx)
-	connPoller := New(cache)
+	connPoller := &connectionPoller{
+		finder:         &testFinder{},
+		recentIPCache:  cache,
+		connectionPool: make(map[connection.Connection]struct{}),
+	}
+	conn1 := connection.Connection{
+		RemoteIP:   "1.1.1.2",
+		RemotePort: 5034,
+		LocalIP:    "1.1.1.3",
+		LocalPort:  58790,
+		Cookie:     "10f3d"}
+	connPoller.connectionPool[conn1] = struct{}{}
 	var tt testTracer
 	connPoller.TraceClosedConnections(&tt)
+
+	time.Sleep(200 * time.Millisecond)
+
+	if connPoller.recentIPCache.GetCacheLength() != 1 {
+		t.Errorf("ConnectionPoller not working properly")
+	}
 }
