@@ -25,6 +25,32 @@ func (tf *testTracer) CreateCacheTest(conn connection.Connection, t time.Time, c
 	return
 }
 
+func TestGetData(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	testCache := ipcache.New(ctx)
+
+	conn1 := connection.Connection{
+		RemoteIP:   "1.1.1.2",
+		RemotePort: 5034,
+		LocalIP:    "1.1.1.3",
+		LocalPort:  58790,
+		Cookie:     "10f3d"}
+	var tt testTracer
+
+	testCache.Trace(conn1, &tt)
+	time.Sleep(200 * time.Millisecond)
+	tmp := testCache.GetData("1.1.1.1")
+	if tmp != "" {
+		t.Error("GetData not working correctly ")
+	}
+
+	tmp = testCache.GetData("1.1.1.2")
+	if tmp != "Fake Trace test 1.1.1.2" {
+		t.Error("GetData not working correctly ")
+	}
+}
+
 func TestTrace(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -40,8 +66,7 @@ func TestTrace(t *testing.T) {
 
 	testCache.Trace(conn1, &tt)
 	time.Sleep(200 * time.Millisecond)
-	tmp := testCache.GetTestContent("1.1.1.2")
-	log.Println("!!!" + tmp + "!!!")
+	tmp := testCache.GetData("1.1.1.2")
 	if tmp != "Fake Trace test 1.1.1.2" {
 		t.Error("cache not trace correctly ")
 	}
