@@ -134,6 +134,7 @@ func (d *Daemon) TraceAll(connections []connection.Connection) {
 	}
 }
 
+// TODO: move this struct to ETL parser.
 type Metadata struct {
 	UUID                    string
 	TracerouteCallerVersion string
@@ -166,16 +167,13 @@ func GetMetaline(conn connection.Connection, isCache int, cachedUUID string) str
 }
 
 func ExtractUUID(metaline string) string {
-	var metaResult map[string]interface{}
+	var metaResult Metadata
 	err := json.Unmarshal([]byte(metaline), &metaResult)
 	if err != nil {
+		log.Println("Could not parse cached results:", metaline)
 		return ""
 	}
-	_, ok := metaResult["UUID"]
-	if !ok {
-		return ""
-	}
-	return metaResult["UUID"].(string)
+	return metaResult.UUID
 }
 
 func (d *Daemon) CreateCacheTest(conn connection.Connection, t time.Time, cachedTest string) {
@@ -184,6 +182,11 @@ func (d *Daemon) CreateCacheTest(conn connection.Connection, t time.Time, cached
 
 	// remove the first line of cachedTest
 	split := strings.Index(cachedTest, "\n")
+
+	if split <= 0 {
+		log.Println("Invalid cached test")
+		return
+	}
 
 	// Get the uuid from the first line of cachedTest
 	newTest := GetMetaline(conn, 1, ExtractUUID(cachedTest[:split])) + cachedTest[split+1:]
