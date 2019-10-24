@@ -7,6 +7,9 @@ import (
 	"fmt"
 	"sync"
 	"time"
+
+	"github.com/m-lab/traceroute-caller/connection"
+	"github.com/m-lab/traceroute-caller/scamper"
 )
 
 var (
@@ -17,23 +20,63 @@ var (
 	IPCacheUpdatePeriod = flag.Duration("IPCacheUpdatePeriod", 1*time.Second, "We run the cache eviction loop with this frequency")
 )
 
+type CacheTest struct {
+	timeStamp time.Time
+	data      string
+	done      chan struct{}
+}
+
 // RecentIPCache contains a list of all the IP addresses that we have traced to
 // recently. We keep this list to ensure that we don't traceroute to the same
 // location repeatedly at a high frequency.
 type RecentIPCache struct {
-	cache map[string]time.Time
+	cache map[string]*CacheTest
 	mu    sync.RWMutex
+}
+
+// GetTrace returns test content in []byte given a connection and tracer
+func (rc *RecentIPCache) Trace(conn connection.Connection, sc scamper.Tracer) {
+	ip := conn.RemoteIP
+	rc.mu.Lock()
+	c, ok := rc.cache[ip]
+	if !ok {
+		nc := &CacheTest{
+			timeStamp: time.Now(),
+			done:      make(chan struct{}),
+		}
+		rc.cache[ip] = nc
+		rc.mu.Unlock()
+
+		nc.data = sc.Trace(conn, nc.timeStamp)
+		close(nc.done)
+		return
+	}
+	rc.mu.Unlock()
+
+	<-c.done
+	cachedData := c.data
+	sc.CreateCacheTest(conn, time.Now(), cachedData)
+}
+
+func (rc *RecentIPCache) GetCacheLength() int {
+	return len(rc.cache)
+}
+
+func (rc *RecentIPCache) GetTestContent(ip string) string {
+	rc.mu.RLock()
+	defer rc.mu.RUnlock()
+	c, ok := rc.cache[ip]
+	if ok {
+		return c.data
+	}
+	return ""
 }
 
 // New creates and returns a RecentIPCache. It also starts up a background
 // goroutine that scrubs the cache.
-//
-// TODO(https://github.com/m-lab/traceroute-caller/issues/30) Make this truly threadsafe
 func New(ctx context.Context) *RecentIPCache {
 	m := &RecentIPCache{}
-	m.mu.Lock()
-	m.cache = make(map[string]time.Time)
-	m.mu.Unlock()
+	m.cache = make(map[string]*CacheTest)
 	go func() {
 		ticker := time.NewTicker(*IPCacheUpdatePeriod)
 		defer ticker.Stop()
@@ -42,7 +85,7 @@ func New(ctx context.Context) *RecentIPCache {
 				return
 			}
 			for k, v := range m.cache {
-				if now.Sub(v) > *IPCacheTimeout {
+				if now.Sub(v.timeStamp) > *IPCacheTimeout {
 					fmt.Println("try to delete " + k)
 					m.mu.Lock()
 					delete(m.cache, k)
@@ -69,8 +112,11 @@ func (m *RecentIPCache) Add(ip string) {
 	fmt.Printf("func Add: Now is %d\n", time.Now().Unix())
 	_, present := m.cache[ip]
 	if !present {
-		m.cache[ip] = time.Now()
-		fmt.Printf("just add %s %d\n", ip, m.cache[ip].Unix())
+		m.cache[ip] = &CacheTest{
+			timeStamp: time.Now(),
+			done:      make(chan struct{}),
+		}
+		fmt.Printf("just add %s %d\n", ip, m.cache[ip].timeStamp.Unix())
 	}
 }
 

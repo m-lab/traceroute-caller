@@ -28,10 +28,16 @@ type fakeTracer struct {
 	wg  sync.WaitGroup
 }
 
-func (ft *fakeTracer) Trace(conn connection.Connection, t time.Time) {
+func (ft *fakeTracer) Trace(conn connection.Connection, t time.Time) string {
 	log.Println("Tracing", conn)
 	ft.ips = append(ft.ips, conn.RemoteIP)
 	ft.wg.Done()
+	return "Fake test Result"
+}
+
+func (ft *fakeTracer) CreateCacheTest(conn connection.Connection, t time.Time, cachedTest string) {
+	log.Println("Create cached test for: ", conn)
+	return
 }
 
 func TestListener(t *testing.T) {

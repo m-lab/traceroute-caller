@@ -8,6 +8,7 @@ import (
 	"os"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/m-lab/traceroute-caller/ipcache"
 
@@ -112,49 +113,51 @@ func TestGetConnectionsWithFakeSS(t *testing.T) {
 	}
 }
 
+type testTracer struct {
+	calls   int
+	answers []map[connection.Connection]struct{}
+}
+
+func (tt *testTracer) Trace(conn connection.Connection, t time.Time) string {
+	return "Fake Trace test"
+}
+
+func (tt *testTracer) CreateCacheTest(conn connection.Connection, t time.Time, cachedTest string) {
+	return
+}
+
+type testFinder struct {
+}
+
+func (tf *testFinder) GetConnections() map[connection.Connection]struct{} {
+	conns := make(map[connection.Connection]struct{})
+	return conns
+}
+
 func TestConnectionPollerConstruction(t *testing.T) {
 	// The only thing we can verify by default is that the code does not crash.
 	// Which is not nothing, but it's not a lot.
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	cache := ipcache.New(ctx)
-	connPoller := New(cache)
-	connPoller.GetClosedConnections()
-}
-
-type testFinder struct {
-	calls   int
-	answers []map[connection.Connection]struct{}
-}
-
-func (tf *testFinder) GetConnections() map[connection.Connection]struct{} {
-	calls := tf.calls
-	tf.calls++
-	return tf.answers[calls]
-}
-
-func TestGetClosedCollection(t *testing.T) {
-	// This setup causes both conn3 and conn2 to disappear, but because conn3 is in
-	// the ipcache, only conn2 should be returned.
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	cache := ipcache.New(ctx)
-	connPoller := New(cache).(*connectionPoller)
-	conn1 := connection.Connection{RemoteIP: "1.1.1.1"}
-	conn2 := connection.Connection{RemoteIP: "1.1.1.2"}
-	conn3 := connection.Connection{RemoteIP: "1.1.1.3"}
-	connPoller.recentIPCache.Add(conn3.RemoteIP)
-	connPoller.finder = &testFinder{
-		answers: []map[connection.Connection]struct{}{
-			{conn1: struct{}{}, conn2: struct{}{}, conn3: struct{}{}},
-			{conn1: struct{}{}},
-		},
+	connPoller := &connectionPoller{
+		finder:         &testFinder{},
+		recentIPCache:  cache,
+		connectionPool: make(map[connection.Connection]struct{}),
 	}
-	connPoller.connectionPool = connPoller.GetConnections()
+	conn1 := connection.Connection{
+		RemoteIP:   "1.1.1.2",
+		RemotePort: 5034,
+		LocalIP:    "1.1.1.3",
+		LocalPort:  58790,
+		Cookie:     "10f3d"}
+	connPoller.connectionPool[conn1] = struct{}{}
+	var tt testTracer
+	connPoller.TraceClosedConnections(&tt)
 
-	c := connPoller.GetClosedConnections()
+	time.Sleep(200 * time.Millisecond)
 
-	if len(c) != 1 || c[0] != conn2 {
-		t.Errorf("Wanted %v but got %v", []connection.Connection{conn2}, c)
+	if connPoller.recentIPCache.GetCacheLength() != 1 {
+		t.Errorf("ConnectionPoller not working properly")
 	}
 }
