@@ -49,17 +49,13 @@ func (rc *RecentIPCache) Trace(conn connection.Connection, sc scamper.Tracer) {
 
 		nc.data = sc.Trace(conn, nc.timeStamp)
 		close(nc.done)
-	} else {
-		rc.mu.Unlock()
+		return
 	}
+	rc.mu.Unlock()
 
-	if ok {
-		<-c.done
-		rc.mu.RLock()
-		cachedData := c.data
-		rc.mu.RUnlock()
-		sc.CreateCacheTest(conn, time.Now(), cachedData)
-	}
+	<-c.done
+	cachedData := c.data
+	sc.CreateCacheTest(conn, time.Now(), cachedData)
 }
 
 func (rc *RecentIPCache) GetCacheLength() int {
