@@ -167,6 +167,13 @@ func TestCreateCacheTest(t *testing.T) {
 	{"type":"cycle-start", "list_name":"/tmp/scamperctrl:51811", "id":1, "hostname":"ndt-plh7v", "start_time":1566691298}
 	{"type":"tracelb", "version":"0.1", "userid":0, "method":"icmp-echo", "src":"::ffff:180.87.97.101", "dst":"::ffff:1.47.236.62", "start":{"sec":1566691298, "usec":476221, "ftime":"2019-08-25 00:01:38"}, "probe_size":60, "firsthop":1, "attempts":3, "confidence":95, "tos":0, "gaplimit":3, "wait_timeout":5, "wait_probe":250, "probec":0, "probec_max":3000, "nodec":0, "linkc":0}
 	{"type":"cycle-stop", "list_name":"/tmp/scamperctrl:51811", "id":1, "hostname":"ndt-plh7v", "stop_time":1566691298}`
+
+	d.CreateCacheTest(c, faketime, "Broken cached test")
+	_, errInvalidTest := ioutil.ReadFile(tempdir + "/2019/04/01/20190401T034551Z_" + prefix.UnsafeString() + "_0000000000000001.jsonl")
+	if errInvalidTest == nil {
+		t.Error("should fail to generate cached test")
+	}
+
 	d.CreateCacheTest(c, faketime, cachedTest)
 
 	// Unmarshal the first line of the output file.
@@ -230,6 +237,11 @@ func TestExtractUUID(t *testing.T) {
 	uuid := ExtractUUID("{\"UUID\": \"ndt-plh7v_1566050090_000000000004D64D\"}")
 	if uuid != "ndt-plh7v_1566050090_000000000004D64D" {
 		t.Error("Fail to extract uuid")
+	}
+
+	failedUUID := ExtractUUID("invalid json")
+	if failedUUID != "" {
+		t.Error("Should fail to extract uuid")
 	}
 }
 

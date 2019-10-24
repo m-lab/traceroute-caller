@@ -38,7 +38,7 @@ type RecentIPCache struct {
 func (rc *RecentIPCache) Trace(conn connection.Connection, sc scamper.Tracer) {
 	ip := conn.RemoteIP
 	rc.mu.Lock()
-	c, ok := rc.cache[ip]
+	_, ok := rc.cache[ip]
 	if !ok {
 		nc := &CacheTest{
 			timeStamp: time.Now(),
@@ -52,21 +52,21 @@ func (rc *RecentIPCache) Trace(conn connection.Connection, sc scamper.Tracer) {
 		return
 	}
 	rc.mu.Unlock()
-
-	<-c.done
-	cachedData := c.data
-	sc.CreateCacheTest(conn, time.Now(), cachedData)
+	sc.CreateCacheTest(conn, time.Now(), rc.GetData(ip))
 }
 
 func (rc *RecentIPCache) GetCacheLength() int {
 	return len(rc.cache)
 }
 
-func (rc *RecentIPCache) GetTestContent(ip string) string {
+// GetData will wait till the test content available if there is an entry
+// in cache.
+func (rc *RecentIPCache) GetData(ip string) string {
 	rc.mu.RLock()
 	defer rc.mu.RUnlock()
 	c, ok := rc.cache[ip]
 	if ok {
+		<-c.done
 		return c.data
 	}
 	return ""
