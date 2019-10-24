@@ -139,7 +139,7 @@ type Metadata struct {
 	UUID                    string
 	TracerouteCallerVersion string
 	CachedResult            bool
-	CachedUUID              string `json:ignoremissing`
+	CachedUUID              string
 }
 
 // isCache indicates whether this meta line is for an orignial trace test or a cached test.
@@ -183,7 +183,7 @@ func (d *Daemon) CreateCacheTest(conn connection.Connection, t time.Time, cached
 	// remove the first line of cachedTest
 	split := strings.Index(cachedTest, "\n")
 
-	if split <= 0 {
+	if split <= 0 || split == len(cachedTest) {
 		log.Println("Invalid cached test")
 		return
 	}
