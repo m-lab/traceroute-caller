@@ -62,6 +62,8 @@ func (rc *RecentIPCache) GetCacheLength() int {
 // GetData will wait till the test content available if there is an entry
 // in cache.
 func (rc *RecentIPCache) GetData(ip string) string {
+	rc.mu.RLock()
+	defer rc.mu.RUnlock()
 	c, ok := rc.cache[ip]
 	if ok {
 		<-c.done
