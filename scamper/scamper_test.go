@@ -239,7 +239,7 @@ func TestExtractUUID(t *testing.T) {
 		t.Error("Fail to extract uuid")
 	}
 
-	failedUUID := ExtractUUID("{\"UID\": \"ndt-plh7v_1566050090_000000000004D64D\"}")
+	failedUUID := ExtractUUID("invalid json")
 	if failedUUID != "" {
 		t.Error("Should fail to extract uuid")
 	}
