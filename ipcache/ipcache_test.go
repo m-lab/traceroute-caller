@@ -10,26 +10,6 @@ import (
 	"github.com/m-lab/traceroute-caller/ipcache"
 )
 
-func TestRecentIPCache(t *testing.T) {
-	*ipcache.IPCacheTimeout = 100 * time.Millisecond
-	*ipcache.IPCacheUpdatePeriod = 10 * time.Millisecond
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	tmp := ipcache.New(ctx)
-	tmp.Add("1.2.3.4")
-	if !tmp.Has("1.2.3.4") {
-		t.Error("cache not working correctly")
-	}
-
-	time.Sleep(300 * time.Millisecond)
-	if tmp.Has("1.2.3.4") {
-		t.Error("cache not expire correctly")
-	}
-	cancel()
-	time.Sleep(200 * time.Millisecond)
-}
-
 type testTracer struct {
 	calls   int
 	answers []map[connection.Connection]struct{}
@@ -60,7 +40,9 @@ func TestTrace(t *testing.T) {
 
 	testCache.Trace(conn1, &tt)
 	time.Sleep(200 * time.Millisecond)
-	if testCache.GetTestContent("1.1.1.2") != "Fake Trace test 1.1.1.2" {
+	tmp := testCache.GetTestContent("1.1.1.2")
+	log.Println("!!!" + tmp + "!!!")
+	if tmp != "Fake Trace test 1.1.1.2" {
 		t.Error("cache not trace correctly ")
 	}
 
@@ -79,4 +61,24 @@ func TestTrace(t *testing.T) {
 	if testCache.GetCacheLength() != 2 {
 		t.Error("cache not working correctly ")
 	}
+}
+
+func TestRecentIPCache(t *testing.T) {
+	*ipcache.IPCacheTimeout = 100 * time.Millisecond
+	*ipcache.IPCacheUpdatePeriod = 10 * time.Millisecond
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	tmp := ipcache.New(ctx)
+	tmp.Add("1.2.3.4")
+	if !tmp.Has("1.2.3.4") {
+		t.Error("cache not working correctly")
+	}
+
+	time.Sleep(300 * time.Millisecond)
+	if tmp.Has("1.2.3.4") {
+		t.Error("cache not expire correctly")
+	}
+	cancel()
+	time.Sleep(200 * time.Millisecond)
 }
