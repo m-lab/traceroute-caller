@@ -148,11 +148,9 @@ func TestConnectionPollerConstruction(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	cache := ipcache.New(ctx)
-	connPoller := &connectionPoller{
-		finder:         &testFinder{},
-		recentIPCache:  cache,
-		connectionPool: make(map[connection.Connection]struct{}),
-	}
+	connPoller := New(cache).(*connectionPoller)
+	connPoller.finder = &testFinder{}
+	connPoller.connectionPool = make(map[connection.Connection]struct{})
 	conn1 := connection.Connection{
 		RemoteIP:   "1.1.1.2",
 		RemotePort: 5034,
