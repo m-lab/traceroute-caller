@@ -32,6 +32,11 @@ func TestParseIPAndPort(t *testing.T) {
 		log.Println("Should have had an error on a bad ip")
 	}
 
+	_, _, err = parseIPAndPort("1.2.3.4:notaport")
+	if err == nil {
+		log.Println("Should have had an error on a bad port")
+	}
+
 	_, _, err = parseIPAndPort("not an address at all")
 	if err == nil {
 		log.Println("Should have had an error on bad input")
@@ -94,10 +99,13 @@ func TestGetConnectionsWithFakeSS(t *testing.T) {
 	rtx.Must(err, "Could not create tempdir")
 	defer os.RemoveAll(tmpdir)
 
-	// Print out two connections, one of which has no cookie.
+	// Print out five connections, one of which has no cookie, another of which is not a tcp connection, two more with bad local or remote IPs, and one good one.
 	fakeSS := `#!/bin/bash
-	echo 'tcp   ESTAB      0      0         [2620:0:1003:416:a0ad:fd1a:62f:c862]:58790                       [2607:f8b0:400d:c0d::81]:5034                  timer:(keepalive,5.980ms,0) ino:6355539 sk:10f3d <->'
 	echo 'tcp   ESTAB      0      0         [2620:0:1003:416:a0ad:fd1a:62f:c862]:58791                       [2607:f8b0:400d:c0d::81]:5034                  timer:(keepalive,5.980ms,0) ino:6355540 <->'
+	echo 'nottcp   ESTAB      0      0         [2620:0:1003:416:a0ad:fd1a:62f:c862]:58792                       [2607:f8b0:400d:c0d::81]:5034                  timer:(keepalive,5.980ms,0) ino:6355539 sk:10f3d <->'
+	echo 'tcp   ESTAB      0      0         [2620:0:1003:416:a0ad:fd1a:62f:c862]:badport                       [2607:f8b0:400d:c0d::81]:5034                  timer:(keepalive,5.980ms,0) ino:6355539 sk:10f3d <->'
+	echo 'tcp   ESTAB      0      0         [2620:0:1003:416:a0ad:fd1a:62f:c862]:58790                       [badip]:5034                  timer:(keepalive,5.980ms,0) ino:6355539 sk:10f3d <->'
+	echo 'tcp   ESTAB      0      0         [2620:0:1003:416:a0ad:fd1a:62f:c862]:58790                       [2607:f8b0:400d:c0d::81]:5034                  timer:(keepalive,5.980ms,0) ino:6355539 sk:10f3d <->'
 	`
 	rtx.Must(ioutil.WriteFile(tmpdir+"/ss", []byte(fakeSS), 0777), "Could not create fake ss")
 
