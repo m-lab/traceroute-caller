@@ -61,7 +61,7 @@ func TestListener(t *testing.T) {
 
 	localIP := net.ParseIP("10.0.0.1")
 	creator := connection.NewFakeCreator([]*net.IP{&localIP})
-	cl := connectionlistener.New(ft, creator, cache, false)
+	cl := connectionlistener.New(ft, creator, cache)
 
 	// Connect the connectionlistener to the server
 	go eventsocket.MustRun(ctx, dir+"/tcpevents.sock", cl)

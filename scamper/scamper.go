@@ -29,6 +29,8 @@ import (
 // and managed.
 type Daemon struct {
 	Binary, AttachBinary, Warts2JSONBinary, ControlSocket, OutputPath string
+
+	DryRun bool
 }
 
 var (
@@ -204,14 +206,16 @@ func (d *Daemon) trace(conn connection.Connection, t time.Time) string {
 	log.Printf(
 		"Running: echo \"tracelb -P icmp-echo -q 3 -O ptr %s\" | %s -i- -o- -U %s | %s > %s\n",
 		conn.RemoteIP, d.AttachBinary, d.ControlSocket, d.Warts2JSONBinary, filename)
-	cmd := pipe.Line(
-		pipe.Println("tracelb -P icmp-echo -q 3 -O ptr ", conn.RemoteIP),
-		pipe.Exec(d.AttachBinary, "-i-", "-o-", "-U", d.ControlSocket),
-		pipe.Exec(d.Warts2JSONBinary),
-		pipe.Write(&buff),
-	)
-	rtx.PanicOnError(pipe.Run(cmd), "Command %v failed", cmd)
-	rtx.PanicOnError(ioutil.WriteFile(filename, buff.Bytes(), 0666), "Could not save output to file")
+	if !d.DryRun {
+		cmd := pipe.Line(
+			pipe.Println("tracelb -P icmp-echo -q 3 -O ptr ", conn.RemoteIP),
+			pipe.Exec(d.AttachBinary, "-i-", "-o-", "-U", d.ControlSocket),
+			pipe.Exec(d.Warts2JSONBinary),
+			pipe.Write(&buff),
+		)
+		rtx.PanicOnError(pipe.Run(cmd), "Command %v failed", cmd)
+		rtx.PanicOnError(ioutil.WriteFile(filename, buff.Bytes(), 0666), "Could not save output to file")
+	}
 	return string(buff.Bytes())
 }
 

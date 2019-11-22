@@ -55,7 +55,7 @@ func (cl *connectionListener) Close(ctx context.Context, timestamp time.Time, uu
 
 // New returns an eventsocket.Handler that will call the passed-in scamper
 // daemon on every closed connection.
-func New(tracer scamper.Tracer, creator connection.Creator, cache *ipcache.RecentIPCache, dryRun bool) eventsocket.Handler {
+func New(tracer scamper.Tracer, creator connection.Creator, cache *ipcache.RecentIPCache) eventsocket.Handler {
 	return &connectionListener{
 		conns:   make(map[string]connection.Connection),
 		tracer:  tracer,

@@ -79,7 +79,12 @@ func main() {
 		go func() {
 			connCreator, err := connection.NewCreator()
 			rtx.Must(err, "Could not discover local IPs")
-			connListener := connectionlistener.New(&daemon, connCreator, cache, *eventsocketDryRun)
+			esdaemon := daemon
+			esdaemon.DryRun = *eventsocketDryRun
+			if *eventsocketDryRun {
+				cache = ipcache.New(ctx)
+			}
+			connListener := connectionlistener.New(&esdaemon, connCreator, cache)
 			eventsocket.MustRun(ctx, *eventsocket.Filename, connListener)
 			wg.Done()
 		}()
