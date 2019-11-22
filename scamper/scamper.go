@@ -201,6 +201,9 @@ func (d *Daemon) trace(conn connection.Connection, t time.Time) string {
 	_, err := buff.WriteString(GetMetaline(conn, 0, ""))
 	rtx.PanicOnError(err, "Could not write to buffer")
 
+	log.Printf(
+		"Running: echo \"tracelb -P icmp-echo -q 3 -O ptr %s\" | %s -i- -o- -U %s | %s > %s\n",
+		conn.RemoteIP, d.AttachBinary, d.ControlSocket, d.Warts2JSONBinary, filename)
 	cmd := pipe.Line(
 		pipe.Println("tracelb -P icmp-echo -q 3 -O ptr ", conn.RemoteIP),
 		pipe.Exec(d.AttachBinary, "-i-", "-o-", "-U", d.ControlSocket),
