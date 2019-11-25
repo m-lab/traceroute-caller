@@ -4,6 +4,7 @@ package main
 import (
 	"context"
 	"flag"
+	"sync"
 	"time"
 
 	"github.com/m-lab/traceroute-caller/connection"
@@ -26,7 +27,8 @@ var (
 	scamperCtrlSocket = flag.String("scamper.unixsocket", "/tmp/scamperctrl", "The name of the UNIX-domain socket that the scamper daemon should listen on")
 	outputPath        = flag.String("outputPath", "/var/spool/scamper", "path of output")
 	waitTime          = flag.Duration("waitTime", 5*time.Second, "how long to wait between subsequent listings of open connections")
-	tcpinfoSocket     = flag.String("tcpinfo.socket", "", "The filename of the unix domain socket served by tcpinfo. If this argument is set, then tcpinfo will be used instead of the `ss` command.")
+	eventsocketDryRun = flag.Bool("tcpinfo.eventsocket.dryrun", false, "Whether the eventsocket machinery should be turned on in print-only mode.")
+	poll              = flag.Bool("poll", true, "Whether the polling method should be used to see new connections.")
 
 	ctx, cancel = context.WithCancel(context.Background())
 )
@@ -50,23 +52,42 @@ func main() {
 		OutputPath:       *outputPath,
 		ControlSocket:    *scamperCtrlSocket,
 	}
-	go daemon.MustStart(ctx)
+	go func() {
+		daemon.MustStart(ctx)
+		cancel()
+	}()
 
+	wg := sync.WaitGroup{}
 	cache := ipcache.New(ctx)
-	if *tcpinfoSocket == "" {
-		connPoller := connectionpoller.New(cache)
-		for ctx.Err() == nil {
-			connPoller.TraceClosedConnections(&daemon)
+	if *poll {
+		wg.Add(1)
+		go func() {
+			connPoller := connectionpoller.New(cache)
+			for ctx.Err() == nil {
+				connPoller.TraceClosedConnections(&daemon)
 
-			select {
-			case <-time.After(*waitTime):
-			case <-ctx.Done():
+				select {
+				case <-time.After(*waitTime):
+				case <-ctx.Done():
+				}
 			}
-		}
-	} else {
-		connCreator, err := connection.NewCreator()
-		rtx.Must(err, "Could not discover local IPs")
-		connListener := connectionlistener.New(&daemon, connCreator, cache)
-		eventsocket.MustRun(ctx, *tcpinfoSocket, connListener)
+			wg.Done()
+		}()
 	}
+	if *eventsocket.Filename != "" {
+		wg.Add(1)
+		go func() {
+			connCreator, err := connection.NewCreator()
+			rtx.Must(err, "Could not discover local IPs")
+			esdaemon := daemon
+			esdaemon.DryRun = *eventsocketDryRun
+			if *eventsocketDryRun {
+				cache = ipcache.New(ctx)
+			}
+			connListener := connectionlistener.New(&esdaemon, connCreator, cache)
+			eventsocket.MustRun(ctx, *eventsocket.Filename, connListener)
+			wg.Done()
+		}()
+	}
+	wg.Wait()
 }

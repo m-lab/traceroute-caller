@@ -1,6 +1,7 @@
 package connectionlistener
 
 import (
+	"context"
 	"log"
 	"sync"
 	"time"
@@ -23,7 +24,7 @@ type connectionListener struct {
 	creator connection.Creator
 }
 
-func (cl *connectionListener) Open(timestamp time.Time, uuid string, id *inetdiag.SockID) {
+func (cl *connectionListener) Open(ctx context.Context, timestamp time.Time, uuid string, id *inetdiag.SockID) {
 	cl.mutex.Lock()
 	defer cl.mutex.Unlock()
 	if id != nil {
@@ -36,7 +37,7 @@ func (cl *connectionListener) Open(timestamp time.Time, uuid string, id *inetdia
 	}
 }
 
-func (cl *connectionListener) Close(timestamp time.Time, uuid string) {
+func (cl *connectionListener) Close(ctx context.Context, timestamp time.Time, uuid string) {
 	cl.mutex.Lock()
 	conn, ok := cl.conns[uuid]
 	if ok {

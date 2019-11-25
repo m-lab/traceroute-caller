@@ -92,6 +92,28 @@ func TestSrcDestSwap(t *testing.T) {
 			},
 			wantErr: true,
 		},
+		{
+			name: "All local",
+			sockid: inetdiag.SockID{
+				DstIP:  "1.2.3.4",
+				DPort:  17,
+				SrcIP:  "1.2.3.4",
+				SPort:  11,
+				Cookie: 0xc,
+			},
+			wantErr: true,
+		},
+		{
+			name: "Bad IPs",
+			sockid: inetdiag.SockID{
+				DstIP:  "1.3.4",
+				DPort:  17,
+				SrcIP:  "2.3.4",
+				SPort:  11,
+				Cookie: 0xc,
+			},
+			wantErr: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

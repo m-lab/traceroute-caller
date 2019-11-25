@@ -38,7 +38,9 @@ func TestMainWithConnectionListener(t *testing.T) {
 	rtx.Must(srv.Listen(), "Could not start the empty server")
 
 	*prometheusx.ListenAddress = ":0"
-	*tcpinfoSocket = dir + "/events.sock"
+	*eventsocket.Filename = dir + "/events.sock"
+	*eventsocketDryRun = true
+
 	ctx, cancel = context.WithCancel(context.Background())
 	go srv.Serve(ctx)
 	go func() {
