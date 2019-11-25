@@ -14,6 +14,7 @@ import (
 	"github.com/m-lab/go/prometheusx"
 	"github.com/m-lab/go/rtx"
 	"github.com/m-lab/traceroute-caller/connection"
+	"github.com/m-lab/traceroute-caller/ipcache"
 	"github.com/m-lab/uuid/prefix"
 )
 
@@ -257,4 +258,10 @@ func TestGetMetaline(t *testing.T) {
 	if !strings.Contains(meta, "0000000000000ABC\",\"TracerouteCallerVersion\":\"Fake Version\",\"CachedResult\":true,\"CachedUUID\":\"00EF\"") {
 		t.Error("Fail to generate meta ", meta)
 	}
+}
+
+// If this successfully compiles, then Daemon implements the Tracer interface,
+// which is what we want it to do.
+func assertDaemonIsTracer(d *Daemon) {
+	func(t ipcache.Tracer) {}(d)
 }
