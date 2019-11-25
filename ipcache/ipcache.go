@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/m-lab/traceroute-caller/connection"
-	"github.com/m-lab/traceroute-caller/scamper"
 )
 
 var (
@@ -20,7 +19,14 @@ var (
 	IPCacheUpdatePeriod = flag.Duration("IPCacheUpdatePeriod", 1*time.Second, "We run the cache eviction loop with this frequency")
 )
 
-type CacheTest struct {
+// Tracer is the generic interface for all things that can perform a traceroute.
+type Tracer interface {
+	Trace(conn connection.Connection, t time.Time) string
+	CreateCacheTest(conn connection.Connection, t time.Time, cachedTest string)
+}
+
+// cachedTest is a single entry in the cache of traceroute results.
+type cachedTest struct {
 	timeStamp time.Time
 	data      string
 	done      chan struct{}
@@ -30,10 +36,10 @@ type CacheTest struct {
 // recently. We keep this list to ensure that we don't traceroute to the same
 // location repeatedly at a high frequency.
 type RecentIPCache struct {
-	cache map[string]*CacheTest
+	cache map[string]*cachedTest
 	mu    sync.RWMutex
 
-	tracer scamper.Tracer
+	tracer Tracer
 }
 
 // Trace performs a trace and adds it to the cache.
@@ -42,7 +48,7 @@ func (rc *RecentIPCache) Trace(conn connection.Connection) {
 	rc.mu.Lock()
 	_, ok := rc.cache[ip]
 	if !ok {
-		nc := &CacheTest{
+		nc := &cachedTest{
 			timeStamp: time.Now(),
 			done:      make(chan struct{}),
 		}
@@ -57,6 +63,9 @@ func (rc *RecentIPCache) Trace(conn connection.Connection) {
 	rc.tracer.CreateCacheTest(conn, time.Now(), rc.GetData(ip))
 }
 
+// GetCacheLength returns the number of items currently in the cache. The
+// primary use of this is for testing, to ensure that something was put into or
+// removed from the cache.
 func (rc *RecentIPCache) GetCacheLength() int {
 	return len(rc.cache)
 }
@@ -76,9 +85,9 @@ func (rc *RecentIPCache) GetData(ip string) string {
 
 // New creates and returns a RecentIPCache. It also starts up a background
 // goroutine that scrubs the cache.
-func New(ctx context.Context, tracer scamper.Tracer, ipCacheTimeout, ipCacheUpdatePeriod time.Duration) *RecentIPCache {
+func New(ctx context.Context, tracer Tracer, ipCacheTimeout, ipCacheUpdatePeriod time.Duration) *RecentIPCache {
 	m := &RecentIPCache{
-		cache:  make(map[string]*CacheTest),
+		cache:  make(map[string]*cachedTest),
 		tracer: tracer,
 	}
 	go func() {
