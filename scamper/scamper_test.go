@@ -14,6 +14,7 @@ import (
 	"github.com/m-lab/go/prometheusx"
 	"github.com/m-lab/go/rtx"
 	"github.com/m-lab/traceroute-caller/connection"
+	"github.com/m-lab/traceroute-caller/ipcache"
 	"github.com/m-lab/uuid/prefix"
 )
 
@@ -234,12 +235,12 @@ func TestRecovery(t *testing.T) {
 }
 
 func TestExtractUUID(t *testing.T) {
-	uuid := ExtractUUID("{\"UUID\": \"ndt-plh7v_1566050090_000000000004D64D\"}")
+	uuid := extractUUID("{\"UUID\": \"ndt-plh7v_1566050090_000000000004D64D\"}")
 	if uuid != "ndt-plh7v_1566050090_000000000004D64D" {
 		t.Error("Fail to extract uuid")
 	}
 
-	failedUUID := ExtractUUID("invalid json")
+	failedUUID := extractUUID("invalid json")
 	if failedUUID != "" {
 		t.Error("Should fail to extract uuid")
 	}
@@ -253,8 +254,14 @@ func TestGetMetaline(t *testing.T) {
 		LocalPort:  345,
 		Cookie:     "abc",
 	}
-	meta := GetMetaline(conn, 1, "00EF")
+	meta := GetMetaline(conn, true, "00EF")
 	if !strings.Contains(meta, "0000000000000ABC\",\"TracerouteCallerVersion\":\"Fake Version\",\"CachedResult\":true,\"CachedUUID\":\"00EF\"") {
 		t.Error("Fail to generate meta ", meta)
 	}
+}
+
+// If this successfully compiles, then Daemon implements the Tracer interface,
+// which is what we want it to do.
+func assertDaemonIsTracer(d *Daemon) {
+	func(t ipcache.Tracer) {}(d)
 }
