@@ -69,8 +69,8 @@ func init() {
 func (d *Daemon) MustStart(ctx context.Context) {
 	derivedCtx, derivedCancel := context.WithCancel(ctx)
 	defer derivedCancel()
-	if f, err := os.Stat(d.ControlSocket); !os.IsNotExist(err) {
-		logFatal("The control socket file must not already exist: ", err, f.Name())
+	if _, err := os.Stat(d.ControlSocket); !os.IsNotExist(err) {
+		logFatal("The control socket file must not already exist: ", err)
 	}
 	defer os.Remove(d.ControlSocket)
 	command := exec.Command(d.Binary, "-U", d.ControlSocket)
