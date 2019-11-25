@@ -55,13 +55,14 @@ func TestListener(t *testing.T) {
 	// Create a new connectionlistener with a fake tracer.
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	cache := ipcache.New(ctx)
 	ft := &fakeTracer{}
+	cache := ipcache.New(ctx, ft, 100*time.Second, time.Second)
+
 	ft.wg.Add(2)
 
 	localIP := net.ParseIP("10.0.0.1")
 	creator := connection.NewFakeCreator([]*net.IP{&localIP})
-	cl := connectionlistener.New(ft, creator, cache)
+	cl := connectionlistener.New(creator, cache)
 
 	// Connect the connectionlistener to the server
 	go eventsocket.MustRun(ctx, dir+"/tcpevents.sock", cl)

@@ -4,6 +4,7 @@ package main
 import (
 	"context"
 	"flag"
+	"log"
 	"sync"
 	"time"
 
@@ -37,6 +38,8 @@ var (
 // go build
 // ./traceroute-caller --outputPath scamper_output
 func main() {
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+
 	flag.Parse()
 	rtx.Must(flagx.ArgsFromEnv(flag.CommandLine), "Could not get args from environment")
 
@@ -58,13 +61,13 @@ func main() {
 	}()
 
 	wg := sync.WaitGroup{}
-	cache := ipcache.New(ctx)
+	cache := ipcache.New(ctx, &daemon, *ipcache.IPCacheTimeout, *ipcache.IPCacheUpdatePeriod)
 	if *poll {
 		wg.Add(1)
 		go func() {
 			connPoller := connectionpoller.New(cache)
 			for ctx.Err() == nil {
-				connPoller.TraceClosedConnections(&daemon)
+				connPoller.TraceClosedConnections()
 
 				select {
 				case <-time.After(*waitTime):
@@ -82,9 +85,9 @@ func main() {
 			esdaemon := daemon
 			esdaemon.DryRun = *eventsocketDryRun
 			if *eventsocketDryRun {
-				cache = ipcache.New(ctx)
+				cache = ipcache.New(ctx, &esdaemon, *ipcache.IPCacheTimeout, *ipcache.IPCacheUpdatePeriod)
 			}
-			connListener := connectionlistener.New(&esdaemon, connCreator, cache)
+			connListener := connectionlistener.New(connCreator, cache)
 			eventsocket.MustRun(ctx, *eventsocket.Filename, connListener)
 			wg.Done()
 		}()

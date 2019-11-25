@@ -147,7 +147,8 @@ func TestConnectionPollerConstruction(t *testing.T) {
 	// Which is not nothing, but it's not a lot.
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	cache := ipcache.New(ctx)
+	var tt testTracer
+	cache := ipcache.New(ctx, &tt, time.Second, time.Second)
 	connPoller := New(cache).(*connectionPoller)
 	connPoller.finder = &testFinder{}
 	connPoller.connectionPool = make(map[connection.Connection]struct{})
@@ -158,8 +159,7 @@ func TestConnectionPollerConstruction(t *testing.T) {
 		LocalPort:  58790,
 		Cookie:     "10f3d"}
 	connPoller.connectionPool[conn1] = struct{}{}
-	var tt testTracer
-	connPoller.TraceClosedConnections(&tt)
+	connPoller.TraceClosedConnections()
 
 	time.Sleep(200 * time.Millisecond)
 
