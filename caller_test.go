@@ -19,9 +19,13 @@ func TestMetrics(t *testing.T) {
 }
 
 func TestMain(t *testing.T) {
+	dir, err := ioutil.TempDir("", "TestMain")
+	rtx.Must(err, "Could not create temp dir")
+
 	// Verify that main doesn't crash, and that it does exit when the context is canceled.
 	// TODO: verify more in this test.
 	*prometheusx.ListenAddress = ":0"
+	*scamperCtrlSocket = dir + "/scamper.sock"
 	*waitTime = time.Nanosecond // Run through the loop a few times.
 	ctx, cancel = context.WithCancel(context.Background())
 	go func() {
@@ -32,12 +36,13 @@ func TestMain(t *testing.T) {
 }
 
 func TestMainWithConnectionListener(t *testing.T) {
-	dir, err := ioutil.TempDir("", "TestTracerouteCaller")
+	dir, err := ioutil.TempDir("", "TestMainWithConnectionListener")
 	rtx.Must(err, "Could not create temp dir")
 	srv := eventsocket.New(dir + "/events.sock")
 	rtx.Must(srv.Listen(), "Could not start the empty server")
 
 	*prometheusx.ListenAddress = ":0"
+	*scamperCtrlSocket = dir + "/scamper.sock"
 	*eventsocket.Filename = dir + "/events.sock"
 	*eventsocketDryRun = true
 

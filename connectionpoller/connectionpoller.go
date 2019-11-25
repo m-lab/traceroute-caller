@@ -15,7 +15,6 @@ import (
 
 	"github.com/m-lab/traceroute-caller/connection"
 	"github.com/m-lab/traceroute-caller/ipcache"
-	"github.com/m-lab/traceroute-caller/scamper"
 )
 
 var (
@@ -137,18 +136,18 @@ type connectionPoller struct {
 // connections which it previously measured to be open, but it can no longer
 // measure to be open.
 type ConnectionPoller interface {
-	TraceClosedConnections(tracer scamper.Tracer)
+	TraceClosedConnections()
 }
 
 // TraceClosedConnections send trace for all closed connections.
-func (c *connectionPoller) TraceClosedConnections(tracer scamper.Tracer) {
+func (c *connectionPoller) TraceClosedConnections() {
 	oldConn := c.connectionPool
 	fmt.Printf("old connection size %d\n", len(oldConn))
 	c.connectionPool = c.GetConnections()
 	fmt.Printf("new connection size %d\n", len(c.connectionPool))
 	for conn := range oldConn {
 		if _, hasConn := c.connectionPool[conn]; !hasConn {
-			go c.recentIPCache.Trace(conn, tracer)
+			go c.recentIPCache.Trace(conn)
 		}
 	}
 }

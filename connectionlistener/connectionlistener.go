@@ -10,7 +10,6 @@ import (
 	"github.com/m-lab/tcp-info/inetdiag"
 	"github.com/m-lab/traceroute-caller/connection"
 	"github.com/m-lab/traceroute-caller/ipcache"
-	"github.com/m-lab/traceroute-caller/scamper"
 )
 
 // connectionListener implements the eventsocket.Handler interface, allowing us
@@ -19,7 +18,6 @@ import (
 type connectionListener struct {
 	mutex   sync.Mutex
 	conns   map[string]connection.Connection
-	tracer  scamper.Tracer
 	cache   *ipcache.RecentIPCache
 	creator connection.Creator
 }
@@ -46,19 +44,15 @@ func (cl *connectionListener) Close(ctx context.Context, timestamp time.Time, uu
 	cl.mutex.Unlock()
 
 	if ok {
-		if !cl.cache.Has(conn.RemoteIP) {
-			cl.cache.Add(conn.RemoteIP)
-			go cl.tracer.Trace(conn, timestamp)
-		}
+		go cl.cache.Trace(conn)
 	}
 }
 
 // New returns an eventsocket.Handler that will call the passed-in scamper
 // daemon on every closed connection.
-func New(tracer scamper.Tracer, creator connection.Creator, cache *ipcache.RecentIPCache) eventsocket.Handler {
+func New(creator connection.Creator, cache *ipcache.RecentIPCache) eventsocket.Handler {
 	return &connectionListener{
 		conns:   make(map[string]connection.Connection),
-		tracer:  tracer,
 		cache:   cache,
 		creator: creator,
 	}
