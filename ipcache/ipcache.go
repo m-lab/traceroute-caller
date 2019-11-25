@@ -102,36 +102,3 @@ func New(ctx context.Context, tracer scamper.Tracer, ipCacheTimeout, ipCacheUpda
 	}()
 	return m
 }
-
-func (m *RecentIPCache) len() int {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	return len(m.cache)
-}
-
-// Add an IP to the cache.
-func (m *RecentIPCache) Add(ip string) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	fmt.Printf("func Add: Now is %d\n", time.Now().Unix())
-	_, present := m.cache[ip]
-	if !present {
-		m.cache[ip] = &CacheTest{
-			timeStamp: time.Now(),
-			done:      make(chan struct{}),
-		}
-		fmt.Printf("just add %s %d\n", ip, m.cache[ip].timeStamp.Unix())
-	}
-}
-
-// Has tests whether an IP is in the cache.
-func (m *RecentIPCache) Has(ip string) bool {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	//fmt.Printf("func Has: Now is %d, length of cache: %d \n", time.Now().Unix(), m.Len())
-	if m.len() == 0 {
-		return false
-	}
-	_, ok := m.cache[ip]
-	return ok
-}

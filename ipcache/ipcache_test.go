@@ -91,15 +91,22 @@ func TestTrace(t *testing.T) {
 func TestRecentIPCache(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	tmp := ipcache.New(ctx, nil, 100*time.Millisecond, 10*time.Millisecond)
-	tmp.Add("1.2.3.4")
-	if !tmp.Has("1.2.3.4") {
+	var tt testTracer
+	tmp := ipcache.New(ctx, &tt, 100*time.Millisecond, 10*time.Millisecond)
+	tmp.Trace(connection.Connection{
+		RemoteIP:   "1.2.3.4",
+		RemotePort: 5,
+		LocalIP:    "6.7.8.9",
+		LocalPort:  10,
+		Cookie:     "11",
+	})
+	if tmp.GetCacheLength() != 1 {
 		t.Error("cache not working correctly")
 	}
 
 	time.Sleep(300 * time.Millisecond)
-	if tmp.Has("1.2.3.4") {
-		t.Error("cache not expire correctly")
+	if tmp.GetCacheLength() != 0 {
+		t.Error("cache not working correctly")
 	}
 	cancel()
 	time.Sleep(200 * time.Millisecond)
