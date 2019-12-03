@@ -6,7 +6,6 @@ import (
 	"bytes"
 	"errors"
 	"flag"
-	"fmt"
 	"log"
 	"net"
 	"os/exec"
@@ -142,9 +141,7 @@ type ConnectionPoller interface {
 // TraceClosedConnections send trace for all closed connections.
 func (c *connectionPoller) TraceClosedConnections() {
 	oldConn := c.connectionPool
-	fmt.Printf("old connection size %d\n", len(oldConn))
 	c.connectionPool = c.GetConnections()
-	fmt.Printf("new connection size %d\n", len(c.connectionPool))
 	for conn := range oldConn {
 		if _, hasConn := c.connectionPool[conn]; !hasConn {
 			go c.recentIPCache.Trace(conn)
