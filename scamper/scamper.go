@@ -136,6 +136,8 @@ func (d *Daemon) TraceAll(connections []connection.Connection) {
 	}
 }
 
+// Metadata is the first line of the traceroute .jsonl file.
+//
 // TODO: move this struct to ETL parser.
 type Metadata struct {
 	UUID                    string
@@ -144,9 +146,11 @@ type Metadata struct {
 	CachedUUID              string
 }
 
-// isCache indicates whether this meta line is for an orignial trace test or a cached test.
-// uuis is the original test if isCache is 1.
-func GetMetaline(conn connection.Connection, isCache int, cachedUUID string) string {
+// GetMetaline returns the what the first line of the output jsonl file should
+// be. Parameter isCache indicates whether this meta line is for an original
+// trace test or a cached test, and parameter cachedUUID is the original test if
+// isCache is 1.
+func GetMetaline(conn connection.Connection, isCache bool, cachedUUID string) string {
 	// Write the UUID as the first line of the file. If we want to add other
 	// metadata, this is the place to do it.
 	//
@@ -159,7 +163,7 @@ func GetMetaline(conn connection.Connection, isCache int, cachedUUID string) str
 	meta := Metadata{
 		UUID:                    uuid,
 		TracerouteCallerVersion: prometheusx.GitShortCommit,
-		CachedResult:            bool(isCache == 1),
+		CachedResult:            isCache,
 		CachedUUID:              cachedUUID,
 	}
 
@@ -168,7 +172,10 @@ func GetMetaline(conn connection.Connection, isCache int, cachedUUID string) str
 	return string(metaJSON) + "\n"
 }
 
-func ExtractUUID(metaline string) string {
+// extractUUID retrieves the UUID from a cached line.
+//
+// TODO: Eliminate the need to unmarshal data we marshaled in the first place.
+func extractUUID(metaline string) string {
 	var metaResult Metadata
 	err := json.Unmarshal([]byte(metaline), &metaResult)
 	if err != nil {
@@ -178,6 +185,8 @@ func ExtractUUID(metaline string) string {
 	return metaResult.UUID
 }
 
+// CreateCacheTest creates a file containing traceroute results that came from a
+// cache result, rather than performing the traceroute with scamper.
 func (d *Daemon) CreateCacheTest(conn connection.Connection, t time.Time, cachedTest string) {
 	filename := d.createTimePath(t) + d.generateFilename(conn.Cookie, t)
 	log.Println("Starting a cached trace to be put in", filename)
@@ -191,7 +200,7 @@ func (d *Daemon) CreateCacheTest(conn connection.Connection, t time.Time, cached
 	}
 
 	// Get the uuid from the first line of cachedTest
-	newTest := GetMetaline(conn, 1, ExtractUUID(cachedTest[:split])) + cachedTest[split+1:]
+	newTest := GetMetaline(conn, true, extractUUID(cachedTest[:split])) + cachedTest[split+1:]
 	rtx.PanicOnError(ioutil.WriteFile(filename, []byte(newTest), 0666), "Could not save output to file")
 }
 
@@ -200,7 +209,7 @@ func (d *Daemon) trace(conn connection.Connection, t time.Time) string {
 	log.Println("Starting a trace to be put in", filename)
 	buff := bytes.Buffer{}
 
-	_, err := buff.WriteString(GetMetaline(conn, 0, ""))
+	_, err := buff.WriteString(GetMetaline(conn, false, ""))
 	rtx.PanicOnError(err, "Could not write to buffer")
 
 	log.Printf(
@@ -219,7 +228,3 @@ func (d *Daemon) trace(conn connection.Connection, t time.Time) string {
 	return string(buff.Bytes())
 }
 
-type Tracer interface {
-	Trace(conn connection.Connection, t time.Time) string
-	CreateCacheTest(conn connection.Connection, t time.Time, cachedTest string)
-}
