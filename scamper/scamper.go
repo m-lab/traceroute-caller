@@ -227,4 +227,3 @@ func (d *Daemon) trace(conn connection.Connection, t time.Time) string {
 	}
 	return string(buff.Bytes())
 }
-

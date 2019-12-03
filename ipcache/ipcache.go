@@ -28,7 +28,7 @@ type Tracer interface {
 type cachedTest struct {
 	timeStamp time.Time
 	data      string
-	done      chan struct{}
+	dataReady chan struct{}
 }
 
 // RecentIPCache contains a list of all the IP addresses that we have traced to
@@ -36,30 +36,35 @@ type cachedTest struct {
 // location repeatedly at a high frequency.
 type RecentIPCache struct {
 	cache map[string]*cachedTest
-	mu    sync.RWMutex
+	mu    sync.Mutex
 
 	tracer Tracer
 }
 
-// Trace performs a trace and adds it to the cache.
-func (rc *RecentIPCache) Trace(conn connection.Connection) {
-	ip := conn.RemoteIP
+func (rc *RecentIPCache) getEntry(ip string) (*cachedTest, bool) {
 	rc.mu.Lock()
-	_, ok := rc.cache[ip]
-	if !ok {
-		nc := &cachedTest{
+	defer rc.mu.Unlock()
+	_, existed := rc.cache[ip]
+	if !existed {
+		rc.cache[ip] = &cachedTest{
 			timeStamp: time.Now(),
-			done:      make(chan struct{}),
+			dataReady: make(chan struct{}),
 		}
-		rc.cache[ip] = nc
-		rc.mu.Unlock()
-
-		nc.data = rc.tracer.Trace(conn, nc.timeStamp)
-		close(nc.done)
-		return
 	}
-	rc.mu.Unlock()
-	rc.tracer.CreateCacheTest(conn, time.Now(), rc.GetData(ip))
+	return rc.cache[ip], existed
+}
+
+// Trace performs a trace and adds it to the cache.
+func (rc *RecentIPCache) Trace(conn connection.Connection) string {
+	c, cached := rc.getEntry(conn.RemoteIP)
+	if cached {
+		<-c.dataReady
+		rc.tracer.CreateCacheTest(conn, time.Now(), c.data)
+		return c.data
+	}
+	c.data = rc.tracer.Trace(conn, c.timeStamp)
+	close(c.dataReady)
+	return c.data
 }
 
 // GetCacheLength returns the number of items currently in the cache. The
@@ -67,19 +72,6 @@ func (rc *RecentIPCache) Trace(conn connection.Connection) {
 // removed from the cache.
 func (rc *RecentIPCache) GetCacheLength() int {
 	return len(rc.cache)
-}
-
-// GetData will wait till the test content available if there is an entry
-// in cache.
-func (rc *RecentIPCache) GetData(ip string) string {
-	rc.mu.RLock()
-	defer rc.mu.RUnlock()
-	c, ok := rc.cache[ip]
-	if ok {
-		<-c.done
-		return c.data
-	}
-	return ""
 }
 
 // New creates and returns a RecentIPCache. It also starts up a background
@@ -96,13 +88,14 @@ func New(ctx context.Context, tracer Tracer, ipCacheTimeout, ipCacheUpdatePeriod
 			if ctx.Err() != nil {
 				return
 			}
+			// Must hold lock while performing GC.
+			m.mu.Lock()
 			for k, v := range m.cache {
 				if now.Sub(v.timeStamp) > ipCacheTimeout {
-					m.mu.Lock()
 					delete(m.cache, k)
-					m.mu.Unlock()
 				}
 			}
+			m.mu.Unlock()
 		}
 
 	}()
