@@ -4,7 +4,6 @@ package ipcache
 import (
 	"context"
 	"flag"
-	"fmt"
 	"sync"
 	"time"
 
@@ -99,10 +98,8 @@ func New(ctx context.Context, tracer Tracer, ipCacheTimeout, ipCacheUpdatePeriod
 			}
 			for k, v := range m.cache {
 				if now.Sub(v.timeStamp) > ipCacheTimeout {
-					fmt.Println("try to delete " + k)
 					m.mu.Lock()
 					delete(m.cache, k)
-					fmt.Println("delete done")
 					m.mu.Unlock()
 				}
 			}
