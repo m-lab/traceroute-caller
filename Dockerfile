@@ -11,9 +11,9 @@ RUN chmod -R a+rx /go/bin/traceroute-caller
 
 
 FROM ubuntu:latest
-# Install all the standard packages we need and then remove the ap-get lists.
+# Install all the standard packages we need and then remove the apt-get lists.
 RUN apt-get update && \
-    apt-get install -y python python-pip make iproute2 coreutils && \
+    apt-get install -y python python-pip make iproute2 coreutils autoconf && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
