@@ -24,11 +24,14 @@ import (
 )
 
 type fakeTracer struct {
-	ips []string
-	wg  sync.WaitGroup
+	ips   []string
+	mutex sync.Mutex
+	wg    sync.WaitGroup
 }
 
 func (ft *fakeTracer) Trace(conn connection.Connection, t time.Time) string {
+	ft.mutex.Lock() // Must have a lock to avoid race conditions around the append.
+	defer ft.mutex.Unlock()
 	log.Println("Tracing", conn)
 	ft.ips = append(ft.ips, conn.RemoteIP)
 	ft.wg.Done()
