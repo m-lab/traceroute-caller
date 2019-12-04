@@ -101,7 +101,7 @@ type pausingTracer struct {
 }
 
 func (pt *pausingTracer) Trace(conn connection.Connection, t time.Time) string {
-	time.Sleep(time.Duration(rand.Intn(1000000)))
+	time.Sleep(time.Duration(rand.Intn(1000000)) * time.Nanosecond)
 	if conn.RemoteIP == pt.traceToBlock {
 		<-pt.ctx.Done()
 	}
@@ -110,6 +110,7 @@ func (pt *pausingTracer) Trace(conn connection.Connection, t time.Time) string {
 }
 
 func (pt *pausingTracer) CreateCacheTest(conn connection.Connection, t time.Time, cachedTest string) {
+	time.Sleep(time.Duration(rand.Intn(1000000)) * time.Nanosecond)
 	atomic.AddInt64(&pt.successes, 1)
 }
 
@@ -120,7 +121,7 @@ func TestCacheWithBlockedTests(t *testing.T) {
 		ctx:          ctx,
 		traceToBlock: "77",
 	}
-	c := ipcache.New(ctx, pt, 100*time.Second, 10*time.Second)
+	c := ipcache.New(ctx, pt, 1*time.Millisecond, 1*time.Microsecond)
 
 	wg := sync.WaitGroup{}
 	wg.Add(990) // 1 out of every 100 will be stalled.
@@ -129,6 +130,7 @@ func TestCacheWithBlockedTests(t *testing.T) {
 
 	for i := 0; i < 1000; i++ {
 		go func(j int) {
+			time.Sleep(time.Duration(rand.Intn(10000000)) * time.Nanosecond)
 			if s := c.Trace(connection.Connection{RemoteIP: fmt.Sprintf("%d", j)}); s != fmt.Sprintf("Trace to %d", j) {
 				t.Errorf("Bad trace output: %q", s)
 			}
