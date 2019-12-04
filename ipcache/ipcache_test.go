@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -91,38 +92,34 @@ func TestRecentIPCache(t *testing.T) {
 	time.Sleep(200 * time.Millisecond)
 }
 
-type testPausingTracer struct {
+type pausingTracer struct {
 	ctx          context.Context
 	traceToBlock string
 	mut          sync.Mutex
-	successes    int
+	successes    int64
 }
 
-func (tpt *testPausingTracer) Trace(conn connection.Connection, t time.Time) string {
+func (pt *pausingTracer) Trace(conn connection.Connection, t time.Time) string {
 	time.Sleep(1 * time.Millisecond)
-	if conn.RemoteIP == tpt.traceToBlock {
-		<-tpt.ctx.Done()
+	if conn.RemoteIP == pt.traceToBlock {
+		<-pt.ctx.Done()
 	}
-	tpt.mut.Lock()
-	tpt.successes++
-	tpt.mut.Unlock()
+	atomic.AddInt64(&pt.successes, 1)
 	return "Trace to " + conn.RemoteIP
 }
 
-func (tpt *testPausingTracer) CreateCacheTest(conn connection.Connection, t time.Time, cachedTest string) {
-	tpt.mut.Lock()
-	tpt.successes++
-	tpt.mut.Unlock()
+func (pt *pausingTracer) CreateCacheTest(conn connection.Connection, t time.Time, cachedTest string) {
+	atomic.AddInt64(&pt.successes, 1)
 }
 
 func TestCacheWithBlockedTests(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	tpt := &testPausingTracer{
+	pt := &pausingTracer{
 		ctx:          ctx,
 		traceToBlock: "77",
 	}
-	c := ipcache.New(ctx, tpt, 100*time.Second, 10*time.Second)
+	c := ipcache.New(ctx, pt, 100*time.Second, 10*time.Second)
 
 	wg := sync.WaitGroup{}
 	wg.Add(990) // 1 out of every 100 will be stalled.
@@ -142,12 +139,12 @@ func TestCacheWithBlockedTests(t *testing.T) {
 		}(i % 100)
 	}
 	wg.Wait()
-	if tpt.successes != 990 {
-		t.Errorf("Expected 990 successes, not %d", tpt.successes)
+	if pt.successes != 990 {
+		t.Errorf("Expected 990 successes, not %d", pt.successes)
 	}
 	cancel() // Unblock the stalled tests.
 	stalledWg.Wait()
-	if tpt.successes != 1000 {
-		t.Errorf("Expected 1000 successes, not %d", tpt.successes)
+	if pt.successes != 1000 {
+		t.Errorf("Expected 1000 successes, not %d", pt.successes)
 	}
 }
