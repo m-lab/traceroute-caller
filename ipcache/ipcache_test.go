@@ -73,7 +73,7 @@ func TestRecentIPCache(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	var tt testTracer
-	tmp := ipcache.New(ctx, &tt, 100*time.Millisecond, 10*time.Millisecond)
+	tmp := ipcache.New(ctx, &tt, 10*time.Millisecond, 1*time.Millisecond)
 	tmp.Trace(connection.Connection{
 		RemoteIP:   "1.2.3.4",
 		RemotePort: 5,
@@ -85,12 +85,16 @@ func TestRecentIPCache(t *testing.T) {
 		t.Error("Did not put an entry into the cache")
 	}
 
-	time.Sleep(300 * time.Millisecond)
+	time.Sleep(30 * time.Millisecond)
 	if tmp.GetCacheLength() != 0 {
 		t.Error("Cache GC failed to collect garbage")
 	}
 	cancel()
-	time.Sleep(200 * time.Millisecond)
+}
+
+func randomDelay() {
+	// Uniform 0 to 20 usec.
+	time.Sleep(time.Duration(rand.Intn(20000)) * time.Nanosecond)
 }
 
 type pausingTracer struct {
@@ -101,7 +105,7 @@ type pausingTracer struct {
 }
 
 func (pt *pausingTracer) Trace(conn connection.Connection, t time.Time) string {
-	time.Sleep(time.Duration(rand.Intn(1000000)) * time.Nanosecond)
+	randomDelay()
 	if conn.RemoteIP == pt.traceToBlock {
 		<-pt.ctx.Done()
 	}
@@ -110,7 +114,7 @@ func (pt *pausingTracer) Trace(conn connection.Connection, t time.Time) string {
 }
 
 func (pt *pausingTracer) CreateCacheTest(conn connection.Connection, t time.Time, cachedTest string) {
-	time.Sleep(time.Duration(rand.Intn(1000000)) * time.Nanosecond)
+	randomDelay()
 	atomic.AddInt64(&pt.successes, 1)
 }
 
@@ -121,7 +125,7 @@ func TestCacheWithBlockedTests(t *testing.T) {
 		ctx:          ctx,
 		traceToBlock: "77",
 	}
-	c := ipcache.New(ctx, pt, 1*time.Millisecond, 1*time.Microsecond)
+	c := ipcache.New(ctx, pt, 10*time.Microsecond, 1*time.Microsecond)
 
 	wg := sync.WaitGroup{}
 	wg.Add(990) // 1 out of every 100 will be stalled.
@@ -130,7 +134,7 @@ func TestCacheWithBlockedTests(t *testing.T) {
 
 	for i := 0; i < 1000; i++ {
 		go func(j int) {
-			time.Sleep(time.Duration(rand.Intn(10000000)) * time.Nanosecond)
+			randomDelay()
 			if s := c.Trace(connection.Connection{RemoteIP: fmt.Sprintf("%d", j)}); s != fmt.Sprintf("Trace to %d", j) {
 				t.Errorf("Bad trace output: %q", s)
 			}
