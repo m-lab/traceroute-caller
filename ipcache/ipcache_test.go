@@ -2,6 +2,8 @@ package ipcache_test
 
 import (
 	"context"
+	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -87,4 +89,65 @@ func TestRecentIPCache(t *testing.T) {
 	}
 	cancel()
 	time.Sleep(200 * time.Millisecond)
+}
+
+type testPausingTracer struct {
+	ctx          context.Context
+	traceToBlock string
+	mut          sync.Mutex
+	successes    int
+}
+
+func (tpt *testPausingTracer) Trace(conn connection.Connection, t time.Time) string {
+	time.Sleep(1 * time.Millisecond)
+	if conn.RemoteIP == tpt.traceToBlock {
+		<-tpt.ctx.Done()
+	}
+	tpt.mut.Lock()
+	tpt.successes++
+	tpt.mut.Unlock()
+	return "Trace to " + conn.RemoteIP
+}
+
+func (tpt *testPausingTracer) CreateCacheTest(conn connection.Connection, t time.Time, cachedTest string) {
+	tpt.mut.Lock()
+	tpt.successes++
+	tpt.mut.Unlock()
+}
+
+func TestCacheWithBlockedTests(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	tpt := &testPausingTracer{
+		ctx:          ctx,
+		traceToBlock: "77",
+	}
+	c := ipcache.New(ctx, tpt, 100*time.Second, 10*time.Second)
+
+	wg := sync.WaitGroup{}
+	wg.Add(990) // 1 out of every 100 will be stalled.
+	stalledWg := sync.WaitGroup{}
+	stalledWg.Add(10) // The waitgroup for the stalled requests.
+
+	for i := 0; i < 1000; i++ {
+		go func(j int) {
+			if s := c.Trace(connection.Connection{RemoteIP: fmt.Sprintf("%d", j)}); s != fmt.Sprintf("Trace to %d", j) {
+				t.Errorf("Bad trace output: %q", s)
+			}
+			if j == 77 {
+				stalledWg.Done()
+			} else {
+				wg.Done()
+			}
+		}(i % 100)
+	}
+	wg.Wait()
+	if tpt.successes != 990 {
+		t.Errorf("Expected 990 successes, not %d", tpt.successes)
+	}
+	cancel() // Unblock the stalled tests.
+	stalledWg.Wait()
+	if tpt.successes != 1000 {
+		t.Errorf("Expected 1000 successes, not %d", tpt.successes)
+	}
 }
