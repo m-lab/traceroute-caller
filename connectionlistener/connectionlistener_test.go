@@ -66,6 +66,7 @@ func TestListener(t *testing.T) {
 	localIP := net.ParseIP("10.0.0.1")
 	creator := connection.NewFakeCreator([]*net.IP{&localIP})
 	cl := connectionlistener.New(creator, cache)
+	cl.Open(ctx, time.Now(), "", nil) // Test that nil pointer to Open does not cause a crash.
 
 	// Connect the connectionlistener to the server
 	go eventsocket.MustRun(ctx, dir+"/tcpevents.sock", cl)
