@@ -24,11 +24,14 @@ import (
 )
 
 type fakeTracer struct {
-	ips []string
-	wg  sync.WaitGroup
+	ips   []string
+	mutex sync.Mutex
+	wg    sync.WaitGroup
 }
 
 func (ft *fakeTracer) Trace(conn connection.Connection, t time.Time) string {
+	ft.mutex.Lock() // Must have a lock to avoid race conditions around the append.
+	defer ft.mutex.Unlock()
 	log.Println("Tracing", conn)
 	ft.ips = append(ft.ips, conn.RemoteIP)
 	ft.wg.Done()
@@ -63,6 +66,7 @@ func TestListener(t *testing.T) {
 	localIP := net.ParseIP("10.0.0.1")
 	creator := connection.NewFakeCreator([]*net.IP{&localIP})
 	cl := connectionlistener.New(creator, cache)
+	cl.Open(ctx, time.Now(), "", nil) // Test that nil pointer to Open does not cause a crash.
 
 	// Connect the connectionlistener to the server
 	go eventsocket.MustRun(ctx, dir+"/tcpevents.sock", cl)
