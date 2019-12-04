@@ -73,6 +73,8 @@ func (rc *RecentIPCache) Trace(conn connection.Connection) string {
 // primary use of this is for testing, to ensure that something was put into or
 // removed from the cache.
 func (rc *RecentIPCache) GetCacheLength() int {
+	rc.mu.Lock()
+	defer rc.mu.Unlock()
 	return len(rc.cache)
 }
 
