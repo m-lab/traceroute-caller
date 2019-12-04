@@ -3,6 +3,7 @@ package ipcache_test
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -100,7 +101,7 @@ type pausingTracer struct {
 }
 
 func (pt *pausingTracer) Trace(conn connection.Connection, t time.Time) string {
-	time.Sleep(1 * time.Millisecond)
+	time.Sleep(time.Duration(rand.Intn(1000000)))
 	if conn.RemoteIP == pt.traceToBlock {
 		<-pt.ctx.Done()
 	}
