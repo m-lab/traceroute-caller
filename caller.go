@@ -64,8 +64,8 @@ func main() {
 	cache := ipcache.New(ctx, &daemon, *ipcache.IPCacheTimeout, *ipcache.IPCacheUpdatePeriod)
 	if *poll {
 		wg.Add(1)
-		go func() {
-			connPoller := connectionpoller.New(cache)
+		go func(c *ipcache.RecentIPCache) {
+			connPoller := connectionpoller.New(c)
 			for ctx.Err() == nil {
 				connPoller.TraceClosedConnections()
 
@@ -75,7 +75,7 @@ func main() {
 				}
 			}
 			wg.Done()
-		}()
+		}(cache)
 	}
 	if *eventsocket.Filename != "" {
 		wg.Add(1)
