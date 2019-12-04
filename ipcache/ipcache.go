@@ -54,7 +54,9 @@ func (rc *RecentIPCache) getEntry(ip string) (*cachedTest, bool) {
 	return rc.cache[ip], existed
 }
 
-// Trace performs a trace and adds it to the cache.
+// Trace performs a trace and adds it to the cache. It calls the methods of the
+// tracer, so if those create files on disk, then files on disk will be created
+// as a side effect.
 func (rc *RecentIPCache) Trace(conn connection.Connection) string {
 	c, cached := rc.getEntry(conn.RemoteIP)
 	if cached {

@@ -45,7 +45,7 @@ func TestTrace(t *testing.T) {
 	conn2 := connection.Connection{
 		RemoteIP:   "1.1.1.5",
 		RemotePort: 5034,
-		LocalIP:    "1.1.1.7",
+		LocalIP:    "1.1.1.3",
 		LocalPort:  58790,
 		Cookie:     "aaaa"}
 
