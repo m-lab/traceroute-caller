@@ -29,6 +29,7 @@ func TestCancelStopsDaemon(t *testing.T) {
 		Warts2JSONBinary: "sc_warts2json",
 		ControlSocket:    tempdir + "/ctrl",
 		OutputPath:       tempdir,
+		ScamperTimeout:   1 * time.Minute,
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	wg := sync.WaitGroup{}
@@ -80,6 +81,7 @@ func TestExistingFileStopsDaemonCreation(t *testing.T) {
 		Warts2JSONBinary: "sc_warts2json",
 		ControlSocket:    tempdir + "/ctrl",
 		OutputPath:       tempdir,
+		ScamperTimeout:   1 * time.Minute,
 	}
 
 	defer func() {
@@ -107,6 +109,7 @@ func TestTraceWritesMeta(t *testing.T) {
 		AttachBinary:     "echo",
 		Warts2JSONBinary: "cat",
 		OutputPath:       tempdir,
+		ScamperTimeout:   1 * time.Minute,
 	}
 
 	c := connection.Connection{
@@ -140,6 +143,44 @@ func TestTraceWritesMeta(t *testing.T) {
 	}
 }
 
+func TestTraceTimeout(t *testing.T) {
+	tempdir, err := ioutil.TempDir("", "TestTimeoutTrace")
+	rtx.Must(err, "Could not create tempdir")
+	defer os.RemoveAll(tempdir)
+
+	// Temporarily set the hostname to a value for testing.
+	defer func(oldHn string) {
+		hostname = oldHn
+	}(hostname)
+	hostname = "testhostname"
+
+	d := Daemon{
+		AttachBinary:     "echo",
+		Warts2JSONBinary: "cat",
+		OutputPath:       tempdir,
+		ScamperTimeout:   1 * time.Millisecond,
+	}
+
+	defer func() {
+		r := recover()
+		if r == nil {
+			log.Println("Corrrect. TimeOut error should NOT trigger recover.")
+		}
+	}()
+
+	c := connection.Connection{
+		Cookie:   "1",
+		RemoteIP: "1.2.3.4",
+	}
+
+	faketime := time.Date(2019, time.April, 1, 3, 45, 51, 0, time.UTC)
+	prometheusx.GitShortCommit = "Fake Version"
+	x := d.Trace(c, faketime)
+	if x != "" {
+		t.Error("Should return empty string when TimeOut")
+	}
+}
+
 func TestCreateCacheTest(t *testing.T) {
 	tempdir, err := ioutil.TempDir("", "TestCachedTrace")
 	rtx.Must(err, "Could not create tempdir")
@@ -155,6 +196,7 @@ func TestCreateCacheTest(t *testing.T) {
 		AttachBinary:     "echo",
 		Warts2JSONBinary: "cat",
 		OutputPath:       tempdir,
+		ScamperTimeout:   1 * time.Minute,
 	}
 
 	c := connection.Connection{
@@ -222,6 +264,7 @@ func TestRecovery(t *testing.T) {
 		AttachBinary:     "echo",
 		Warts2JSONBinary: "cat",
 		OutputPath:       tempdir,
+		ScamperTimeout:   1 * time.Minute,
 	}
 
 	c := connection.Connection{

@@ -29,8 +29,8 @@ import (
 // and managed.
 type Daemon struct {
 	Binary, AttachBinary, Warts2JSONBinary, ControlSocket, OutputPath string
-
-	DryRun bool
+	ScamperTimeout                                                    time.Duration
+	DryRun                                                            bool
 }
 
 var (
@@ -204,6 +204,8 @@ func (d *Daemon) CreateCacheTest(conn connection.Connection, t time.Time, cached
 	rtx.PanicOnError(ioutil.WriteFile(filename, []byte(newTest), 0666), "Could not save output to file")
 }
 
+// trace will panic if the operation failed w/ an error not ErrTimeout.
+// It will return an empty string when there is ErrTimeout.
 func (d *Daemon) trace(conn connection.Connection, t time.Time) string {
 	filename := d.createTimePath(t) + d.generateFilename(conn.Cookie, t)
 	log.Println("Starting a trace to be put in", filename)
@@ -222,8 +224,15 @@ func (d *Daemon) trace(conn connection.Connection, t time.Time) string {
 			pipe.Exec(d.Warts2JSONBinary),
 			pipe.Write(&buff),
 		)
-		rtx.PanicOnError(pipe.Run(cmd), "Command %v failed", cmd)
-		rtx.PanicOnError(ioutil.WriteFile(filename, buff.Bytes(), 0666), "Could not save output to file")
+		err = pipe.RunTimeout(cmd, d.ScamperTimeout)
+		if err == nil {
+			rtx.PanicOnError(ioutil.WriteFile(filename, buff.Bytes(), 0666), "Could not save output to file")
+		} else if err == pipe.ErrTimeout {
+			log.Println("TimeOut for Trace: ", cmd)
+			return ""
+		} else if err != nil {
+			rtx.PanicOnError(err, "Command %v failed", cmd)
+		}
 	}
 	return string(buff.Bytes())
 }
