@@ -28,7 +28,7 @@ type Tracer interface {
 type cachedTest struct {
 	timeStamp time.Time
 	data      string
-	dataReady chan error
+	dataReady chan struct{}
 }
 
 // RecentIPCache contains a list of all the IP addresses that we have traced to
@@ -48,7 +48,7 @@ func (rc *RecentIPCache) getEntry(ip string) (*cachedTest, bool) {
 	if !existed {
 		rc.cache[ip] = &cachedTest{
 			timeStamp: time.Now(),
-			dataReady: make(chan error),
+			dataReady: make(chan struct{}),
 		}
 	}
 	return rc.cache[ip], existed
