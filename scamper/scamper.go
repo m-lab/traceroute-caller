@@ -225,14 +225,12 @@ func (d *Daemon) trace(conn connection.Connection, t time.Time) string {
 			pipe.Write(&buff),
 		)
 		err = pipe.RunTimeout(cmd, d.ScamperTimeout)
-		if err == nil {
-			rtx.PanicOnError(ioutil.WriteFile(filename, buff.Bytes(), 0666), "Could not save output to file")
-		} else if err == pipe.ErrTimeout {
-			log.Println("TimeOut for Trace: ", cmd)
-			return ""
-		} else if err != nil {
-			rtx.PanicOnError(err, "Command %v failed", cmd)
-		}
+		if err ==  pipe.ErrTimeout {
+                        log.Println("TimeOut for Trace: ", cmd)
+                        return ""
+                }
+                rtx.PanicOnError(err, "Command %v failed", cmd)
+                rtx.PanicOnError(ioutil.WriteFile(filename, buff.Bytes(), 0666), "Could not save output to file")
 	}
 	return string(buff.Bytes())
 }
