@@ -19,8 +19,8 @@ type testTracer struct {
 	answers []map[connection.Connection]struct{}
 }
 
-func (tf *testTracer) Trace(conn connection.Connection, t time.Time) string {
-	return "Fake trace test " + conn.RemoteIP
+func (tf *testTracer) Trace(conn connection.Connection, t time.Time) (string, error) {
+	return "Fake trace test " + conn.RemoteIP, nil
 }
 
 func (tf *testTracer) CreateCacheTest(conn connection.Connection, t time.Time, cachedTest string) {
@@ -41,7 +41,10 @@ func TestTrace(t *testing.T) {
 		LocalPort:  58790,
 		Cookie:     "10f3d"}
 
-	tmp := testCache.Trace(conn1)
+	tmp, err := testCache.Trace(conn1)
+	if err != nil {
+		t.Error("trace not working correctly.")
+	}
 	if tmp != "Fake trace test 1.1.1.2" {
 		t.Error("cache not trace correctly ")
 	}
@@ -53,7 +56,10 @@ func TestTrace(t *testing.T) {
 		LocalPort:  58790,
 		Cookie:     "aaaa"}
 
-	t2 := testCache.Trace(conn2)
+	t2, err := testCache.Trace(conn2)
+	if err != nil {
+		t.Error("trace not working correctly.")
+	}
 	if t2 != "Fake trace test 1.1.1.5" {
 		t.Error("cache did not trace")
 	}
@@ -65,7 +71,7 @@ func TestTrace(t *testing.T) {
 		t.Errorf("Should have had one call to CreateCachedTest, not %d", tt.cctest)
 	}
 	if testCache.GetCacheLength() != 2 {
-		t.Error("cache not working correctly ")
+		t.Error("cache not working correctly.")
 	}
 }
 
@@ -104,13 +110,13 @@ type pausingTracer struct {
 	successes    int64
 }
 
-func (pt *pausingTracer) Trace(conn connection.Connection, t time.Time) string {
+func (pt *pausingTracer) Trace(conn connection.Connection, t time.Time) (string, error) {
 	randomDelay()
 	if conn.RemoteIP == pt.traceToBlock {
 		<-pt.ctx.Done()
 	}
 	atomic.AddInt64(&pt.successes, 1)
-	return "Trace to " + conn.RemoteIP
+	return "Trace to " + conn.RemoteIP, nil
 }
 
 func (pt *pausingTracer) CreateCacheTest(conn connection.Connection, t time.Time, cachedTest string) {
@@ -135,7 +141,8 @@ func TestCacheWithBlockedTests(t *testing.T) {
 	for i := 0; i < 1000; i++ {
 		go func(j int) {
 			randomDelay()
-			if s := c.Trace(connection.Connection{RemoteIP: fmt.Sprintf("%d", j)}); s != fmt.Sprintf("Trace to %d", j) {
+			s, err := c.Trace(connection.Connection{RemoteIP: fmt.Sprintf("%d", j)})
+			if err != nil || s != fmt.Sprintf("Trace to %d", j) {
 				t.Errorf("Bad trace output: %q", s)
 			}
 			if j == 77 {

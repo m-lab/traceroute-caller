@@ -158,7 +158,8 @@ func TestTraceTimeout(t *testing.T) {
 		AttachBinary:     "echo",
 		Warts2JSONBinary: "cat",
 		OutputPath:       tempdir,
-		ScamperTimeout:   1 * time.Millisecond,
+		ScamperTimeout:   1 * time.Nanosecond,
+		DryRun:           false,
 	}
 
 	defer func() {
@@ -175,8 +176,11 @@ func TestTraceTimeout(t *testing.T) {
 
 	faketime := time.Date(2019, time.April, 1, 3, 45, 51, 0, time.UTC)
 	prometheusx.GitShortCommit = "Fake Version"
-	x := d.Trace(c, faketime)
-	if x != "" {
+	data, err := d.Trace(c, faketime)
+	if err.Error() != "Timeout" {
+		t.Error("Should return TimeOut err, not ", err)
+	}
+	if data != "" {
 		t.Error("Should return empty string when TimeOut")
 	}
 }

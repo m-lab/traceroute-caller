@@ -3,6 +3,7 @@ package ipcache
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"sync"
 	"time"
@@ -20,7 +21,7 @@ var (
 
 // Tracer is the generic interface for all things that can perform a traceroute.
 type Tracer interface {
-	Trace(conn connection.Connection, t time.Time) string
+	Trace(conn connection.Connection, t time.Time) (string, error)
 	CreateCacheTest(conn connection.Connection, t time.Time, cachedTest string)
 }
 
@@ -57,18 +58,21 @@ func (rc *RecentIPCache) getEntry(ip string) (*cachedTest, bool) {
 // Trace performs a trace and adds it to the cache. It calls the methods of the
 // tracer, so if those create files on disk, then files on disk will be created
 // as a side effect.
-func (rc *RecentIPCache) Trace(conn connection.Connection) string {
+func (rc *RecentIPCache) Trace(conn connection.Connection) (string, error) {
 	c, cached := rc.getEntry(conn.RemoteIP)
 	if cached {
 		<-c.dataReady
 		if len(c.data) > 0 {
 			rc.tracer.CreateCacheTest(conn, time.Now(), c.data)
 		}
-		return c.data
+		return "", errors.New("Timeout")
 	}
-	c.data = rc.tracer.Trace(conn, c.timeStamp)
+	data, err := rc.tracer.Trace(conn, c.timeStamp)
+	if err == nil {
+		c.data = data
+	}
 	close(c.dataReady)
-	return c.data
+	return c.data, err
 }
 
 // GetCacheLength returns the number of items currently in the cache. The
