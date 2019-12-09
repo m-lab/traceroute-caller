@@ -99,12 +99,6 @@ func TestTraceWritesMeta(t *testing.T) {
 	rtx.Must(err, "Could not create tempdir")
 	defer os.RemoveAll(tempdir)
 
-	// Temporarily set the hostname to a value for testing.
-	defer func(oldHn string) {
-		hostname = oldHn
-	}(hostname)
-	hostname = "testhostname"
-
 	d := Daemon{
 		AttachBinary:     "echo",
 		Warts2JSONBinary: "cat",
@@ -119,9 +113,12 @@ func TestTraceWritesMeta(t *testing.T) {
 
 	faketime := time.Date(2019, time.April, 1, 3, 45, 51, 0, time.UTC)
 	prometheusx.GitShortCommit = "Fake Version"
-	d.Trace(c, faketime)
+	data, err := d.Trace(c, faketime)
 
+	log.Println("err: ", err)
+	log.Println("data: ", data)
 	// Unmarshal the first line of the output file.
+	log.Println("here tmpdir: ", tempdir)
 	b, err := ioutil.ReadFile(tempdir + "/2019/04/01/20190401T034551Z_" + prefix.UnsafeString() + "_0000000000000001.jsonl")
 	rtx.Must(err, "Could not read file")
 
@@ -165,7 +162,7 @@ func TestTraceTimeout(t *testing.T) {
 	defer func() {
 		r := recover()
 		if r == nil {
-			log.Println("Corrrect. TimeOut error should NOT trigger recover.")
+			log.Println("Correct. timeout error should NOT trigger recover.")
 		}
 	}()
 
@@ -177,7 +174,8 @@ func TestTraceTimeout(t *testing.T) {
 	faketime := time.Date(2019, time.April, 1, 3, 45, 51, 0, time.UTC)
 	prometheusx.GitShortCommit = "Fake Version"
 	data, err := d.Trace(c, faketime)
-	if err.Error() != "Timeout" {
+	log.Println("ha ", err)
+	if err.Error() != "timeout" {
 		t.Error("Should return TimeOut err, not ", err)
 	}
 	if data != "" {
@@ -301,6 +299,7 @@ func TestGetMetaline(t *testing.T) {
 		LocalPort:  345,
 		Cookie:     "abc",
 	}
+	prometheusx.GitShortCommit = "Fake Version"
 	meta := GetMetaline(conn, true, "00EF")
 	if !strings.Contains(meta, "0000000000000ABC\",\"TracerouteCallerVersion\":\"Fake Version\",\"CachedResult\":true,\"CachedUUID\":\"00EF\"") {
 		t.Error("Fail to generate meta ", meta)

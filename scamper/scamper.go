@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"io/ioutil"
 	"log"
 	"os"
@@ -226,11 +225,11 @@ func (d *Daemon) trace(conn connection.Connection, t time.Time) (string, error) 
 			pipe.Write(&buff),
 		)
 		err = pipe.RunTimeout(cmd, d.ScamperTimeout)
-		log.Println("here", err)
-		if err.Error() == "timeout" {
+		if err != nil && err.Error() == "timeout" {
 			log.Println("TimeOut for Trace: ", cmd)
-			return "", errors.New("Timeout")
+			return "", err
 		}
+
 		rtx.PanicOnError(err, "Command %v failed", cmd)
 		rtx.PanicOnError(ioutil.WriteFile(filename, buff.Bytes(), 0666), "Could not save output to file")
 	}
