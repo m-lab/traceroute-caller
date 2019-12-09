@@ -113,12 +113,12 @@ func TestTraceWritesMeta(t *testing.T) {
 
 	faketime := time.Date(2019, time.April, 1, 3, 45, 51, 0, time.UTC)
 	prometheusx.GitShortCommit = "Fake Version"
-	data, err := d.Trace(c, faketime)
+	_, err = d.Trace(c, faketime)
 
-	log.Println("err: ", err)
-	log.Println("data: ", data)
+	if err != nil {
+		t.Error("Trace not done correctly.")
+	}
 	// Unmarshal the first line of the output file.
-	log.Println("here tmpdir: ", tempdir)
 	b, err := ioutil.ReadFile(tempdir + "/2019/04/01/20190401T034551Z_" + prefix.UnsafeString() + "_0000000000000001.jsonl")
 	rtx.Must(err, "Could not read file")
 
