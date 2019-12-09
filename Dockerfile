@@ -22,7 +22,7 @@ RUN mkdir /source
 ADD ./vendor/scamper/ /source
 RUN chmod +x /source/scamper-cvs-20190916/configure
 WORKDIR /source/scamper-cvs-20190916/
-RUN ./configure
+RUN CFLAGS='-g' ./configure --disable-privsep
 RUN make -j 8
 RUN make install
 RUN ldconfig
