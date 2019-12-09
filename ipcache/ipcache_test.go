@@ -142,8 +142,12 @@ func TestCacheWithBlockedTests(t *testing.T) {
 		go func(j int) {
 			randomDelay()
 			s, err := c.Trace(connection.Connection{RemoteIP: fmt.Sprintf("%d", j)})
-			if err != nil || s != fmt.Sprintf("Trace to %d", j) {
-				t.Errorf("Bad trace output: %q", s)
+			expected := fmt.Sprintf("Trace to %d", j)
+			if err != nil {
+				t.Error("Trace not done correctly.")
+			}
+			if s != expected {
+				t.Errorf("Bad trace output: %q, should be %s", s, expected)
 			}
 			if j == 77 {
 				stalledWg.Done()

@@ -3,7 +3,6 @@ package ipcache
 
 import (
 	"context"
-	"errors"
 	"flag"
 	"sync"
 	"time"
@@ -30,6 +29,7 @@ type cachedTest struct {
 	timeStamp time.Time
 	data      string
 	dataReady chan struct{}
+	err       error
 }
 
 // RecentIPCache contains a list of all the IP addresses that we have traced to
@@ -62,14 +62,17 @@ func (rc *RecentIPCache) Trace(conn connection.Connection) (string, error) {
 	c, cached := rc.getEntry(conn.RemoteIP)
 	if cached {
 		<-c.dataReady
-		if len(c.data) > 0 {
+		if c.err == nil {
 			rc.tracer.CreateCacheTest(conn, time.Now(), c.data)
+			return c.data, nil
 		}
-		return "", errors.New("Timeout")
+		return "", c.err
 	}
 	data, err := rc.tracer.Trace(conn, c.timeStamp)
 	if err == nil {
 		c.data = data
+	} else {
+		c.err = err
 	}
 	close(c.dataReady)
 	return c.data, err
