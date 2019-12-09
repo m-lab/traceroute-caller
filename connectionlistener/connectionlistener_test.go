@@ -29,13 +29,13 @@ type fakeTracer struct {
 	wg    sync.WaitGroup
 }
 
-func (ft *fakeTracer) Trace(conn connection.Connection, t time.Time) string {
+func (ft *fakeTracer) Trace(conn connection.Connection, t time.Time) (string, error) {
 	ft.mutex.Lock() // Must have a lock to avoid race conditions around the append.
 	defer ft.mutex.Unlock()
 	log.Println("Tracing", conn)
 	ft.ips = append(ft.ips, conn.RemoteIP)
 	ft.wg.Done()
-	return "Fake test Result"
+	return "Fake test Result", nil
 }
 
 func (ft *fakeTracer) CreateCacheTest(conn connection.Connection, t time.Time, cachedTest string) {

@@ -30,7 +30,7 @@ var (
 	waitTime          = flag.Duration("waitTime", 5*time.Second, "how long to wait between subsequent listings of open connections")
 	eventsocketDryRun = flag.Bool("tcpinfo.eventsocket.dryrun", false, "Whether the eventsocket machinery should be turned on in print-only mode.")
 	poll              = flag.Bool("poll", true, "Whether the polling method should be used to see new connections.")
-	scamperTimeout    = flag.Duration("waitTime", 300*time.Second, "how long to wait to complete a scamper trace.")
+	scamperTimeout    = flag.Duration("scamperTimeout", 300*time.Second, "how long to wait to complete a scamper trace.")
 
 	ctx, cancel = context.WithCancel(context.Background())
 )
