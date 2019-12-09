@@ -145,12 +145,6 @@ func TestTraceTimeout(t *testing.T) {
 	rtx.Must(err, "Could not create tempdir")
 	defer os.RemoveAll(tempdir)
 
-	// Temporarily set the hostname to a value for testing.
-	defer func(oldHn string) {
-		hostname = oldHn
-	}(hostname)
-	hostname = "testhostname"
-
 	d := Daemon{
 		AttachBinary:     "echo",
 		Warts2JSONBinary: "cat",
