@@ -146,7 +146,7 @@ func TestTraceTimeout(t *testing.T) {
 	defer os.RemoveAll(tempdir)
 
 	d := Daemon{
-		AttachBinary:     "echo",
+		AttachBinary:     "yes",
 		Warts2JSONBinary: "cat",
 		OutputPath:       tempdir,
 		ScamperTimeout:   1 * time.Nanosecond,
