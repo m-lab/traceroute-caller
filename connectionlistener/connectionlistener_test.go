@@ -43,6 +43,8 @@ func (ft *fakeTracer) CreateCacheTest(conn connection.Connection, t time.Time, c
 	return
 }
 
+func (*fakeTracer) DontTrace(conn connection.Connection, err error) {}
+
 func TestListener(t *testing.T) {
 	dir, err := ioutil.TempDir("", "TestEventSocketClient")
 	rtx.Must(err, "Could not create tempdir")

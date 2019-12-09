@@ -22,6 +22,7 @@ var (
 type Tracer interface {
 	Trace(conn connection.Connection, t time.Time) (string, error)
 	CreateCacheTest(conn connection.Connection, t time.Time, cachedTest string)
+	DontTrace(conn connection.Connection, err error)
 }
 
 // cachedTest is a single entry in the cache of traceroute results.
@@ -66,6 +67,7 @@ func (rc *RecentIPCache) Trace(conn connection.Connection) (string, error) {
 			rc.tracer.CreateCacheTest(conn, time.Now(), c.data)
 			return c.data, nil
 		}
+		rc.tracer.DontTrace(conn, c.err)
 		return "", c.err
 	}
 	c.data, c.err = rc.tracer.Trace(conn, c.timeStamp)

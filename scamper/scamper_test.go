@@ -3,6 +3,7 @@ package scamper
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io/ioutil"
 	"log"
 	"os"
@@ -31,6 +32,7 @@ func TestCancelStopsDaemon(t *testing.T) {
 		OutputPath:       tempdir,
 		ScamperTimeout:   1 * time.Minute,
 	}
+	d.DontTrace(connection.Connection{}, errors.New(""))
 	ctx, cancel := context.WithCancel(context.Background())
 	wg := sync.WaitGroup{}
 	wg.Add(1)
