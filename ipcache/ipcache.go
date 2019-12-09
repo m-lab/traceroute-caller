@@ -68,14 +68,9 @@ func (rc *RecentIPCache) Trace(conn connection.Connection) (string, error) {
 		}
 		return "", c.err
 	}
-	data, err := rc.tracer.Trace(conn, c.timeStamp)
-	if err == nil {
-		c.data = data
-	} else {
-		c.err = err
-	}
+	c.data, c.err = rc.tracer.Trace(conn, c.timeStamp)
 	close(c.dataReady)
-	return c.data, err
+	return c.data, c.err
 }
 
 // GetCacheLength returns the number of items currently in the cache. The
