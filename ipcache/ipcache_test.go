@@ -2,7 +2,9 @@ package ipcache_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"log"
 	"math/rand"
 	"sync"
 	"sync/atomic"
@@ -11,6 +13,7 @@ import (
 
 	"github.com/m-lab/traceroute-caller/connection"
 	"github.com/m-lab/traceroute-caller/ipcache"
+	pipe "gopkg.in/m-lab/pipe.v3"
 )
 
 type testTracer struct {
@@ -19,13 +22,16 @@ type testTracer struct {
 	answers []map[connection.Connection]struct{}
 }
 
-func (tf *testTracer) Trace(conn connection.Connection, t time.Time) string {
-	return "Fake trace test " + conn.RemoteIP
+func (tf *testTracer) Trace(conn connection.Connection, t time.Time) (string, error) {
+	return "Fake trace test " + conn.RemoteIP, nil
 }
 
 func (tf *testTracer) CreateCacheTest(conn connection.Connection, t time.Time, cachedTest string) {
 	tf.cctest++
-	return
+}
+
+func (tf *testTracer) DontTrace(conn connection.Connection, err error) {
+	log.Fatal("This function should not be called")
 }
 
 func TestTrace(t *testing.T) {
@@ -41,7 +47,10 @@ func TestTrace(t *testing.T) {
 		LocalPort:  58790,
 		Cookie:     "10f3d"}
 
-	tmp := testCache.Trace(conn1)
+	tmp, err := testCache.Trace(conn1)
+	if err != nil {
+		t.Error("trace not working correctly.")
+	}
 	if tmp != "Fake trace test 1.1.1.2" {
 		t.Error("cache not trace correctly ")
 	}
@@ -53,7 +62,10 @@ func TestTrace(t *testing.T) {
 		LocalPort:  58790,
 		Cookie:     "aaaa"}
 
-	t2 := testCache.Trace(conn2)
+	t2, err := testCache.Trace(conn2)
+	if err != nil {
+		t.Error("trace not working correctly.")
+	}
 	if t2 != "Fake trace test 1.1.1.5" {
 		t.Error("cache did not trace")
 	}
@@ -65,7 +77,7 @@ func TestTrace(t *testing.T) {
 		t.Errorf("Should have had one call to CreateCachedTest, not %d", tt.cctest)
 	}
 	if testCache.GetCacheLength() != 2 {
-		t.Error("cache not working correctly ")
+		t.Error("cache not working correctly.")
 	}
 }
 
@@ -98,19 +110,24 @@ func randomDelay() {
 }
 
 type pausingTracer struct {
-	ctx          context.Context
-	traceToBlock string
-	mut          sync.Mutex
-	successes    int64
+	ctx                  context.Context
+	traceToBlock         string
+	traceToBlockAndError string
+	traceToError         string
+	mut                  sync.Mutex
+	successes            int64
 }
 
-func (pt *pausingTracer) Trace(conn connection.Connection, t time.Time) string {
+func (pt *pausingTracer) Trace(conn connection.Connection, t time.Time) (string, error) {
 	randomDelay()
-	if conn.RemoteIP == pt.traceToBlock {
+	if conn.RemoteIP == pt.traceToBlock || conn.RemoteIP == pt.traceToBlockAndError {
 		<-pt.ctx.Done()
 	}
 	atomic.AddInt64(&pt.successes, 1)
-	return "Trace to " + conn.RemoteIP
+	if conn.RemoteIP == pt.traceToError || conn.RemoteIP == pt.traceToBlockAndError {
+		return "", errors.New(pipe.ErrTimeout.Error())
+	}
+	return "Trace to " + conn.RemoteIP, nil
 }
 
 func (pt *pausingTracer) CreateCacheTest(conn connection.Connection, t time.Time, cachedTest string) {
@@ -118,27 +135,49 @@ func (pt *pausingTracer) CreateCacheTest(conn connection.Connection, t time.Time
 	atomic.AddInt64(&pt.successes, 1)
 }
 
+func (pt *pausingTracer) DontTrace(conn connection.Connection, err error) {
+	randomDelay()
+	atomic.AddInt64(&pt.successes, 1)
+}
+
 func TestCacheWithBlockedTests(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+	block := 77
+	blockThenError := 33
+	justError := 90
 	pt := &pausingTracer{
-		ctx:          ctx,
-		traceToBlock: "77",
+		ctx:                  ctx,
+		traceToBlock:         fmt.Sprintf("%d", block),
+		traceToBlockAndError: fmt.Sprintf("%d", blockThenError),
+		traceToError:         fmt.Sprintf("%d", justError),
 	}
+	log.Printf("%+v\n", pt)
 	c := ipcache.New(ctx, pt, 10*time.Microsecond, 1*time.Microsecond)
 
 	wg := sync.WaitGroup{}
-	wg.Add(990) // 1 out of every 100 will be stalled.
+	wg.Add(980) // 2 out of every 100 will be stalled - one with errors and one without.
 	stalledWg := sync.WaitGroup{}
-	stalledWg.Add(10) // The waitgroup for the stalled requests.
+	stalledWg.Add(20) // The waitgroup for the stalled requests.
 
 	for i := 0; i < 1000; i++ {
 		go func(j int) {
 			randomDelay()
-			if s := c.Trace(connection.Connection{RemoteIP: fmt.Sprintf("%d", j)}); s != fmt.Sprintf("Trace to %d", j) {
-				t.Errorf("Bad trace output: %q", s)
+			s, err := c.Trace(connection.Connection{RemoteIP: fmt.Sprintf("%d", j)})
+			expected := fmt.Sprintf("Trace to %d", j)
+			if j == justError || j == blockThenError {
+				if err == nil {
+					t.Error("Should have had an error")
+				}
+			} else {
+				if err != nil {
+					t.Errorf("Trace %d not done correctly.", j)
+				}
+				if s != expected {
+					t.Errorf("Bad trace output: %q, should be %s", s, expected)
+				}
 			}
-			if j == 77 {
+			if j == block || j == blockThenError {
 				stalledWg.Done()
 			} else {
 				wg.Done()
@@ -146,12 +185,12 @@ func TestCacheWithBlockedTests(t *testing.T) {
 		}(i % 100)
 	}
 	wg.Wait()
-	if pt.successes != 990 {
-		t.Errorf("Expected 990 successes, not %d", pt.successes)
+	if atomic.LoadInt64(&pt.successes) != 980 {
+		t.Errorf("Expected 980 successes, not %d", atomic.LoadInt64(&pt.successes))
 	}
 	cancel() // Unblock the stalled tests.
 	stalledWg.Wait()
-	if pt.successes != 1000 {
+	if atomic.LoadInt64(&pt.successes) != 1000 {
 		t.Errorf("Expected 1000 successes, not %d", pt.successes)
 	}
 }

@@ -10,7 +10,8 @@ script:
 # Vet the code, build the code, and run all the tests.
 - go vet ./...
 - go build ./...
-- go test ./... -v -coverprofile=_coverage.cov -race
+- go test ./... -race
+- go test ./... -v -coverprofile=_coverage.cov
 
 # Build a Docker image to make sure that we can.
 - docker build .

@@ -20,8 +20,9 @@ var (
 
 // Tracer is the generic interface for all things that can perform a traceroute.
 type Tracer interface {
-	Trace(conn connection.Connection, t time.Time) string
+	Trace(conn connection.Connection, t time.Time) (string, error)
 	CreateCacheTest(conn connection.Connection, t time.Time, cachedTest string)
+	DontTrace(conn connection.Connection, err error)
 }
 
 // cachedTest is a single entry in the cache of traceroute results.
@@ -29,6 +30,7 @@ type cachedTest struct {
 	timeStamp time.Time
 	data      string
 	dataReady chan struct{}
+	err       error
 }
 
 // RecentIPCache contains a list of all the IP addresses that we have traced to
@@ -57,16 +59,20 @@ func (rc *RecentIPCache) getEntry(ip string) (*cachedTest, bool) {
 // Trace performs a trace and adds it to the cache. It calls the methods of the
 // tracer, so if those create files on disk, then files on disk will be created
 // as a side effect.
-func (rc *RecentIPCache) Trace(conn connection.Connection) string {
+func (rc *RecentIPCache) Trace(conn connection.Connection) (string, error) {
 	c, cached := rc.getEntry(conn.RemoteIP)
 	if cached {
 		<-c.dataReady
-		rc.tracer.CreateCacheTest(conn, time.Now(), c.data)
-		return c.data
+		if c.err == nil {
+			rc.tracer.CreateCacheTest(conn, time.Now(), c.data)
+			return c.data, nil
+		}
+		rc.tracer.DontTrace(conn, c.err)
+		return "", c.err
 	}
-	c.data = rc.tracer.Trace(conn, c.timeStamp)
+	c.data, c.err = rc.tracer.Trace(conn, c.timeStamp)
 	close(c.dataReady)
-	return c.data
+	return c.data, c.err
 }
 
 // GetCacheLength returns the number of items currently in the cache. The
