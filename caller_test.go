@@ -27,6 +27,8 @@ func TestMain(t *testing.T) {
 	*prometheusx.ListenAddress = ":0"
 	*scamperCtrlSocket = dir + "/scamper.sock"
 	*waitTime = time.Nanosecond // Run through the loop a few times.
+	*outputPath = dir
+	tracerType.Value = "scamper"
 	ctx, cancel = context.WithCancel(context.Background())
 	go func() {
 		time.Sleep(1 * time.Second)
@@ -44,6 +46,8 @@ func TestMainWithConnectionListener(t *testing.T) {
 	*prometheusx.ListenAddress = ":0"
 	*scamperCtrlSocket = dir + "/scamper.sock"
 	*eventsocket.Filename = dir + "/events.sock"
+	*outputPath = dir
+	tracerType.Value = "paris-traceroute"
 
 	ctx, cancel = context.WithCancel(context.Background())
 	go srv.Serve(ctx)
