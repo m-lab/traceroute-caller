@@ -231,7 +231,7 @@ func (d *Daemon) trace(conn connection.Connection, t time.Time) (string, error) 
 		)
 		err = pipe.RunTimeout(cmd, d.ScamperTimeout)
 		if err != nil && err.Error() == pipe.ErrTimeout.Error() {
-			log.Println("TimeOut for Trace: ", cmd)
+			log.Println("Timeout for trace", cmd, "after", d.ScamperTimeout)
 			return "", err
 		}
 
