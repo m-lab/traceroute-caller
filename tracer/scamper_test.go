@@ -1,4 +1,4 @@
-package scamper
+package tracer
 
 import (
 	"context"
@@ -23,7 +23,7 @@ func TestCancelStopsDaemon(t *testing.T) {
 	tempdir, err := ioutil.TempDir("", "CancelStopsDaemon")
 	rtx.Must(err, "Could not create tempdir")
 	defer os.RemoveAll(tempdir)
-	d := Daemon{
+	d := ScamperDaemon{
 		// Let the shell use the path to discover these.
 		Binary:           "scamper",
 		AttachBinary:     "sc_attach",
@@ -76,7 +76,7 @@ func TestExistingFileStopsDaemonCreation(t *testing.T) {
 	rtx.Must(err, "Could not create tempdir")
 	defer os.RemoveAll(tempdir)
 	rtx.Must(ioutil.WriteFile(tempdir+"/ctrl", []byte("test"), 0666), "Could not create file")
-	d := Daemon{
+	d := ScamperDaemon{
 		// Let the shell use the path to discover these.
 		Binary:           "scamper",
 		AttachBinary:     "sc_attach",
@@ -101,7 +101,13 @@ func TestTraceWritesMeta(t *testing.T) {
 	rtx.Must(err, "Could not create tempdir")
 	defer os.RemoveAll(tempdir)
 
-	d := Daemon{
+	// Temporarily set the hostname to a value for testing.
+	defer func(oldHn string) {
+		hostname = oldHn
+	}(hostname)
+	hostname = "testhostname"
+
+	d := ScamperDaemon{
 		AttachBinary:     "echo",
 		Warts2JSONBinary: "cat",
 		OutputPath:       tempdir,
@@ -147,7 +153,7 @@ func TestTraceTimeout(t *testing.T) {
 	rtx.Must(err, "Could not create tempdir")
 	defer os.RemoveAll(tempdir)
 
-	d := Daemon{
+	d := ScamperDaemon{
 		AttachBinary:     "yes",
 		Warts2JSONBinary: "cat",
 		OutputPath:       tempdir,
@@ -189,7 +195,7 @@ func TestCreateCacheTest(t *testing.T) {
 	}(hostname)
 	hostname = "testhostname"
 
-	d := Daemon{
+	d := ScamperDaemon{
 		AttachBinary:     "echo",
 		Warts2JSONBinary: "cat",
 		OutputPath:       tempdir,
@@ -257,7 +263,7 @@ func TestRecovery(t *testing.T) {
 	}(hostname)
 	hostname = "testhostname"
 
-	d := Daemon{
+	d := ScamperDaemon{
 		AttachBinary:     "echo",
 		Warts2JSONBinary: "cat",
 		OutputPath:       tempdir,
@@ -301,8 +307,8 @@ func TestGetMetaline(t *testing.T) {
 	}
 }
 
-// If this successfully compiles, then Daemon implements the Tracer interface,
+// If this successfully compiles, then ScamperDaemon implements the Tracer interface,
 // which is what we want it to do.
-func assertDaemonIsTracer(d *Daemon) {
+func assertScamperDaemonIsTracer(d *ScamperDaemon) {
 	func(t ipcache.Tracer) {}(d)
 }

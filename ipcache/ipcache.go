@@ -86,10 +86,10 @@ func (rc *RecentIPCache) GetCacheLength() int {
 
 // New creates and returns a RecentIPCache. It also starts up a background
 // goroutine that scrubs the cache.
-func New(ctx context.Context, tracer Tracer, ipCacheTimeout, ipCacheUpdatePeriod time.Duration) *RecentIPCache {
+func New(ctx context.Context, trace Tracer, ipCacheTimeout, ipCacheUpdatePeriod time.Duration) *RecentIPCache {
 	m := &RecentIPCache{
 		cache:  make(map[string]*cachedTest),
-		tracer: tracer,
+		tracer: trace,
 	}
 	go func() {
 		ticker := time.NewTicker(ipCacheUpdatePeriod)

@@ -120,7 +120,7 @@ type pausingTracer struct {
 
 func (pt *pausingTracer) Trace(conn connection.Connection, t time.Time) (string, error) {
 	randomDelay()
-	if conn.RemoteIP == pt.traceToBlock || conn.RemoteIP == pt.traceToBlockAndError {
+	if conn.RemoteIP == pt.traceToBlock || conn.RemoteIP == pt.traceToError {
 		<-pt.ctx.Done()
 	}
 	atomic.AddInt64(&pt.successes, 1)
@@ -143,16 +143,12 @@ func (pt *pausingTracer) DontTrace(conn connection.Connection, err error) {
 func TestCacheWithBlockedTests(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	block := 77
-	blockThenError := 33
-	justError := 90
 	pt := &pausingTracer{
 		ctx:                  ctx,
-		traceToBlock:         fmt.Sprintf("%d", block),
-		traceToBlockAndError: fmt.Sprintf("%d", blockThenError),
-		traceToError:         fmt.Sprintf("%d", justError),
+		traceToBlock:         "77",
+		traceToBlockAndError: "33",
+		traceToError:         "90",
 	}
-	log.Printf("%+v\n", pt)
 	c := ipcache.New(ctx, pt, 10*time.Microsecond, 1*time.Microsecond)
 
 	wg := sync.WaitGroup{}
@@ -165,7 +161,7 @@ func TestCacheWithBlockedTests(t *testing.T) {
 			randomDelay()
 			s, err := c.Trace(connection.Connection{RemoteIP: fmt.Sprintf("%d", j)})
 			expected := fmt.Sprintf("Trace to %d", j)
-			if j == justError || j == blockThenError {
+			if j == 90 || j == 33 {
 				if err == nil {
 					t.Error("Should have had an error")
 				}
@@ -177,7 +173,7 @@ func TestCacheWithBlockedTests(t *testing.T) {
 					t.Errorf("Bad trace output: %q, should be %s", s, expected)
 				}
 			}
-			if j == block || j == blockThenError {
+			if j == 77 || j == 90 {
 				stalledWg.Done()
 			} else {
 				wg.Done()
