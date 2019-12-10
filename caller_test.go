@@ -44,7 +44,6 @@ func TestMainWithConnectionListener(t *testing.T) {
 	*prometheusx.ListenAddress = ":0"
 	*scamperCtrlSocket = dir + "/scamper.sock"
 	*eventsocket.Filename = dir + "/events.sock"
-	*eventsocketDryRun = true
 
 	ctx, cancel = context.WithCancel(context.Background())
 	go srv.Serve(ctx)
