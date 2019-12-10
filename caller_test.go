@@ -26,7 +26,7 @@ func TestMain(t *testing.T) {
 	// TODO: verify more in this test.
 	*prometheusx.ListenAddress = ":0"
 	*scamperCtrlSocket = dir + "/scamper.sock"
-	*waitTime = 1 * time.Nanosecond // Run through the loop a few times.
+	*waitTime = time.Nanosecond // Run through the loop a few times.
 	ctx, cancel = context.WithCancel(context.Background())
 	go func() {
 		time.Sleep(1 * time.Second)
