@@ -100,7 +100,7 @@ func parseSSLine(line string) (*connection.Connection, error) {
 type ssFinder struct{}
 
 func (f *ssFinder) GetConnections() map[connection.Connection]struct{} {
-	cmd := exec.Command(*ssBinary, "-e")
+	cmd := exec.Command(*ssBinary, "-e", "-n")
 	var out bytes.Buffer
 	var stderr bytes.Buffer
 	cmd.Stdout = &out

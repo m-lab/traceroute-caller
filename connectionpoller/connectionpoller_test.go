@@ -130,8 +130,11 @@ func (tt *testTracer) Trace(conn connection.Connection, t time.Time) (string, er
 	return "Fake Trace test", nil
 }
 
-func (tt *testTracer) CreateCacheTest(conn connection.Connection, t time.Time, cachedTest string) {}
-func (tt *testTracer) DontTrace(conn connection.Connection, err error)                            {}
+func (tt *testTracer) TraceFromCachedTrace(conn connection.Connection, t time.Time, cachedTest string) error {
+	return nil
+}
+
+func (tt *testTracer) DontTrace(conn connection.Connection, err error) {}
 
 type testFinder struct {
 }

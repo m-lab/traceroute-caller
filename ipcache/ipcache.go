@@ -21,7 +21,7 @@ var (
 // Tracer is the generic interface for all things that can perform a traceroute.
 type Tracer interface {
 	Trace(conn connection.Connection, t time.Time) (string, error)
-	CreateCacheTest(conn connection.Connection, t time.Time, cachedTest string)
+	TraceFromCachedTrace(conn connection.Connection, t time.Time, cachedTest string) error
 	DontTrace(conn connection.Connection, err error)
 }
 
@@ -64,7 +64,7 @@ func (rc *RecentIPCache) Trace(conn connection.Connection) (string, error) {
 	if cached {
 		<-c.dataReady
 		if c.err == nil {
-			rc.tracer.CreateCacheTest(conn, time.Now(), c.data)
+			rc.tracer.TraceFromCachedTrace(conn, time.Now(), c.data)
 			return c.data, nil
 		}
 		rc.tracer.DontTrace(conn, c.err)

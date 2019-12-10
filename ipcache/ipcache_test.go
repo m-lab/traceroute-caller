@@ -26,8 +26,9 @@ func (tf *testTracer) Trace(conn connection.Connection, t time.Time) (string, er
 	return "Fake trace test " + conn.RemoteIP, nil
 }
 
-func (tf *testTracer) CreateCacheTest(conn connection.Connection, t time.Time, cachedTest string) {
+func (tf *testTracer) TraceFromCachedTrace(conn connection.Connection, t time.Time, cachedTest string) error {
 	tf.cctest++
+	return nil
 }
 
 func (tf *testTracer) DontTrace(conn connection.Connection, err error) {
@@ -130,9 +131,10 @@ func (pt *pausingTracer) Trace(conn connection.Connection, t time.Time) (string,
 	return "Trace to " + conn.RemoteIP, nil
 }
 
-func (pt *pausingTracer) CreateCacheTest(conn connection.Connection, t time.Time, cachedTest string) {
+func (pt *pausingTracer) TraceFromCachedTrace(conn connection.Connection, t time.Time, cachedTest string) error {
 	randomDelay()
 	atomic.AddInt64(&pt.successes, 1)
+	return nil
 }
 
 func (pt *pausingTracer) DontTrace(conn connection.Connection, err error) {

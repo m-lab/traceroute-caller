@@ -1,4 +1,4 @@
-FROM golang:1.12 as build
+FROM golang:1.13 as build
 ADD . /go/src/github.com/m-lab/traceroute-caller
 ENV GOARCH amd64
 ENV CGO_ENABLED 0

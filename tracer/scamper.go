@@ -4,16 +4,19 @@ package tracer
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
 
 	"github.com/m-lab/go/rtx"
 	"github.com/m-lab/traceroute-caller/connection"
+	"github.com/m-lab/uuid"
 	pipe "gopkg.in/m-lab/pipe.v3"
 )
 
@@ -28,7 +31,6 @@ import (
 type ScamperDaemon struct {
 	Binary, AttachBinary, Warts2JSONBinary, ControlSocket, OutputPath string
 	ScamperTimeout                                                    time.Duration
-	DryRun                                                            bool
 }
 
 // MustStart starts a scamper binary running and listening to the given context.
@@ -78,11 +80,11 @@ func (d *ScamperDaemon) Trace(conn connection.Connection, t time.Time) (string, 
 	defer func() {
 		if r := recover(); r != nil {
 			log.Printf("Recovered (%v) a crashed trace for %v at %v\n", r, conn, t)
-			crashedTraces.Inc()
+			crashedTraces.WithLabelValues("scamper").Inc()
 		}
 	}()
-	tracesInProgress.Inc()
-	defer tracesInProgress.Dec()
+	tracesInProgress.WithLabelValues("scamper").Inc()
+	defer tracesInProgress.WithLabelValues("scamper").Dec()
 	return d.trace(conn, t)
 }
 
@@ -94,10 +96,23 @@ func (d *ScamperDaemon) TraceAll(connections []connection.Connection) {
 	}
 }
 
-// CreateCacheTest creates a file containing traceroute results that came from a
+// generatesFilename creates the string filename for storing the data.
+func (*ScamperDaemon) generateFilename(cookie string, t time.Time) string {
+	c, err := strconv.ParseInt(cookie, 16, 64)
+	rtx.PanicOnError(err, "Could not turn cookie into number")
+	return t.Format("20060102T150405Z") + "_" + uuid.FromCookie(uint64(c)) + ".jsonl"
+}
+
+// TraceFromCachedTrace creates a file containing traceroute results that came from a
 // cache result, rather than performing the traceroute with scamper.
-func (d *ScamperDaemon) CreateCacheTest(conn connection.Connection, t time.Time, cachedTest string) {
-	filename := createTimePath(d.OutputPath, t) + generateFilename(conn.Cookie, t)
+func (d *ScamperDaemon) TraceFromCachedTrace(conn connection.Connection, t time.Time, cachedTest string) error {
+	dir, err := createTimePath(d.OutputPath, t)
+	if err != nil {
+		log.Println("Could not create directories")
+		cacheErrors.WithLabelValues("scamper", "baddir").Inc()
+		return err
+	}
+	filename := dir + d.generateFilename(conn.Cookie, t)
 	log.Println("Starting a cached trace to be put in", filename)
 
 	// remove the first line of cachedTest
@@ -105,41 +120,43 @@ func (d *ScamperDaemon) CreateCacheTest(conn connection.Connection, t time.Time,
 
 	if split <= 0 || split == len(cachedTest) {
 		log.Println("Invalid cached test")
-		return
+		cacheErrors.WithLabelValues("scamper", "badcache").Inc()
+		return errors.New("Invalid cached test")
 	}
 
 	// Get the uuid from the first line of cachedTest
 	newTest := GetMetaline(conn, true, extractUUID(cachedTest[:split])) + cachedTest[split+1:]
-	rtx.PanicOnError(ioutil.WriteFile(filename, []byte(newTest), 0666), "Could not save output to file")
+	return ioutil.WriteFile(filename, []byte(newTest), 0666)
 }
 
 func (d *ScamperDaemon) trace(conn connection.Connection, t time.Time) (string, error) {
-	filename := createTimePath(d.OutputPath, t) + generateFilename(conn.Cookie, t)
+	dir, err := createTimePath(d.OutputPath, t)
+	rtx.PanicOnError(err, "Could not create directory")
+	filename := dir + d.generateFilename(conn.Cookie, t)
 	log.Println("Starting a trace to be put in", filename)
 	buff := bytes.Buffer{}
 
-	_, err := buff.WriteString(GetMetaline(conn, false, ""))
+	_, err = buff.WriteString(GetMetaline(conn, false, ""))
 	rtx.PanicOnError(err, "Could not write to buffer")
 
 	log.Printf(
 		"Running: echo \"tracelb -P icmp-echo -q 3 -O ptr %s\" | %s -i- -o- -U %s | %s > %s\n",
 		conn.RemoteIP, d.AttachBinary, d.ControlSocket, d.Warts2JSONBinary, filename)
-	if !d.DryRun {
-		cmd := pipe.Line(
-			pipe.Println("tracelb -P icmp-echo -q 3 -O ptr ", conn.RemoteIP),
-			pipe.Exec(d.AttachBinary, "-i-", "-o-", "-U", d.ControlSocket),
-			pipe.Exec(d.Warts2JSONBinary),
-			pipe.Write(&buff),
-		)
-		err = pipe.RunTimeout(cmd, d.ScamperTimeout)
-		if err != nil && err.Error() == pipe.ErrTimeout.Error() {
-			log.Println("TimeOut for Trace: ", cmd)
-			return "", err
-		}
-
-		rtx.PanicOnError(err, "Command %v failed", cmd)
-		rtx.PanicOnError(ioutil.WriteFile(filename, buff.Bytes(), 0666), "Could not save output to file")
+	cmd := pipe.Line(
+		pipe.Println("tracelb -P icmp-echo -q 3 -O ptr ", conn.RemoteIP),
+		pipe.Exec(d.AttachBinary, "-i-", "-o-", "-U", d.ControlSocket),
+		pipe.Exec(d.Warts2JSONBinary),
+		pipe.Write(&buff),
+	)
+	err = pipe.RunTimeout(cmd, d.ScamperTimeout)
+	tracesPerformed.WithLabelValues("scamper").Inc()
+	if err != nil && err.Error() == pipe.ErrTimeout.Error() {
+		log.Println("TimeOut for Trace: ", cmd)
+		return "", err
 	}
+
+	rtx.PanicOnError(err, "Command %v failed", cmd)
+	rtx.PanicOnError(ioutil.WriteFile(filename, buff.Bytes(), 0666), "Could not save output to file")
 	return string(buff.Bytes()), nil
 }
 
@@ -147,5 +164,5 @@ func (d *ScamperDaemon) trace(conn connection.Connection, t time.Time) (string, 
 // previous round not already returned an error. This should increment a counter
 // that tracks the number of tests which have been "transitively failed".
 func (d *ScamperDaemon) DontTrace(conn connection.Connection, err error) {
-	tracesNotPerformed.Inc()
+	tracesNotPerformed.WithLabelValues("scamper").Inc()
 }

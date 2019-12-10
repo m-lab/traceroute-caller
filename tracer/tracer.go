@@ -4,33 +4,51 @@ import (
 	"encoding/json"
 	"log"
 	"os"
-	"strconv"
 	"time"
 
 	"github.com/m-lab/go/prometheusx"
 	"github.com/m-lab/go/rtx"
 	"github.com/m-lab/traceroute-caller/connection"
-	"github.com/m-lab/uuid"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
 var (
-	tracesInProgress = promauto.NewGauge(
+	tracesPerformed = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "traces_performed_total",
+			Help: "The number of calls to the external trace routine",
+		},
+		[]string{"type"},
+	)
+	tracesInProgress = promauto.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "traces_in_progress",
 			Help: "The number of traces currently being run",
-		})
-	crashedTraces = promauto.NewCounter(
+		},
+		[]string{"type"},
+	)
+	crashedTraces = promauto.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "traces_crashed_total",
 			Help: "The number of traces that have crashed",
-		})
-	tracesNotPerformed = promauto.NewCounter(
+		},
+		[]string{"type"},
+	)
+	tracesNotPerformed = promauto.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "traces_skipped_total",
 			Help: "The number of traces that have not been performed because there was an error cached",
-		})
+		},
+		[]string{"type"},
+	)
+	cacheErrors = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "traces_error_caching_total",
+			Help: "The number of traces that were supposed to be gotten from the cache but could not be",
+		},
+		[]string{"type", "error"},
+	)
 
 	// hostname of the current machine. Only call os.Hostname once, because the
 	// result should never change.
@@ -95,17 +113,10 @@ func GetMetaline(conn connection.Connection, isCache bool, cachedUUID string) st
 	return string(metaJSON) + "\n"
 }
 
-// createTimePath returns a string with date in format
-// prefix/yyyy/mm/dd/hostname/ after creating a directory of the same name.
-func createTimePath(outputPath string, t time.Time) string {
+// createTimePath returns a string with date in format prefix/yyyy/mm/dd/ after
+// creating a directory of the same name.
+func createTimePath(outputPath string, t time.Time) (string, error) {
 	dir := outputPath + "/" + t.Format("2006/01/02") + "/"
-	rtx.PanicOnError(os.MkdirAll(dir, 0777), "Could not create the output dir")
-	return dir
-}
-
-// generatesFilename creates the string filename for storing the data.
-func generateFilename(cookie string, t time.Time) string {
-	c, err := strconv.ParseInt(cookie, 16, 64)
-	rtx.PanicOnError(err, "Could not turn cookie into number")
-	return t.Format("20060102T150405Z") + "_" + uuid.FromCookie(uint64(c)) + ".jsonl"
+	err := os.MkdirAll(dir, 0777)
+	return dir, err
 }

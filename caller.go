@@ -5,6 +5,7 @@ import (
 	"context"
 	"flag"
 	"log"
+	"os"
 	"sync"
 	"time"
 
@@ -29,9 +30,8 @@ var (
 	parisBin          = flag.String("paris.bin", "paris-traceroute", "The path to the paris-traceroute binary.")
 	outputPath        = flag.String("outputPath", "/var/spool/scamper", "path of output")
 	waitTime          = flag.Duration("waitTime", 5*time.Second, "how long to wait between subsequent listings of open connections")
-	eventsocketDryRun = flag.Bool("tcpinfo.eventsocket.dryrun", false, "Whether the eventsocket machinery should be turned on in print-only mode.")
 	poll              = flag.Bool("poll", true, "Whether the polling method should be used to see new connections.")
-	scamperTimeout    = flag.Duration("scamperTimeout", 300*time.Second, "how long to wait to complete a scamper trace.")
+	traceTimeout      = flag.Duration("traceTimeout", 300*time.Second, "how long to wait to complete a scamper trace.")
 	tracerType        = flagx.Enum{
 		Options: []string{"paris-traceroute", "scamper"},
 		Value:   "scamper",
@@ -52,6 +52,7 @@ func main() {
 
 	flag.Parse()
 	rtx.Must(flagx.ArgsFromEnv(flag.CommandLine), "Could not get args from environment")
+	rtx.Must(os.MkdirAll(*outputPath, 0557), "Could not create data directory")
 
 	defer cancel()
 
@@ -67,7 +68,7 @@ func main() {
 			Warts2JSONBinary: *scwarts2jsonBin,
 			OutputPath:       *outputPath,
 			ControlSocket:    *scamperCtrlSocket,
-			ScamperTimeout:   *scamperTimeout,
+			ScamperTimeout:   *traceTimeout,
 		}
 		go func() {
 			daemon.MustStart(ctx)
@@ -78,6 +79,7 @@ func main() {
 		trace = &tracer.Paris{
 			Binary:     *parisBin,
 			OutputPath: *outputPath,
+			Timeout:    *traceTimeout,
 		}
 	}
 
