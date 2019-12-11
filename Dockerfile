@@ -1,6 +1,7 @@
 # Build the traceroute-caller binary
-FROM golang:1.13 as build
+FROM golang:1.13 as build_caller
 ADD . /go/src/github.com/m-lab/traceroute-caller
+RUN rm /go/src/github.com/m-lab/traceroute-caller/Dockerfile
 ENV GOARCH amd64
 ENV CGO_ENABLED 0
 ENV GOOS linux
@@ -12,12 +13,12 @@ RUN chmod -R a+rx /go/bin/traceroute-caller
 
 
 # Build the binaries that are called by traceroute-caller
-FROM ubuntu:latest
+FROM ubuntu:latest as build_tracers
 # Install all the packages we need and then remove the apt-get lists.
 # iproute2 gives us ss
 # all the other packages are for the build processes.
 RUN apt-get update && \
-    apt-get install -y iproute2 make coreutils autoconf libtool git build-essential && \
+    apt-get install -y make coreutils autoconf libtool git build-essential && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
@@ -27,24 +28,45 @@ RUN mkdir /scamper-src
 ADD ./vendor/scamper/ /scamper-src
 RUN chmod +x /scamper-src/scamper-cvs-20190916/configure
 WORKDIR /scamper-src/scamper-cvs-20190916/
-RUN ./configure
+RUN ./configure --prefix=/scamper
 RUN make -j 8
 RUN make install
-RUN ldconfig
 
 # Build and install paris-traceroute
 RUN mkdir /pt-src
 ADD ./vendor/libparistraceroute/ /pt-src
 WORKDIR /pt-src
-RUN mkdir m4
+RUN mkdir -p m4
 RUN ./autogen.sh
-RUN ./configure
+RUN ./configure --prefix=/paris-traceroute
 RUN make -j 8
 RUN make install
-RUN ldconfig
 
-# Bring the statically-linked traceroute-caller binary from the build image.
-COPY --from=build /go/bin/traceroute-caller /
+# Create an image for the binaries that are called by traceroute-caller without
+# any of the build tools.
+FROM ubuntu:latest
+# Install all the packages we need and then remove the apt-get lists.
+# iproute2 gives us ss
+RUN apt-get update && \
+    apt-get install -y iproute2 && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# Bring the statically-linked traceroute-caller binary from the go build image.
+COPY --from=build_caller /go/bin/traceroute-caller /
+
+# Bring the dynamically-linked traceroute binaries from their build image.
+COPY --from=build_tracers /scamper /scamper
+RUN cp -R /scamper/* /usr/local/.
+RUN rm -Rf /scamper
+
+COPY --from=build_tracers /paris-traceroute /paris-traceroute
+RUN cp -R /paris-traceroute/* /usr/local/.
+RUN rm -Rf /paris-traceroute
+
+# They are dynamically-linked, so make sure to run ldconfig to locate all new
+# libraries.
+RUN ldconfig
 
 # Verify that all the binaries we depend on are actually available
 RUN which paris-traceroute
