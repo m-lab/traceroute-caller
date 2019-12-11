@@ -1,4 +1,4 @@
-FROM golang:1.12 as build
+FROM golang:1.13 as build
 ADD . /go/src/github.com/m-lab/traceroute-caller
 ENV GOARCH amd64
 ENV CGO_ENABLED 0
@@ -13,15 +13,25 @@ RUN chmod -R a+rx /go/bin/traceroute-caller
 FROM ubuntu:latest
 # Install all the standard packages we need and then remove the apt-get lists.
 RUN apt-get update && \
-    apt-get install -y python python-pip make iproute2 coreutils autoconf && \
+    apt-get install -y python python-pip make iproute2 coreutils autoconf libtool git build-essential && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
 RUN ls -l
-RUN mkdir /source
-ADD ./vendor/scamper/ /source
-RUN chmod +x /source/scamper-cvs-20190916/configure
-WORKDIR /source/scamper-cvs-20190916/
+RUN mkdir /scamper-src
+ADD ./vendor/scamper/ /scamper-src
+RUN chmod +x /scamper-src/scamper-cvs-20190916/configure
+WORKDIR /scamper-src/scamper-cvs-20190916/
+RUN ./configure
+RUN make -j 8
+RUN make install
+RUN ldconfig
+
+RUN mkdir /pt-src
+ADD ./vendor/libparistraceroute/ /pt-src
+WORKDIR /pt-src
+RUN mkdir m4
+RUN ./autogen.sh
 RUN ./configure
 RUN make -j 8
 RUN make install

@@ -1,0 +1,3 @@
+[submodule "vendor/libparistraceroute"]
+	path = vendor/libparistraceroute
+	url = https://github.com/libparistraceroute/libparistraceroute.git
