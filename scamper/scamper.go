@@ -29,8 +29,8 @@ import (
 // and managed.
 type Daemon struct {
 	Binary, AttachBinary, Warts2JSONBinary, ControlSocket, OutputPath string
-
-	DryRun bool
+	ScamperTimeout                                                    time.Duration
+	DryRun                                                            bool
 }
 
 var (
@@ -43,6 +43,11 @@ var (
 		prometheus.CounterOpts{
 			Name: "traces_crashed_total",
 			Help: "The number of traces that have crashed",
+		})
+	tracesNotPerformed = promauto.NewCounter(
+		prometheus.CounterOpts{
+			Name: "traces_skipped_total",
+			Help: "The number of traces that have not been performed because there was an error cached",
 		})
 
 	// hostname of the current machine. Only call os.Hostname once, because the
@@ -116,7 +121,7 @@ func (d *Daemon) generateFilename(cookie string, t time.Time) string {
 // All checks inside of this function and its subfunctions should call
 // PanicOnError instead of Must because each trace is independent of the others,
 // so we should prevent a single failed trace from crashing everything.
-func (d *Daemon) Trace(conn connection.Connection, t time.Time) string {
+func (d *Daemon) Trace(conn connection.Connection, t time.Time) (string, error) {
 	defer func() {
 		if r := recover(); r != nil {
 			log.Printf("Recovered (%v) a crashed trace for %v at %v\n", r, conn, t)
@@ -204,7 +209,9 @@ func (d *Daemon) CreateCacheTest(conn connection.Connection, t time.Time, cached
 	rtx.PanicOnError(ioutil.WriteFile(filename, []byte(newTest), 0666), "Could not save output to file")
 }
 
-func (d *Daemon) trace(conn connection.Connection, t time.Time) string {
+// trace will panic if the operation failed w/ an error not ErrTimeout.
+// It will return an empty string when there is ErrTimeout.
+func (d *Daemon) trace(conn connection.Connection, t time.Time) (string, error) {
 	filename := d.createTimePath(t) + d.generateFilename(conn.Cookie, t)
 	log.Println("Starting a trace to be put in", filename)
 	buff := bytes.Buffer{}
@@ -222,8 +229,21 @@ func (d *Daemon) trace(conn connection.Connection, t time.Time) string {
 			pipe.Exec(d.Warts2JSONBinary),
 			pipe.Write(&buff),
 		)
-		rtx.PanicOnError(pipe.Run(cmd), "Command %v failed", cmd)
+		err = pipe.RunTimeout(cmd, d.ScamperTimeout)
+		if err != nil && err.Error() == pipe.ErrTimeout.Error() {
+			log.Println("Timeout for trace", cmd, "after", d.ScamperTimeout)
+			return "", err
+		}
+
+		rtx.PanicOnError(err, "Command %v failed", cmd)
 		rtx.PanicOnError(ioutil.WriteFile(filename, buff.Bytes(), 0666), "Could not save output to file")
 	}
-	return string(buff.Bytes())
+	return string(buff.Bytes()), nil
+}
+
+// DontTrace does not perform a trace that would have been performed, had the
+// previous round not already returned an error. This should increment a counter
+// that tracks the number of tests which have been "transitively failed".
+func (d *Daemon) DontTrace(conn connection.Connection, err error) {
+	tracesNotPerformed.Inc()
 }

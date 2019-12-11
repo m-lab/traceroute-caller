@@ -3,6 +3,7 @@ package scamper
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io/ioutil"
 	"log"
 	"os"
@@ -29,7 +30,9 @@ func TestCancelStopsDaemon(t *testing.T) {
 		Warts2JSONBinary: "sc_warts2json",
 		ControlSocket:    tempdir + "/ctrl",
 		OutputPath:       tempdir,
+		ScamperTimeout:   1 * time.Minute,
 	}
+	d.DontTrace(connection.Connection{}, errors.New(""))
 	ctx, cancel := context.WithCancel(context.Background())
 	wg := sync.WaitGroup{}
 	wg.Add(1)
@@ -80,6 +83,7 @@ func TestExistingFileStopsDaemonCreation(t *testing.T) {
 		Warts2JSONBinary: "sc_warts2json",
 		ControlSocket:    tempdir + "/ctrl",
 		OutputPath:       tempdir,
+		ScamperTimeout:   1 * time.Minute,
 	}
 
 	defer func() {
@@ -97,16 +101,11 @@ func TestTraceWritesMeta(t *testing.T) {
 	rtx.Must(err, "Could not create tempdir")
 	defer os.RemoveAll(tempdir)
 
-	// Temporarily set the hostname to a value for testing.
-	defer func(oldHn string) {
-		hostname = oldHn
-	}(hostname)
-	hostname = "testhostname"
-
 	d := Daemon{
 		AttachBinary:     "echo",
 		Warts2JSONBinary: "cat",
 		OutputPath:       tempdir,
+		ScamperTimeout:   1 * time.Minute,
 	}
 
 	c := connection.Connection{
@@ -116,8 +115,11 @@ func TestTraceWritesMeta(t *testing.T) {
 
 	faketime := time.Date(2019, time.April, 1, 3, 45, 51, 0, time.UTC)
 	prometheusx.GitShortCommit = "Fake Version"
-	d.Trace(c, faketime)
+	_, err = d.Trace(c, faketime)
 
+	if err != nil {
+		t.Error("Trace not done correctly.")
+	}
 	// Unmarshal the first line of the output file.
 	b, err := ioutil.ReadFile(tempdir + "/2019/04/01/20190401T034551Z_" + prefix.UnsafeString() + "_0000000000000001.jsonl")
 	rtx.Must(err, "Could not read file")
@@ -140,6 +142,42 @@ func TestTraceWritesMeta(t *testing.T) {
 	}
 }
 
+func TestTraceTimeout(t *testing.T) {
+	tempdir, err := ioutil.TempDir("", "TestTimeoutTrace")
+	rtx.Must(err, "Could not create tempdir")
+	defer os.RemoveAll(tempdir)
+
+	d := Daemon{
+		AttachBinary:     "yes",
+		Warts2JSONBinary: "cat",
+		OutputPath:       tempdir,
+		ScamperTimeout:   1 * time.Nanosecond,
+		DryRun:           false,
+	}
+
+	defer func() {
+		r := recover()
+		if r == nil {
+			log.Println("Correct. timeout error should NOT trigger recover.")
+		}
+	}()
+
+	c := connection.Connection{
+		Cookie:   "1",
+		RemoteIP: "1.2.3.4",
+	}
+
+	faketime := time.Date(2019, time.April, 1, 3, 45, 51, 0, time.UTC)
+	prometheusx.GitShortCommit = "Fake Version"
+	data, err := d.Trace(c, faketime)
+	if err.Error() != "timeout" {
+		t.Error("Should return TimeOut err, not ", err)
+	}
+	if data != "" {
+		t.Error("Should return empty string when TimeOut")
+	}
+}
+
 func TestCreateCacheTest(t *testing.T) {
 	tempdir, err := ioutil.TempDir("", "TestCachedTrace")
 	rtx.Must(err, "Could not create tempdir")
@@ -155,6 +193,7 @@ func TestCreateCacheTest(t *testing.T) {
 		AttachBinary:     "echo",
 		Warts2JSONBinary: "cat",
 		OutputPath:       tempdir,
+		ScamperTimeout:   1 * time.Minute,
 	}
 
 	c := connection.Connection{
@@ -222,6 +261,7 @@ func TestRecovery(t *testing.T) {
 		AttachBinary:     "echo",
 		Warts2JSONBinary: "cat",
 		OutputPath:       tempdir,
+		ScamperTimeout:   1 * time.Minute,
 	}
 
 	c := connection.Connection{
@@ -254,6 +294,7 @@ func TestGetMetaline(t *testing.T) {
 		LocalPort:  345,
 		Cookie:     "abc",
 	}
+	prometheusx.GitShortCommit = "Fake Version"
 	meta := GetMetaline(conn, true, "00EF")
 	if !strings.Contains(meta, "0000000000000ABC\",\"TracerouteCallerVersion\":\"Fake Version\",\"CachedResult\":true,\"CachedUUID\":\"00EF\"") {
 		t.Error("Fail to generate meta ", meta)
