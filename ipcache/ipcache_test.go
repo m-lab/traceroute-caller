@@ -145,11 +145,14 @@ func (pt *pausingTracer) DontTrace(conn connection.Connection, err error) {
 func TestCacheWithBlockedTests(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+	block := 77
+	blockThenError := 33
+	justError := 90
 	pt := &pausingTracer{
 		ctx:                  ctx,
-		traceToBlock:         "77",
-		traceToBlockAndError: "33",
-		traceToError:         "90",
+		traceToBlock:         fmt.Sprintf("%d", block),
+		traceToBlockAndError: fmt.Sprintf("%d", blockThenError),
+		traceToError:         fmt.Sprintf("%d", justError),
 	}
 	c := ipcache.New(ctx, pt, 10*time.Microsecond, 1*time.Microsecond)
 
@@ -163,7 +166,7 @@ func TestCacheWithBlockedTests(t *testing.T) {
 			randomDelay()
 			s, err := c.Trace(connection.Connection{RemoteIP: fmt.Sprintf("%d", j)})
 			expected := fmt.Sprintf("Trace to %d", j)
-			if j == 90 || j == 33 {
+			if j == justError || j == blockThenError {
 				if err == nil {
 					t.Error("Should have had an error")
 				}
@@ -175,7 +178,7 @@ func TestCacheWithBlockedTests(t *testing.T) {
 					t.Errorf("Bad trace output: %q, should be %s", s, expected)
 				}
 			}
-			if j == 77 || j == 90 {
+			if j == block || j == blockThenError {
 				stalledWg.Done()
 			} else {
 				wg.Done()
