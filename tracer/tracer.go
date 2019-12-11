@@ -42,7 +42,7 @@ var (
 		},
 		[]string{"type"},
 	)
-	cacheErrors = promauto.NewCounterVec(
+	tracerCacheErrors = promauto.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "traces_error_caching_total",
 			Help: "The number of traces that were supposed to be gotten from the cache but could not be",

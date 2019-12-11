@@ -69,12 +69,12 @@ func (p *Paris) Trace(conn connection.Connection, t time.Time) (string, error) {
 func (p *Paris) TraceFromCachedTrace(conn connection.Connection, t time.Time, cachedTest string) error {
 	uuid, err := conn.UUID()
 	if err != nil {
-		cacheErrors.WithLabelValues("paris-traceroute", "uuid").Inc()
+		tracerCacheErrors.WithLabelValues("paris-traceroute", "uuid").Inc()
 		return err
 	}
 	dir, err := createTimePath(p.OutputPath, t)
 	if err != nil {
-		cacheErrors.WithLabelValues("paris-traceroute", "mkdir").Inc()
+		tracerCacheErrors.WithLabelValues("paris-traceroute", "mkdir").Inc()
 		return err
 	}
 	fn := p.filename(uuid, t, true)

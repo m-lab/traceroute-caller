@@ -109,7 +109,7 @@ func (d *ScamperDaemon) TraceFromCachedTrace(conn connection.Connection, t time.
 	dir, err := createTimePath(d.OutputPath, t)
 	if err != nil {
 		log.Println("Could not create directories")
-		cacheErrors.WithLabelValues("scamper", "baddir").Inc()
+		tracerCacheErrors.WithLabelValues("scamper", "baddir").Inc()
 		return err
 	}
 	filename := dir + d.generateFilename(conn.Cookie, t)
@@ -120,7 +120,7 @@ func (d *ScamperDaemon) TraceFromCachedTrace(conn connection.Connection, t time.
 
 	if split <= 0 || split == len(cachedTest) {
 		log.Println("Invalid cached test")
-		cacheErrors.WithLabelValues("scamper", "badcache").Inc()
+		tracerCacheErrors.WithLabelValues("scamper", "badcache").Inc()
 		return errors.New("Invalid cached test")
 	}
 
