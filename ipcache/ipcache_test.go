@@ -154,6 +154,7 @@ func TestCacheWithBlockedTests(t *testing.T) {
 		traceToBlockAndError: fmt.Sprintf("%d", blockThenError),
 		traceToError:         fmt.Sprintf("%d", justError),
 	}
+	log.Printf("%+v\n", pt)
 	c := ipcache.New(ctx, pt, 10*time.Microsecond, 1*time.Microsecond)
 
 	wg := sync.WaitGroup{}
