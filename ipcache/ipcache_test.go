@@ -121,7 +121,7 @@ type pausingTracer struct {
 
 func (pt *pausingTracer) Trace(conn connection.Connection, t time.Time) (string, error) {
 	randomDelay()
-	if conn.RemoteIP == pt.traceToBlock || conn.RemoteIP == pt.traceToError {
+	if conn.RemoteIP == pt.traceToBlock || conn.RemoteIP == pt.traceToBlockAndError {
 		<-pt.ctx.Done()
 	}
 	atomic.AddInt64(&pt.successes, 1)

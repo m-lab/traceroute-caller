@@ -27,11 +27,12 @@ var (
 	scattachBin       = flag.String("scamper.sc_attach", "sc_attach", "The path to the sc_attach binary.")
 	scwarts2jsonBin   = flag.String("scamper.sc_warts2json", "sc_warts2json", "The path to the sc_warts2json binary.")
 	scamperCtrlSocket = flag.String("scamper.unixsocket", "/tmp/scamperctrl", "The name of the UNIX-domain socket that the scamper daemon should listen on")
+	scamperTimeout    = flag.Duration("scamper.timeout", 300*time.Second, "how long to wait to complete a scamper trace.")
 	parisBin          = flag.String("paris.bin", "paris-traceroute", "The path to the paris-traceroute binary.")
+	parisTimeout      = flag.Duration("paris.timeout", 60*time.Second, "how long to wait to complete a paris-traceroute trace.")
 	outputPath        = flag.String("outputPath", "/var/spool/scamper", "path of output")
 	waitTime          = flag.Duration("waitTime", 5*time.Second, "how long to wait between subsequent listings of open connections")
 	poll              = flag.Bool("poll", true, "Whether the polling method should be used to see new connections.")
-	traceTimeout      = flag.Duration("traceTimeout", 300*time.Second, "how long to wait to complete a scamper trace.")
 	tracerType        = flagx.Enum{
 		Options: []string{"paris-traceroute", "scamper"},
 		Value:   "scamper",
@@ -68,7 +69,7 @@ func main() {
 			Warts2JSONBinary: *scwarts2jsonBin,
 			OutputPath:       *outputPath,
 			ControlSocket:    *scamperCtrlSocket,
-			ScamperTimeout:   *traceTimeout,
+			ScamperTimeout:   *scamperTimeout,
 		}
 		go func() {
 			daemon.MustStart(ctx)
@@ -79,7 +80,7 @@ func main() {
 		trace = &tracer.Paris{
 			Binary:     *parisBin,
 			OutputPath: *outputPath,
-			Timeout:    *traceTimeout,
+			Timeout:    *parisTimeout,
 		}
 	}
 
