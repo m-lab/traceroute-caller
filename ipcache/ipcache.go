@@ -21,7 +21,7 @@ var (
 // Tracer is the generic interface for all things that can perform a traceroute.
 type Tracer interface {
 	Trace(conn connection.Connection, t time.Time) (string, error)
-	CreateCacheTest(conn connection.Connection, t time.Time, cachedTest string)
+	TraceFromCachedTrace(conn connection.Connection, t time.Time, cachedTest string) error
 	DontTrace(conn connection.Connection, err error)
 }
 
@@ -64,7 +64,7 @@ func (rc *RecentIPCache) Trace(conn connection.Connection) (string, error) {
 	if cached {
 		<-c.dataReady
 		if c.err == nil {
-			rc.tracer.CreateCacheTest(conn, time.Now(), c.data)
+			rc.tracer.TraceFromCachedTrace(conn, time.Now(), c.data)
 			return c.data, nil
 		}
 		rc.tracer.DontTrace(conn, c.err)
@@ -86,10 +86,10 @@ func (rc *RecentIPCache) GetCacheLength() int {
 
 // New creates and returns a RecentIPCache. It also starts up a background
 // goroutine that scrubs the cache.
-func New(ctx context.Context, tracer Tracer, ipCacheTimeout, ipCacheUpdatePeriod time.Duration) *RecentIPCache {
+func New(ctx context.Context, trace Tracer, ipCacheTimeout, ipCacheUpdatePeriod time.Duration) *RecentIPCache {
 	m := &RecentIPCache{
 		cache:  make(map[string]*cachedTest),
-		tracer: tracer,
+		tracer: trace,
 	}
 	go func() {
 		ticker := time.NewTicker(ipCacheUpdatePeriod)

@@ -1,4 +1,4 @@
-package scamper
+package tracer
 
 import (
 	"context"
@@ -23,7 +23,7 @@ func TestCancelStopsDaemon(t *testing.T) {
 	tempdir, err := ioutil.TempDir("", "CancelStopsDaemon")
 	rtx.Must(err, "Could not create tempdir")
 	defer os.RemoveAll(tempdir)
-	d := Daemon{
+	d := ScamperDaemon{
 		// Let the shell use the path to discover these.
 		Binary:           "scamper",
 		AttachBinary:     "sc_attach",
@@ -76,7 +76,7 @@ func TestExistingFileStopsDaemonCreation(t *testing.T) {
 	rtx.Must(err, "Could not create tempdir")
 	defer os.RemoveAll(tempdir)
 	rtx.Must(ioutil.WriteFile(tempdir+"/ctrl", []byte("test"), 0666), "Could not create file")
-	d := Daemon{
+	d := ScamperDaemon{
 		// Let the shell use the path to discover these.
 		Binary:           "scamper",
 		AttachBinary:     "sc_attach",
@@ -101,7 +101,13 @@ func TestTraceWritesMeta(t *testing.T) {
 	rtx.Must(err, "Could not create tempdir")
 	defer os.RemoveAll(tempdir)
 
-	d := Daemon{
+	// Temporarily set the hostname to a value for testing.
+	defer func(oldHn string) {
+		hostname = oldHn
+	}(hostname)
+	hostname = "testhostname"
+
+	d := ScamperDaemon{
 		AttachBinary:     "echo",
 		Warts2JSONBinary: "cat",
 		OutputPath:       tempdir,
@@ -147,12 +153,11 @@ func TestTraceTimeout(t *testing.T) {
 	rtx.Must(err, "Could not create tempdir")
 	defer os.RemoveAll(tempdir)
 
-	d := Daemon{
+	d := ScamperDaemon{
 		AttachBinary:     "yes",
 		Warts2JSONBinary: "cat",
 		OutputPath:       tempdir,
 		ScamperTimeout:   1 * time.Nanosecond,
-		DryRun:           false,
 	}
 
 	defer func() {
@@ -189,7 +194,7 @@ func TestCreateCacheTest(t *testing.T) {
 	}(hostname)
 	hostname = "testhostname"
 
-	d := Daemon{
+	d := ScamperDaemon{
 		AttachBinary:     "echo",
 		Warts2JSONBinary: "cat",
 		OutputPath:       tempdir,
@@ -208,13 +213,13 @@ func TestCreateCacheTest(t *testing.T) {
 	{"type":"tracelb", "version":"0.1", "userid":0, "method":"icmp-echo", "src":"::ffff:180.87.97.101", "dst":"::ffff:1.47.236.62", "start":{"sec":1566691298, "usec":476221, "ftime":"2019-08-25 00:01:38"}, "probe_size":60, "firsthop":1, "attempts":3, "confidence":95, "tos":0, "gaplimit":3, "wait_timeout":5, "wait_probe":250, "probec":0, "probec_max":3000, "nodec":0, "linkc":0}
 	{"type":"cycle-stop", "list_name":"/tmp/scamperctrl:51811", "id":1, "hostname":"ndt-plh7v", "stop_time":1566691298}`
 
-	d.CreateCacheTest(c, faketime, "Broken cached test")
+	d.TraceFromCachedTrace(c, faketime, "Broken cached test")
 	_, errInvalidTest := ioutil.ReadFile(tempdir + "/2019/04/01/20190401T034551Z_" + prefix.UnsafeString() + "_0000000000000001.jsonl")
 	if errInvalidTest == nil {
 		t.Error("should fail to generate cached test")
 	}
 
-	d.CreateCacheTest(c, faketime, cachedTest)
+	d.TraceFromCachedTrace(c, faketime, cachedTest)
 
 	// Unmarshal the first line of the output file.
 	b, err := ioutil.ReadFile(tempdir + "/2019/04/01/20190401T034551Z_" + prefix.UnsafeString() + "_0000000000000001.jsonl")
@@ -244,6 +249,12 @@ func TestCreateCacheTest(t *testing.T) {
 	if m.CachedUUID != "ndt-plh7v_1566050090_000000000004D64D" {
 		t.Error("Bad traceroute CachedUUID value:", m.CachedUUID)
 	}
+
+	// Now test an error condition.
+	d.OutputPath = "/dev/null"
+	if d.TraceFromCachedTrace(c, faketime, cachedTest) == nil {
+		t.Error("Should have had a test failure tryin gto write to /dev/null")
+	}
 }
 
 func TestRecovery(t *testing.T) {
@@ -257,7 +268,7 @@ func TestRecovery(t *testing.T) {
 	}(hostname)
 	hostname = "testhostname"
 
-	d := Daemon{
+	d := ScamperDaemon{
 		AttachBinary:     "echo",
 		Warts2JSONBinary: "cat",
 		OutputPath:       tempdir,
@@ -301,8 +312,8 @@ func TestGetMetaline(t *testing.T) {
 	}
 }
 
-// If this successfully compiles, then Daemon implements the Tracer interface,
+// If this successfully compiles, then ScamperDaemon implements the Tracer interface,
 // which is what we want it to do.
-func assertDaemonIsTracer(d *Daemon) {
+func assertScamperDaemonIsTracer(d *ScamperDaemon) {
 	func(t ipcache.Tracer) {}(d)
 }

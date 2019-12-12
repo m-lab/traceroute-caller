@@ -5,10 +5,12 @@ import (
 	"context"
 	"flag"
 	"log"
+	"os"
 	"sync"
 	"time"
 
 	"github.com/m-lab/traceroute-caller/connection"
+	"github.com/m-lab/traceroute-caller/tracer"
 
 	"github.com/m-lab/go/flagx"
 	"github.com/m-lab/go/rtx"
@@ -18,22 +20,32 @@ import (
 	"github.com/m-lab/traceroute-caller/connectionlistener"
 	"github.com/m-lab/traceroute-caller/connectionpoller"
 	"github.com/m-lab/traceroute-caller/ipcache"
-	"github.com/m-lab/traceroute-caller/scamper"
 )
 
 var (
-	scamperBin        = flag.String("scamper.bin", "scamper", "path of scamper binary")
-	scattachBin       = flag.String("scamper.sc_attach", "sc_attach", "path of sc_attach binary")
-	scwarts2jsonBin   = flag.String("scamper.sc_warts2json", "sc_warts2json", "path of sc_warts2json binary")
+	scamperBin        = flag.String("scamper.bin", "scamper", "The path to the scamper binary.")
+	scattachBin       = flag.String("scamper.sc_attach", "sc_attach", "The path to the sc_attach binary.")
+	scwarts2jsonBin   = flag.String("scamper.sc_warts2json", "sc_warts2json", "The path to the sc_warts2json binary.")
 	scamperCtrlSocket = flag.String("scamper.unixsocket", "/tmp/scamperctrl", "The name of the UNIX-domain socket that the scamper daemon should listen on")
+	scamperTimeout    = flag.Duration("scamper.timeout", 300*time.Second, "how long to wait to complete a scamper trace.")
+	parisBin          = flag.String("paris.bin", "paris-traceroute", "The path to the paris-traceroute binary.")
+	parisTimeout      = flag.Duration("paris.timeout", 60*time.Second, "how long to wait to complete a paris-traceroute trace.")
 	outputPath        = flag.String("outputPath", "/var/spool/scamper", "path of output")
 	waitTime          = flag.Duration("waitTime", 5*time.Second, "how long to wait between subsequent listings of open connections")
-	eventsocketDryRun = flag.Bool("tcpinfo.eventsocket.dryrun", false, "Whether the eventsocket machinery should be turned on in print-only mode.")
 	poll              = flag.Bool("poll", true, "Whether the polling method should be used to see new connections.")
-	scamperTimeout    = flag.Duration("scamperTimeout", 300*time.Second, "how long to wait to complete a scamper trace.")
+	tracerType        = flagx.Enum{
+		Options: []string{"paris-traceroute", "scamper"},
+		Value:   "scamper",
+	}
 
+	// Variables to aid in testing of main()
 	ctx, cancel = context.WithCancel(context.Background())
+	logFatal    = log.Fatal
 )
+
+func init() {
+	flag.Var(&tracerType, "tracetool", "Choose whether paris-traceroute or scamper should be used.")
+}
 
 // Sample cmd:
 // go build
@@ -43,27 +55,42 @@ func main() {
 
 	flag.Parse()
 	rtx.Must(flagx.ArgsFromEnv(flag.CommandLine), "Could not get args from environment")
+	rtx.Must(os.MkdirAll(*outputPath, 0557), "Could not create data directory")
 
 	defer cancel()
+	wg := sync.WaitGroup{}
 
 	promSrv := prometheusx.MustServeMetrics()
 	defer promSrv.Shutdown(ctx)
 
-	daemon := scamper.Daemon{
-		Binary:           *scamperBin,
-		AttachBinary:     *scattachBin,
-		Warts2JSONBinary: *scwarts2jsonBin,
-		OutputPath:       *outputPath,
-		ControlSocket:    *scamperCtrlSocket,
-		ScamperTimeout:   *scamperTimeout,
+	var trace ipcache.Tracer
+	switch tracerType.Value {
+	case "scamper":
+		daemon := &tracer.ScamperDaemon{
+			Binary:           *scamperBin,
+			AttachBinary:     *scattachBin,
+			Warts2JSONBinary: *scwarts2jsonBin,
+			OutputPath:       *outputPath,
+			ControlSocket:    *scamperCtrlSocket,
+			ScamperTimeout:   *scamperTimeout,
+		}
+		wg.Add(1)
+		go func() {
+			daemon.MustStart(ctx)
+			cancel()
+			wg.Done()
+		}()
+		trace = daemon
+	case "paris-traceroute":
+		trace = &tracer.Paris{
+			Binary:     *parisBin,
+			OutputPath: *outputPath,
+			Timeout:    *parisTimeout,
+		}
 	}
-	go func() {
-		daemon.MustStart(ctx)
-		cancel()
-	}()
 
-	wg := sync.WaitGroup{}
-	cache := ipcache.New(ctx, &daemon, *ipcache.IPCacheTimeout, *ipcache.IPCacheUpdatePeriod)
+	cache := ipcache.New(ctx, trace, *ipcache.IPCacheTimeout, *ipcache.IPCacheUpdatePeriod)
+
 	if *poll {
 		wg.Add(1)
 		go func(c *ipcache.RecentIPCache) {
@@ -78,21 +105,17 @@ func main() {
 			}
 			wg.Done()
 		}(cache)
-	}
-	if *eventsocket.Filename != "" {
+	} else if *eventsocket.Filename != "" {
 		wg.Add(1)
 		go func() {
 			connCreator, err := connection.NewCreator()
 			rtx.Must(err, "Could not discover local IPs")
-			esdaemon := daemon
-			esdaemon.DryRun = *eventsocketDryRun
-			if *eventsocketDryRun {
-				cache = ipcache.New(ctx, &esdaemon, *ipcache.IPCacheTimeout, *ipcache.IPCacheUpdatePeriod)
-			}
 			connListener := connectionlistener.New(connCreator, cache)
 			eventsocket.MustRun(ctx, *eventsocket.Filename, connListener)
 			wg.Done()
 		}()
+	} else {
+		logFatal("--poll was false but --tcpinfo.eventsocket was set to \"\". This is a nonsensical configuration.")
 	}
 	wg.Wait()
 }

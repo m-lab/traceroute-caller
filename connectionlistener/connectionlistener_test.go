@@ -38,9 +38,9 @@ func (ft *fakeTracer) Trace(conn connection.Connection, t time.Time) (string, er
 	return "Fake test Result", nil
 }
 
-func (ft *fakeTracer) CreateCacheTest(conn connection.Connection, t time.Time, cachedTest string) {
+func (ft *fakeTracer) TraceFromCachedTrace(conn connection.Connection, t time.Time, cachedTest string) error {
 	log.Println("Create cached test for: ", conn)
-	return
+	return nil
 }
 
 func (*fakeTracer) DontTrace(conn connection.Connection, err error) {}
