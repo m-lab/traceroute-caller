@@ -56,21 +56,28 @@ func (rc *RecentIPCache) getEntry(ip string) (*cachedTest, bool) {
 	return rc.cache[ip], existed
 }
 
+func (rc *RecentIPCache) getTracer() Tracer {
+	rc.mu.Lock()
+	defer rc.mu.Unlock()
+	return rc.tracer
+}
+
 // Trace performs a trace and adds it to the cache. It calls the methods of the
 // tracer, so if those create files on disk, then files on disk will be created
 // as a side effect.
 func (rc *RecentIPCache) Trace(conn connection.Connection) (string, error) {
 	c, cached := rc.getEntry(conn.RemoteIP)
+	t := rc.getTracer()
 	if cached {
 		<-c.dataReady
 		if c.err == nil {
-			rc.tracer.TraceFromCachedTrace(conn, time.Now(), c.data)
+			t.TraceFromCachedTrace(conn, time.Now(), c.data)
 			return c.data, nil
 		}
-		rc.tracer.DontTrace(conn, c.err)
+		t.DontTrace(conn, c.err)
 		return "", c.err
 	}
-	c.data, c.err = rc.tracer.Trace(conn, c.timeStamp)
+	c.data, c.err = t.Trace(conn, c.timeStamp)
 	close(c.dataReady)
 	return c.data, c.err
 }
@@ -82,6 +89,14 @@ func (rc *RecentIPCache) GetCacheLength() int {
 	rc.mu.Lock()
 	defer rc.mu.Unlock()
 	return len(rc.cache)
+}
+
+// UpdateTracer switches the Tracer being used. This allows us to dynamically
+// switch between scamper and paris-traceroute.
+func (rc *RecentIPCache) UpdateTracer(t Tracer) {
+	rc.mu.Lock()
+	defer rc.mu.Unlock()
+	rc.tracer = t
 }
 
 // New creates and returns a RecentIPCache. It also starts up a background
