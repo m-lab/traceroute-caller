@@ -38,7 +38,9 @@ var (
 		Value:   "scamper",
 	}
 
+	// Variables to aid in testing of main()
 	ctx, cancel = context.WithCancel(context.Background())
+	logFatal    = log.Fatal
 )
 
 func init() {
@@ -56,6 +58,7 @@ func main() {
 	rtx.Must(os.MkdirAll(*outputPath, 0557), "Could not create data directory")
 
 	defer cancel()
+	wg := sync.WaitGroup{}
 
 	promSrv := prometheusx.MustServeMetrics()
 	defer promSrv.Shutdown(ctx)
@@ -71,9 +74,11 @@ func main() {
 			ControlSocket:    *scamperCtrlSocket,
 			ScamperTimeout:   *scamperTimeout,
 		}
+		wg.Add(1)
 		go func() {
 			daemon.MustStart(ctx)
 			cancel()
+			wg.Done()
 		}()
 		trace = daemon
 	case "paris-traceroute":
@@ -84,7 +89,6 @@ func main() {
 		}
 	}
 
-	wg := sync.WaitGroup{}
 	cache := ipcache.New(ctx, trace, *ipcache.IPCacheTimeout, *ipcache.IPCacheUpdatePeriod)
 
 	if *poll {
@@ -101,8 +105,7 @@ func main() {
 			}
 			wg.Done()
 		}(cache)
-	}
-	if *eventsocket.Filename != "" {
+	} else if *eventsocket.Filename != "" {
 		wg.Add(1)
 		go func() {
 			connCreator, err := connection.NewCreator()
@@ -111,6 +114,8 @@ func main() {
 			eventsocket.MustRun(ctx, *eventsocket.Filename, connListener)
 			wg.Done()
 		}()
+	} else {
+		logFatal("--poll was false but --tcpinfo.eventsocket was set to \"\". This is a nonsensical configuration.")
 	}
 	wg.Wait()
 }
