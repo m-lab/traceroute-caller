@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/m-lab/go/rtx"
 	"github.com/m-lab/traceroute-caller/connection"
 	"github.com/m-lab/traceroute-caller/ipcache"
 	pipe "gopkg.in/m-lab/pipe.v3"
@@ -23,6 +24,7 @@ type testTracer struct {
 }
 
 func (tf *testTracer) Trace(conn connection.Connection, t time.Time) (string, error) {
+	tf.calls++
 	return "Fake trace test " + conn.RemoteIP, nil
 }
 
@@ -79,6 +81,35 @@ func TestTrace(t *testing.T) {
 	}
 	if testCache.GetCacheLength() != 2 {
 		t.Error("cache not working correctly.")
+	}
+}
+
+func TestUpdateTracer(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	var tt, tt2 testTracer
+	testCache := ipcache.New(ctx, &tt, 100*time.Second, time.Second)
+	conn1 := connection.Connection{
+		RemoteIP:   "1.1.1.2",
+		RemotePort: 5034,
+		LocalIP:    "1.1.1.3",
+		LocalPort:  58790,
+		Cookie:     "10f3d"}
+	_, err := testCache.Trace(conn1)
+	rtx.Must(err, "Could not trace using tt")
+
+	testCache.UpdateTracer(&tt2)
+	conn2 := connection.Connection{
+		RemoteIP:   "1.1.1.5",
+		RemotePort: 5034,
+		LocalIP:    "1.1.1.3",
+		LocalPort:  58790,
+		Cookie:     "aaaa"}
+	_, err = testCache.Trace(conn2)
+	rtx.Must(err, "Could not trace using tt2")
+
+	if tt.calls != 1 || tt2.calls != 1 {
+		t.Error("Each tracer should have been called once, not", tt.calls, tt2.calls)
 	}
 }
 
