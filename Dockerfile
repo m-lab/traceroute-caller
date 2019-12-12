@@ -55,14 +55,10 @@ RUN apt-get update && \
 # Bring the statically-linked traceroute-caller binary from the go build image.
 COPY --from=build_caller /go/bin/traceroute-caller /
 
-# Bring the dynamically-linked traceroute binaries from their build image.
-COPY --from=build_tracers /scamper /scamper
-RUN cp -R /scamper/* /usr/local/.
-RUN rm -Rf /scamper
-
-COPY --from=build_tracers /paris-traceroute /paris-traceroute
-RUN cp -R /paris-traceroute/* /usr/local/.
-RUN rm -Rf /paris-traceroute
+# Bring the dynamically-linked traceroute binaries and their associated
+# libraries from their build image.
+COPY --from=build_tracers /scamper /usr/local
+COPY --from=build_tracers /paris-traceroute /usr/local
 
 # They are dynamically-linked, so make sure to run ldconfig to locate all new
 # libraries.
