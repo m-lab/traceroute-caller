@@ -64,15 +64,15 @@ func main() {
 	defer promSrv.Shutdown(ctx)
 
 	scamper := &tracer.Scamper{
-		Binary:           *scamperBin,
-		Warts2JSONBinary: *scwarts2jsonBin,
-		OutputPath:       *outputPath,
-		ScamperTimeout:   *scamperTimeout,
+		Binary:         *scamperBin,
+		OutputPath:     *outputPath,
+		ScamperTimeout: *scamperTimeout,
 	}
 	scamperDaemon := &tracer.ScamperDaemon{
-		Scamper:       scamper,
-		AttachBinary:  *scattachBin,
-		ControlSocket: *scamperCtrlSocket,
+		Scamper:          scamper,
+		AttachBinary:     *scattachBin,
+		Warts2JSONBinary: *scwarts2jsonBin,
+		ControlSocket:    *scamperCtrlSocket,
 	}
 	parisTracer := &tracer.Paris{
 		Binary:     *parisBin,
