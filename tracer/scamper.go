@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
@@ -20,6 +21,98 @@ import (
 	pipe "gopkg.in/m-lab/pipe.v3"
 )
 
+// Scamper uses scamper in non-daemon mode to perform traceroutes. This is much
+// less efficient, but when scamper crashes, it has a much lower "blast radius".
+type Scamper struct {
+	Binary, OutputPath string
+	ScamperTimeout     time.Duration
+}
+
+// generatesFilename creates the string filename for storing the data.
+func (*Scamper) generateFilename(cookie string, t time.Time) string {
+	c, err := strconv.ParseInt(cookie, 16, 64)
+	rtx.PanicOnError(err, "Could not turn cookie into number")
+	return t.Format("20060102T150405Z") + "_" + uuid.FromCookie(uint64(c)) + ".jsonl"
+}
+
+// TraceFromCachedTrace creates a file containing traceroute results that came from a
+// cache result, rather than performing the traceroute with scamper. Because
+// scamper-in-standalone and scamper-as-daemon use the same output format, this
+// function is the same code for both.
+func (s *Scamper) TraceFromCachedTrace(conn connection.Connection, t time.Time, cachedTest string) error {
+	dir, err := createTimePath(s.OutputPath, t)
+	if err != nil {
+		log.Println("Could not create directories")
+		tracerCacheErrors.WithLabelValues("scamper", "baddir").Inc()
+		return err
+	}
+	filename := dir + s.generateFilename(conn.Cookie, t)
+	log.Println("Starting a cached trace to be put in", filename)
+
+	// remove the first line of cachedTest
+	split := strings.Index(cachedTest, "\n")
+
+	if split <= 0 || split == len(cachedTest) {
+		log.Println("Invalid cached test")
+		tracerCacheErrors.WithLabelValues("scamper", "badcache").Inc()
+		return errors.New("Invalid cached test")
+	}
+
+	// Get the uuid from the first line of cachedTest
+	newTest := GetMetaline(conn, true, extractUUID(cachedTest[:split])) + cachedTest[split+1:]
+	return ioutil.WriteFile(filename, []byte(newTest), 0666)
+}
+
+// DontTrace does not perform a trace that would have been performed, had the
+// previous round not already returned an error. This should increment a counter
+// that tracks the number of tests which have been "transitively failed".
+func (*Scamper) DontTrace(conn connection.Connection, err error) {
+	tracesNotPerformed.WithLabelValues("scamper").Inc()
+}
+
+// Trace starts a new scamper process running the paris-traceroute algorithm to
+// every node. This uses more resources per-traceroute, but segfaults in the
+// called binaries have a much smaller "blast radius".
+func (s *Scamper) Trace(conn connection.Connection, t time.Time) (out string, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("Recovered (%v) a crashed trace for %v at %v\n", r, conn, t)
+			crashedTraces.WithLabelValues("scamper").Inc()
+			err = errors.New(fmt.Sprint(r))
+		}
+	}()
+	tracesInProgress.WithLabelValues("scamper").Inc()
+	defer tracesInProgress.WithLabelValues("scamper").Dec()
+	return s.trace(conn, t)
+}
+
+// trace a single connection using scamper as a standalone binary.
+func (s *Scamper) trace(conn connection.Connection, t time.Time) (string, error) {
+	dir, err := createTimePath(s.OutputPath, t)
+	rtx.PanicOnError(err, "Could not create directory")
+	filename := dir + s.generateFilename(conn.Cookie, t)
+	log.Println("Starting a trace to be put in", filename)
+	buff := bytes.Buffer{}
+
+	_, err = buff.WriteString(GetMetaline(conn, false, ""))
+	rtx.PanicOnError(err, "Could not write to buffer")
+
+	cmd := pipe.Line(
+		pipe.Exec(s.Binary, "-I", "tracelb -P icmp-echo -q 3 -O ptr "+conn.RemoteIP, "-o-", "-O", "json"),
+		pipe.Write(&buff),
+	)
+	err = pipe.RunTimeout(cmd, s.ScamperTimeout)
+	tracesPerformed.WithLabelValues("scamper").Inc()
+	if err != nil && err.Error() == pipe.ErrTimeout.Error() {
+		log.Println("TimeOut for Trace: ", cmd)
+		return "", err
+	}
+
+	rtx.PanicOnError(err, "Command %v failed", cmd)
+	rtx.PanicOnError(ioutil.WriteFile(filename, buff.Bytes(), 0666), "Could not save output to file")
+	return string(buff.Bytes()), nil
+}
+
 // ScamperDaemon contains a single instance of a scamper process. Once the ScamperDaemon has
 // been started, you can call Trace and then all traces will be centrally run
 // and managed.
@@ -29,8 +122,8 @@ import (
 // all traces are centrally managed, so if the central daemon goes wrong for
 // some reason, there is a much larger blast radius.
 type ScamperDaemon struct {
-	Binary, AttachBinary, Warts2JSONBinary, ControlSocket, OutputPath string
-	ScamperTimeout                                                    time.Duration
+	*Scamper
+	AttachBinary, Warts2JSONBinary, ControlSocket string
 }
 
 // MustStart starts a scamper binary running and listening to the given context.
@@ -76,15 +169,16 @@ func (d *ScamperDaemon) MustStart(ctx context.Context) {
 // All checks inside of this function and its subfunctions should call
 // PanicOnError instead of Must because each trace is independent of the others,
 // so we should prevent a single failed trace from crashing everything.
-func (d *ScamperDaemon) Trace(conn connection.Connection, t time.Time) (string, error) {
+func (d *ScamperDaemon) Trace(conn connection.Connection, t time.Time) (out string, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			log.Printf("Recovered (%v) a crashed trace for %v at %v\n", r, conn, t)
-			crashedTraces.WithLabelValues("scamper").Inc()
+			crashedTraces.WithLabelValues("scamper-daemon").Inc()
+			err = errors.New(fmt.Sprint(r))
 		}
 	}()
-	tracesInProgress.WithLabelValues("scamper").Inc()
-	defer tracesInProgress.WithLabelValues("scamper").Dec()
+	tracesInProgress.WithLabelValues("scamper-daemon").Inc()
+	defer tracesInProgress.WithLabelValues("scamper-daemon").Dec()
 	return d.trace(conn, t)
 }
 
@@ -94,39 +188,6 @@ func (d *ScamperDaemon) TraceAll(connections []connection.Connection) {
 		log.Printf("PT start: %s %d", c.RemoteIP, c.RemotePort)
 		go d.Trace(c, time.Now())
 	}
-}
-
-// generatesFilename creates the string filename for storing the data.
-func (*ScamperDaemon) generateFilename(cookie string, t time.Time) string {
-	c, err := strconv.ParseInt(cookie, 16, 64)
-	rtx.PanicOnError(err, "Could not turn cookie into number")
-	return t.Format("20060102T150405Z") + "_" + uuid.FromCookie(uint64(c)) + ".jsonl"
-}
-
-// TraceFromCachedTrace creates a file containing traceroute results that came from a
-// cache result, rather than performing the traceroute with scamper.
-func (d *ScamperDaemon) TraceFromCachedTrace(conn connection.Connection, t time.Time, cachedTest string) error {
-	dir, err := createTimePath(d.OutputPath, t)
-	if err != nil {
-		log.Println("Could not create directories")
-		tracerCacheErrors.WithLabelValues("scamper", "baddir").Inc()
-		return err
-	}
-	filename := dir + d.generateFilename(conn.Cookie, t)
-	log.Println("Starting a cached trace to be put in", filename)
-
-	// remove the first line of cachedTest
-	split := strings.Index(cachedTest, "\n")
-
-	if split <= 0 || split == len(cachedTest) {
-		log.Println("Invalid cached test")
-		tracerCacheErrors.WithLabelValues("scamper", "badcache").Inc()
-		return errors.New("Invalid cached test")
-	}
-
-	// Get the uuid from the first line of cachedTest
-	newTest := GetMetaline(conn, true, extractUUID(cachedTest[:split])) + cachedTest[split+1:]
-	return ioutil.WriteFile(filename, []byte(newTest), 0666)
 }
 
 func (d *ScamperDaemon) trace(conn connection.Connection, t time.Time) (string, error) {
@@ -149,7 +210,7 @@ func (d *ScamperDaemon) trace(conn connection.Connection, t time.Time) (string, 
 		pipe.Write(&buff),
 	)
 	err = pipe.RunTimeout(cmd, d.ScamperTimeout)
-	tracesPerformed.WithLabelValues("scamper").Inc()
+	tracesPerformed.WithLabelValues("scamper-daemon").Inc()
 	if err != nil && err.Error() == pipe.ErrTimeout.Error() {
 		log.Println("TimeOut for Trace: ", cmd)
 		return "", err
@@ -158,11 +219,4 @@ func (d *ScamperDaemon) trace(conn connection.Connection, t time.Time) (string, 
 	rtx.PanicOnError(err, "Command %v failed", cmd)
 	rtx.PanicOnError(ioutil.WriteFile(filename, buff.Bytes(), 0666), "Could not save output to file")
 	return string(buff.Bytes()), nil
-}
-
-// DontTrace does not perform a trace that would have been performed, had the
-// previous round not already returned an error. This should increment a counter
-// that tracks the number of tests which have been "transitively failed".
-func (d *ScamperDaemon) DontTrace(conn connection.Connection, err error) {
-	tracesNotPerformed.WithLabelValues("scamper").Inc()
 }

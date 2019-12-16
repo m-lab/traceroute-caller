@@ -34,7 +34,7 @@ var (
 	waitTime          = flag.Duration("waitTime", 5*time.Second, "how long to wait between subsequent listings of open connections")
 	poll              = flag.Bool("poll", true, "Whether the polling method should be used to see new connections.")
 	tracerType        = flagx.Enum{
-		Options: []string{"paris-traceroute", "scamper", "scamper-with-paris-backup"},
+		Options: []string{"paris-traceroute", "scamper", "scamper-daemon", "scamper-daemon-with-paris-backup"},
 		Value:   "scamper",
 	}
 
@@ -63,13 +63,16 @@ func main() {
 	promSrv := prometheusx.MustServeMetrics()
 	defer promSrv.Shutdown(ctx)
 
+	scamper := &tracer.Scamper{
+		Binary:         *scamperBin,
+		OutputPath:     *outputPath,
+		ScamperTimeout: *scamperTimeout,
+	}
 	scamperDaemon := &tracer.ScamperDaemon{
-		Binary:           *scamperBin,
+		Scamper:          scamper,
 		AttachBinary:     *scattachBin,
 		Warts2JSONBinary: *scwarts2jsonBin,
-		OutputPath:       *outputPath,
 		ControlSocket:    *scamperCtrlSocket,
-		ScamperTimeout:   *scamperTimeout,
 	}
 	parisTracer := &tracer.Paris{
 		Binary:     *parisBin,
@@ -81,7 +84,11 @@ func main() {
 
 	// Set up the cache three different ways, depending on the trace method requested.
 	switch tracerType.Value {
+	case "paris-traceroute":
+		cache = ipcache.New(ctx, parisTracer, *ipcache.IPCacheTimeout, *ipcache.IPCacheUpdatePeriod)
 	case "scamper":
+		cache = ipcache.New(ctx, scamper, *ipcache.IPCacheTimeout, *ipcache.IPCacheUpdatePeriod)
+	case "scamper-daemon":
 		cache = ipcache.New(ctx, scamperDaemon, *ipcache.IPCacheTimeout, *ipcache.IPCacheUpdatePeriod)
 		wg.Add(1)
 		go func() {
@@ -90,9 +97,7 @@ func main() {
 			cancel()
 			wg.Done()
 		}()
-	case "paris-traceroute":
-		cache = ipcache.New(ctx, parisTracer, *ipcache.IPCacheTimeout, *ipcache.IPCacheUpdatePeriod)
-	case "scamper-with-paris-backup":
+	case "scamper-daemon-with-paris-backup":
 		cache = ipcache.New(ctx, scamperDaemon, *ipcache.IPCacheTimeout, *ipcache.IPCacheUpdatePeriod)
 		wg.Add(1)
 		go func() {
