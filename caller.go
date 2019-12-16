@@ -34,7 +34,7 @@ var (
 	waitTime          = flag.Duration("waitTime", 5*time.Second, "how long to wait between subsequent listings of open connections")
 	poll              = flag.Bool("poll", true, "Whether the polling method should be used to see new connections.")
 	tracerType        = flagx.Enum{
-		Options: []string{"paris-traceroute", "scamper"},
+		Options: []string{"paris-traceroute", "scamper", "scamper-with-paris-backup"},
 		Value:   "scamper",
 	}
 
@@ -63,33 +63,45 @@ func main() {
 	promSrv := prometheusx.MustServeMetrics()
 	defer promSrv.Shutdown(ctx)
 
-	var trace ipcache.Tracer
+	scamperDaemon := &tracer.ScamperDaemon{
+		Binary:           *scamperBin,
+		AttachBinary:     *scattachBin,
+		Warts2JSONBinary: *scwarts2jsonBin,
+		OutputPath:       *outputPath,
+		ControlSocket:    *scamperCtrlSocket,
+		ScamperTimeout:   *scamperTimeout,
+	}
+	parisTracer := &tracer.Paris{
+		Binary:     *parisBin,
+		OutputPath: *outputPath,
+		Timeout:    *parisTimeout,
+	}
+
+	var cache *ipcache.RecentIPCache
+
+	// Set up the cache three different ways, depending on the trace method requested.
 	switch tracerType.Value {
 	case "scamper":
-		daemon := &tracer.ScamperDaemon{
-			Binary:           *scamperBin,
-			AttachBinary:     *scattachBin,
-			Warts2JSONBinary: *scwarts2jsonBin,
-			OutputPath:       *outputPath,
-			ControlSocket:    *scamperCtrlSocket,
-			ScamperTimeout:   *scamperTimeout,
-		}
+		cache = ipcache.New(ctx, scamperDaemon, *ipcache.IPCacheTimeout, *ipcache.IPCacheUpdatePeriod)
 		wg.Add(1)
 		go func() {
-			daemon.MustStart(ctx)
+			scamperDaemon.MustStart(ctx)
+			// When the scamper daemon dies, cancel main() and exit.
 			cancel()
 			wg.Done()
 		}()
-		trace = daemon
 	case "paris-traceroute":
-		trace = &tracer.Paris{
-			Binary:     *parisBin,
-			OutputPath: *outputPath,
-			Timeout:    *parisTimeout,
-		}
+		cache = ipcache.New(ctx, parisTracer, *ipcache.IPCacheTimeout, *ipcache.IPCacheUpdatePeriod)
+	case "scamper-with-paris-backup":
+		cache = ipcache.New(ctx, scamperDaemon, *ipcache.IPCacheTimeout, *ipcache.IPCacheUpdatePeriod)
+		wg.Add(1)
+		go func() {
+			scamperDaemon.MustStart(ctx)
+			// When the scamper daemon dies, switch to paris-traceroute.
+			cache.UpdateTracer(parisTracer)
+			wg.Done()
+		}()
 	}
-
-	cache := ipcache.New(ctx, trace, *ipcache.IPCacheTimeout, *ipcache.IPCacheUpdatePeriod)
 
 	if *poll {
 		wg.Add(1)
