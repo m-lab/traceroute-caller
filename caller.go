@@ -34,7 +34,7 @@ var (
 	waitTime          = flag.Duration("waitTime", 5*time.Second, "how long to wait between subsequent listings of open connections")
 	poll              = flag.Bool("poll", true, "Whether the polling method should be used to see new connections.")
 	tracerType        = flagx.Enum{
-		Options: []string{"paris-traceroute", "scamper", "scamper-daemon", "scamper-daemon-with-paris-backup"},
+		Options: []string{"paris-traceroute", "scamper", "scamper-daemon", "scamper-daemon-with-paris-backup", "scamper-daemon-with-scamper-backup"},
 		Value:   "scamper",
 	}
 
@@ -95,6 +95,16 @@ func main() {
 			scamperDaemon.MustStart(ctx)
 			// When the scamper daemon dies, cancel main() and exit.
 			cancel()
+			wg.Done()
+		}()
+	// These are hacks - the scamper daemon should not fail at all.
+	case "scamper-daemon-with-scamper-backup":
+		cache = ipcache.New(ctx, scamperDaemon, *ipcache.IPCacheTimeout, *ipcache.IPCacheUpdatePeriod)
+		wg.Add(1)
+		go func() {
+			scamperDaemon.MustStart(ctx)
+			// When the scamper daemon dies, switch to scamper
+			cache.UpdateTracer(scamper)
 			wg.Done()
 		}()
 	case "scamper-daemon-with-paris-backup":
