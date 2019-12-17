@@ -134,6 +134,8 @@ type ScamperDaemon struct {
 // We expect this function to be mostly used as a goroutine:
 //    go d.MustStart(ctx)
 func (d *ScamperDaemon) MustStart(ctx context.Context) {
+	scamperDaemonRunning.Set(1)
+	defer scamperDaemonRunning.Set(0)
 	derivedCtx, derivedCancel := context.WithCancel(ctx)
 	defer derivedCancel()
 	if _, err := os.Stat(d.ControlSocket); !os.IsNotExist(err) {

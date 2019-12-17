@@ -49,6 +49,12 @@ var (
 		},
 		[]string{"type", "error"},
 	)
+	scamperDaemonRunning = promauto.NewGauge(
+		prometheus.GaugeOpts{
+			Name: "traces_scamper_daemon_running",
+			Help: "Whether the scamper daemon is running or not.",
+		},
+	)
 
 	// hostname of the current machine. Only call os.Hostname once, because the
 	// result should never change.

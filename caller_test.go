@@ -86,6 +86,30 @@ func TestMainWithConnectionListener(t *testing.T) {
 	main()
 }
 
+func TestMainWithBackupScamper(t *testing.T) {
+	dir, err := ioutil.TempDir("", "TestMainWithBackupScamper")
+	rtx.Must(err, "Could not create temp dir")
+	defer os.RemoveAll(dir)
+	srv := eventsocket.New(dir + "/events.sock")
+	rtx.Must(srv.Listen(), "Could not start the empty server")
+
+	*prometheusx.ListenAddress = ":0"
+	*eventsocket.Filename = dir + "/events.sock"
+	*outputPath = dir
+	*poll = false
+	*scamperCtrlSocket = dir + "/scamper.sock"
+	*scamperBin = "false"
+	tracerType.Value = "scamper-daemon-with-scamper-backup"
+
+	ctx, cancel = context.WithCancel(context.Background())
+	go srv.Serve(ctx)
+	go func() {
+		time.Sleep(1 * time.Second)
+		cancel()
+	}()
+	main()
+}
+
 func TestMainWithBackupPT(t *testing.T) {
 	dir, err := ioutil.TempDir("", "TestMainWithBackupPT")
 	rtx.Must(err, "Could not create temp dir")
