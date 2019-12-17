@@ -19,18 +19,74 @@ import (
 	"github.com/m-lab/uuid/prefix"
 )
 
+func TestScamper(t *testing.T) {
+	dir, err := ioutil.TempDir("", "TestScamper")
+	rtx.Must(err, "Could not create tempdir")
+
+	s := &Scamper{
+		OutputPath:     dir,
+		Binary:         "echo",
+		ScamperTimeout: time.Duration(time.Hour),
+	}
+
+	// Test that it can perform a trace
+	now := time.Date(2003, 11, 9, 15, 55, 59, 0, time.UTC)
+	conn := connection.Connection{
+		RemoteIP:   "10.1.1.1",
+		RemotePort: 123,
+		LocalIP:    "192.768.0.1",
+		LocalPort:  456,
+		Cookie:     "12AB",
+	}
+	s.DontTrace(conn, nil) // No crash == success
+
+	// Test Trace
+	out, err := s.Trace(conn, now)
+	if err != nil {
+		t.Error(err)
+	}
+	uuid, err := conn.UUID()
+	rtx.Must(err, "Could not make uuid")
+	expected := `{"UUID":"` + uuid + `","TracerouteCallerVersion":"` + prometheusx.GitShortCommit + `","CachedResult":false,"CachedUUID":""}
+-I tracelb -P icmp-echo -q 3 -O ptr 10.1.1.1 -o- -O json
+`
+	if strings.TrimSpace(out) != strings.TrimSpace(expected) {
+		t.Error("Bad output:", out)
+	}
+	contents, err := ioutil.ReadFile(dir + "/2003/11/09/20031109T155559Z_" + prefix.UnsafeString() + "_00000000000012AB.jsonl")
+	rtx.Must(err, "Could not read file")
+	if string(contents) != out {
+		t.Error("The contents of the file should equal the returned values from scraper")
+	}
+
+	s.Binary = "false"
+	_, err = s.Trace(conn, now)
+	if err == nil {
+		t.Error("A failed call to the scamper binary should cause an error")
+	}
+
+	s.Binary = "yes"
+	s.ScamperTimeout = time.Nanosecond
+	_, err = s.Trace(conn, now)
+	if err == nil {
+		t.Error("A timed-out call to the scamper binary should cause an error")
+	}
+}
+
 func TestCancelStopsDaemon(t *testing.T) {
 	tempdir, err := ioutil.TempDir("", "CancelStopsDaemon")
 	rtx.Must(err, "Could not create tempdir")
 	defer os.RemoveAll(tempdir)
 	d := ScamperDaemon{
 		// Let the shell use the path to discover these.
-		Binary:           "scamper",
+		Scamper: &Scamper{
+			Binary:         "scamper",
+			OutputPath:     tempdir,
+			ScamperTimeout: 1 * time.Minute,
+		},
 		AttachBinary:     "sc_attach",
 		Warts2JSONBinary: "sc_warts2json",
 		ControlSocket:    tempdir + "/ctrl",
-		OutputPath:       tempdir,
-		ScamperTimeout:   1 * time.Minute,
 	}
 	d.DontTrace(connection.Connection{}, errors.New(""))
 	ctx, cancel := context.WithCancel(context.Background())
@@ -78,12 +134,14 @@ func TestExistingFileStopsDaemonCreation(t *testing.T) {
 	rtx.Must(ioutil.WriteFile(tempdir+"/ctrl", []byte("test"), 0666), "Could not create file")
 	d := ScamperDaemon{
 		// Let the shell use the path to discover these.
-		Binary:           "scamper",
+		Scamper: &Scamper{
+			Binary:         "scamper",
+			OutputPath:     tempdir,
+			ScamperTimeout: 1 * time.Minute,
+		},
 		AttachBinary:     "sc_attach",
 		Warts2JSONBinary: "sc_warts2json",
 		ControlSocket:    tempdir + "/ctrl",
-		OutputPath:       tempdir,
-		ScamperTimeout:   1 * time.Minute,
 	}
 
 	defer func() {
@@ -108,10 +166,12 @@ func TestTraceWritesMeta(t *testing.T) {
 	hostname = "testhostname"
 
 	d := ScamperDaemon{
+		Scamper: &Scamper{
+			OutputPath:     tempdir,
+			ScamperTimeout: 1 * time.Minute,
+		},
 		AttachBinary:     "echo",
 		Warts2JSONBinary: "cat",
-		OutputPath:       tempdir,
-		ScamperTimeout:   1 * time.Minute,
 	}
 
 	c := connection.Connection{
@@ -154,10 +214,12 @@ func TestTraceTimeout(t *testing.T) {
 	defer os.RemoveAll(tempdir)
 
 	d := ScamperDaemon{
+		Scamper: &Scamper{
+			OutputPath:     tempdir,
+			ScamperTimeout: 1 * time.Nanosecond,
+		},
 		AttachBinary:     "yes",
 		Warts2JSONBinary: "cat",
-		OutputPath:       tempdir,
-		ScamperTimeout:   1 * time.Nanosecond,
 	}
 
 	defer func() {
@@ -195,10 +257,12 @@ func TestCreateCacheTest(t *testing.T) {
 	hostname = "testhostname"
 
 	d := ScamperDaemon{
+		Scamper: &Scamper{
+			OutputPath:     tempdir,
+			ScamperTimeout: 1 * time.Minute,
+		},
 		AttachBinary:     "echo",
 		Warts2JSONBinary: "cat",
-		OutputPath:       tempdir,
-		ScamperTimeout:   1 * time.Minute,
 	}
 
 	c := connection.Connection{
@@ -269,10 +333,12 @@ func TestRecovery(t *testing.T) {
 	hostname = "testhostname"
 
 	d := ScamperDaemon{
+		Scamper: &Scamper{
+			OutputPath:     tempdir,
+			ScamperTimeout: 1 * time.Minute,
+		},
 		AttachBinary:     "echo",
 		Warts2JSONBinary: "cat",
-		OutputPath:       tempdir,
-		ScamperTimeout:   1 * time.Minute,
 	}
 
 	c := connection.Connection{
