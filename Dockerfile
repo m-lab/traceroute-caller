@@ -27,7 +27,6 @@ RUN ls -l
 RUN mkdir /scamper-src
 ADD ./vendor/scamper/ /scamper-src
 RUN tar xvzf  /scamper-src/scamper-cvs-20191102a.tar.gz -C /scamper-src/
-RUN ls -l /scamper-src/
 RUN chmod +x /scamper-src/scamper-cvs-20191102a/configure
 WORKDIR /scamper-src/scamper-cvs-20191102a/
 RUN ./configure --prefix=/scamper
