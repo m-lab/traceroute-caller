@@ -1758,7 +1758,8 @@ static int tracelb_node_ptr(scamper_task_t *task, scamper_tracelb_node_t *node)
   tracelb_state_t *state = tracelb_getstate(task);
   tracelb_host_t *th = NULL;
 
-  if((trace->flags & SCAMPER_TRACELB_FLAG_PTR) == 0)
+  if((trace->flags & SCAMPER_TRACELB_FLAG_PTR) == 0 ||
+     node->addr == NULL)
     return 0;
 
   if((state->ths == NULL && (state->ths = dlist_alloc()) == NULL))
