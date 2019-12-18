@@ -47,7 +47,7 @@ func (s *Scamper) TraceFromCachedTrace(conn connection.Connection, t time.Time, 
 		return err
 	}
 	filename := dir + s.generateFilename(conn.Cookie, t)
-	log.Println("Starting a cached trace to be put in", filename)
+	// log.Println("Starting a cached trace to be put in", filename)
 
 	// remove the first line of cachedTest
 	split := strings.Index(cachedTest, "\n")
