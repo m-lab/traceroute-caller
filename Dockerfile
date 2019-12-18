@@ -25,9 +25,10 @@ RUN apt-get update && \
 # Build and install scamper
 RUN ls -l
 RUN mkdir /scamper-src
-ADD ./vendor/scamper/ /scamper-src
-RUN chmod +x /scamper-src/scamper-cvs-20190916/configure
-WORKDIR /scamper-src/scamper-cvs-20190916/
+ADD ./vendor/ /scamper-src/
+RUN tar xvzf  /scamper-src/scamper-cvs-20191102a.tar.gz
+RUN chmod +x /scamper-src/scamper-cvs-20191102a/configure
+WORKDIR /scamper-src/scamper-cvs-20191102a/
 RUN ./configure --prefix=/scamper
 RUN make -j 8
 RUN make install
