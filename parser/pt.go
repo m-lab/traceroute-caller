@@ -1,10 +1,13 @@
 package parser
 
+// Parse PT filename like 20170320T23:53:10Z-98.162.212.214-53849-64.86.132.75-42677.paris
+// The format of legacy test file can be found at https://paris-traceroute.net/.
+
 import (
 	"errors"
-	"fmt"
 	"log"
 	"net"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -14,6 +17,33 @@ import (
 	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/schema"
 )
+
+func init() {
+	initParserVersion()
+}
+
+var gParserVersion string
+
+// initParserVersion initializes the gParserVersion variable for use by all parsers.
+func initParserVersion() string {
+	release, ok := os.LookupEnv("RELEASE_TAG")
+	if ok && release != "empty_tag" {
+		gParserVersion = "https://github.com/m-lab/etl/tree/" + release
+	} else {
+		hash := os.Getenv("COMMIT_HASH")
+		if len(hash) >= 8 {
+			gParserVersion = "https://github.com/m-lab/etl/tree/" + hash[0:8]
+		} else {
+			gParserVersion = "local development"
+		}
+	}
+	return gParserVersion
+}
+
+// Version returns the parser version used by parsers to annotate data rows.
+func Version() string {
+	return gParserVersion
+}
 
 type PTFileName struct {
 	Name string
@@ -38,6 +68,14 @@ func GetLogtime(filename PTFileName) (time.Time, error) {
 	return time.Parse("20060102T150405Z", date)
 }
 
+// IsParsable returns the canonical test type and whether to parse data.
+func IsParsable(testName string) (string, bool) {
+	if strings.HasSuffix(testName, ".paris") || strings.HasSuffix(testName, ".jsonl") {
+		return "paris", true
+	}
+	return "unknown", false
+}
+
 // The data structure is used to store the parsed results temporarily before it is verified
 // not polluted and can be inserted into BQ tables
 type cachedPTData struct {
@@ -49,14 +87,6 @@ type cachedPTData struct {
 	LastValidHopLine string
 	MetroName        string
 	UUID             string
-}
-
-type PTParser struct {
-	Base
-	// Care should be taken to ensure this does not accumulate many rows and
-	// lead to OOM problems.
-	previousTests []cachedPTData
-	taskFileName  string // The tar file containing these tests.
 }
 
 type Node struct {
@@ -79,7 +109,7 @@ const IPv6_AF int32 = 10
 const PTBufferSize int = 2
 
 // ProcessAllNodes take the array of the Nodes, and generate one ScamperHop entry from each node.
-func ProcessAllNodes(allNodes []Node, server_IP, protocol string, tableName string) []schema.ScamperHop {
+func ProcessAllNodes(allNodes []Node, server_IP, protocol string) []schema.ScamperHop {
 	var results []schema.ScamperHop
 	if len(allNodes) == 0 {
 		return nil
@@ -87,7 +117,6 @@ func ProcessAllNodes(allNodes []Node, server_IP, protocol string, tableName stri
 
 	// Iterate from the end of the list of nodes to minimize cost of removing nodes.
 	for i := len(allNodes) - 1; i >= 0; i-- {
-		metrics.PTHopCount.WithLabelValues(tableName, "pt", "ok")
 		oneProbe := schema.HopProbe{
 			Rtt: allNodes[i].rtts,
 		}
@@ -195,14 +224,6 @@ func CreateTestId(fn string, bn string) string {
 	return testId
 }
 
-// IsParsable returns the canonical test type and whether to parse data.
-func IsParsable(testName string) (string, bool) {
-	if strings.HasSuffix(testName, ".paris") || strings.HasSuffix(testName, ".jsonl") {
-		return "paris", true
-	}
-	return "unknown", false
-}
-
 // For each 4 tuples, it is like:
 // parts[0] is the hostname, like "if-ae-10-3.tcore2.DT8-Dallas.as6453.net".
 // parts[1] is IP address like "(66.110.57.41)" or "(72.14.218.190):0,2,3,4,6,8,10"
@@ -224,7 +245,7 @@ func ProcessOneTuple(parts []string, protocol string, currentLeaves []Node, allN
 		if err == nil {
 			rtt = append(rtt, oneRtt)
 		} else {
-			fmt.Printf("Failed to conver rtt to number with error %v", err)
+			log.Printf("Failed to conver rtt to number with error %v", err)
 			return err
 		}
 
@@ -239,7 +260,7 @@ func ProcessOneTuple(parts []string, protocol string, currentLeaves []Node, allN
 			if err == nil {
 				rtt = append(rtt, oneRtt)
 			} else {
-				fmt.Printf("Failed to conver rtt to number with error %v", err)
+				log.Printf("Failed to conver rtt to number with error %v", err)
 				return err
 			}
 		}
@@ -315,8 +336,7 @@ func ProcessOneTuple(parts []string, protocol string, currentLeaves []Node, allN
 }
 
 // Parse the raw test file into hops ParisTracerouteHop.
-// TODO(dev): dedup the hops that are identical.
-func Parse(fileName string, testName string, testId string, rawContent []byte, tableName string) (cachedPTData, error) {
+func Parse(fileName string, testName string, testId string, rawContent []byte) (cachedPTData, error) {
 	//log.Printf("%s", testName)
 
 	// Get the logtime
@@ -359,8 +379,6 @@ func Parse(fileName string, testName string, testId string, rawContent []byte, t
 			protocol, destIP, serverIP, err = ParseFirstLine(oneLine)
 			if err != nil {
 				log.Printf("%s %s", oneLine, testName)
-				metrics.ErrorCount.WithLabelValues(tableName, "pt", "corrupted first line").Inc()
-				metrics.TestCount.WithLabelValues(tableName, "pt", "corrupted first line").Inc()
 				return cachedPTData{}, err
 			}
 		} else {
@@ -382,7 +400,6 @@ func Parse(fileName string, testName string, testId string, rawContent []byte, t
 				tupleStr := []string{parts[i], parts[i+1], parts[i+2], parts[i+3]}
 				err := ProcessOneTuple(tupleStr, protocol, currentLeaves, &allNodes, &newLeaves)
 				if err != nil {
-					metrics.PTHopCount.WithLabelValues(tableName, "pt", "discarded").Add(float64(len(allNodes)))
 					return cachedPTData{}, err
 				}
 				// Skip over any error codes for now. These are after the "ms" and start with '!'.
@@ -407,37 +424,19 @@ func Parse(fileName string, testName string, testId string, rawContent []byte, t
 
 	iataCode := etl.GetIATACode(fileName)
 	metrics.PTTestCount.WithLabelValues(iataCode).Inc()
-	// lastHop is a close estimation for where the test reached at the end.
-	// It is possible that the last line contains destIP and other IP at the same time
-	// if the previous hop contains multiple paths.
-	// So it is possible that allNodes[len(allNodes)-1].ip is not destIP but the test
-	// reach destIP at the last hop.
-	lastHop := destIP
 
 	if allNodes[len(allNodes)-1].ip != destIP && !strings.Contains(lastValidHopLine, destIP) {
 		// This is the case that we consider the test did not reach destIP at the last hop.
-		lastHop = allNodes[len(allNodes)-1].ip
-		metrics.PTNotReachDestCount.WithLabelValues(iataCode).Inc()
 		if reachedDest {
 			// This test reach dest in the middle, but then do weird things for unknown reason.
-			metrics.PTMoreHopsAfterDest.WithLabelValues(iataCode).Inc()
 			log.Printf("middle mess up test_id: " + fileName + " " + testName)
 		}
 	} else {
 		lastValidHopLine = "ExpectedDestIP"
 	}
-	// Calculate how close is the last hop with the real dest.
-	// The last node of allNodes contains the last hop IP.
-	bitsDiff, ipType := etl.NumberBitsDifferent(destIP, lastHop)
-	if ipType == 4 {
-		metrics.PTBitsAwayFromDestV4.WithLabelValues(iataCode).Observe(float64(bitsDiff))
-	}
-	if ipType == 6 {
-		metrics.PTBitsAwayFromDestV6.WithLabelValues(iataCode).Observe(float64(bitsDiff))
-	}
 
 	// Generate Hops from allNodes
-	PTHops := ProcessAllNodes(allNodes, serverIP, protocol, tableName)
+	PTHops := ProcessAllNodes(allNodes, serverIP, protocol)
 
 	source := schema.ServerInfo{
 		IP: serverIP,
@@ -457,4 +456,109 @@ func Parse(fileName string, testName string, testId string, rawContent []byte, t
 		LastValidHopLine: lastValidHopLine,
 		MetroName:        iataCode,
 	}, nil
+}
+
+type PTParser struct {
+	// Care should be taken to ensure this does not accumulate many rows and
+	// lead to OOM problems.
+	previousTests []cachedPTData
+	taskFileName  string // The tar file containing these tests.
+	NumFiles      int    // Number of files already written
+}
+
+// ParseAndInsert parses a paris-traceroute log file and write the output in a json file.
+func (pt *PTParser) ParseAndWrite(fileName string, testName string, rawContent []byte) error {
+	testId := filepath.Base(testName)
+	if fileName != "" {
+		testId = CreateTestId(fileName, filepath.Base(testName))
+		pt.taskFileName = fileName
+	} else {
+		return errors.New("empty filename")
+	}
+
+	// Process the legacy Paris Traceroute txt output
+	cachedTest, err := Parse(fileName, testName, testId, rawContent)
+	if err != nil {
+		log.Printf("%v %s", err, testName)
+		return err
+	}
+
+	if len(cachedTest.Hops) == 0 {
+		// Empty test, no further action.
+		return nil
+	}
+
+	// Check all buffered PT tests whether Client_ip in connSpec appear in
+	// the last hop of the buffered test.
+	// If it does appear, then the buffered test was polluted, and it will
+	// be discarded from buffer.
+	// If it does not appear, then no pollution detected.
+	destIP := cachedTest.Destination.IP
+	for index, PTTest := range pt.previousTests {
+		// array of hops was built in reverse order from list of nodes
+		// (in func ProcessAllNodes()). So the final parsed hop is Hops[0].
+		finalHop := PTTest.Hops[0]
+		if PTTest.Destination.IP != destIP && len(finalHop.Links) > 0 &&
+			(finalHop.Links[0].HopDstIP == destIP || strings.Contains(PTTest.LastValidHopLine, destIP)) {
+			// Discard pt.previousTests[index]
+			pt.previousTests = append(pt.previousTests[:index], pt.previousTests[index+1:]...)
+			break
+		}
+	}
+
+	// If a test ends at the expected DestIP, it is not at risk of being
+	// polluted,so we don't have to wait to check against further tests.
+	// We can just go ahead and insert it to BigQuery table directly. This
+	// optimization makes the pollution check more effective by saving the
+	// unnecessary check between those tests (reached expected DestIP) and
+	// the new test.
+	// Also we don't care about test LogTime order, since there are other
+	// workers inserting other blocks of hops concurrently.
+	if cachedTest.LastValidHopLine == "ExpectedDestIP" {
+		pt.WriteOneTest(cachedTest)
+		return nil
+	}
+
+	// If buffer is full, remove the oldest test and insert it into BigQuery table.
+	if len(pt.previousTests) >= PTBufferSize {
+		// Insert the oldest test pt.previousTests[0] into BigQuery
+		pt.WriteOneTest(pt.previousTests[0])
+		pt.previousTests = pt.previousTests[1:]
+	}
+	// Insert current test into pt.previousTests
+	pt.previousTests = append(pt.previousTests, cachedTest)
+	return nil
+}
+
+func (pt *PTParser) WriteOneTest(oneTest cachedPTData) {
+	// TODO: Annotate the IPs and write the file to Disk
+	/*
+		parseInfo := schema.ParseInfo{
+			TaskFileName:  pt.taskFileName,
+			ParseTime:     time.Now(),
+			ParserVersion: Version(),
+			Filename:      oneTest.TestID,
+		}
+
+		ptTest := schema.PTTest{
+			UUID:        oneTest.UUID,
+			TestTime:    oneTest.LogTime,
+			Parseinfo:   parseInfo,
+			Source:      oneTest.Source,
+			Destination: oneTest.Destination,
+			Hop:         oneTest.Hops,
+		}
+
+
+		err := pt.AddRow(&ptTest)
+	*/
+	pt.NumFiles++
+}
+
+func (pt *PTParser) NumBufferedTests() int {
+	return len(pt.previousTests)
+}
+
+func (pt *PTParser) NumFilesForTests() int {
+	return pt.NumFiles
 }
