@@ -6,8 +6,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/m-lab/etl/parser"
 	"github.com/m-lab/etl/schema"
+	"github.com/m-lab/traceroute-caller/parser"
 )
 
 func TestParseJsonSimple(t *testing.T) {
