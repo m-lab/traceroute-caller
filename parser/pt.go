@@ -19,13 +19,13 @@ import (
 )
 
 func init() {
-	initParserVersion()
+	InitParserVersion()
 }
 
 var gParserVersion string
 
-// initParserVersion initializes the gParserVersion variable for use by all parsers.
-func initParserVersion() string {
+// InitParserVersion initializes the gParserVersion variable for use by all parsers.
+func InitParserVersion() string {
 	release, ok := os.LookupEnv("RELEASE_TAG")
 	if ok && release != "empty_tag" {
 		gParserVersion = "https://github.com/m-lab/etl/tree/" + release
@@ -222,9 +222,6 @@ func CreateTestId(fn string, bn string) string {
 // parts[2] are rtt in numbers like "0.298/0.318/0.340/0.016"
 // parts[3] should always be "ms"
 func ProcessOneTuple(parts []string, protocol string, currentLeaves []Node, allNodes, newLeaves *[]Node) error {
-	if len(parts) != 4 {
-		return errors.New("corrupted input")
-	}
 	if parts[3] != "ms" {
 		return errors.New("Malformed line. Expected 'ms'")
 	}
@@ -322,7 +319,7 @@ func ProcessOneTuple(parts []string, protocol string, currentLeaves []Node, allN
 			}
 		}
 	default:
-		return errors.New("Wrong format for IP address.")
+		return errors.New("Wrong format for flow IP address")
 	}
 	return nil
 }
@@ -473,11 +470,6 @@ func (pt *PTParser) ParseAndWrite(fileName string, testName string, rawContent [
 	if err != nil {
 		log.Printf("%v %s", err, testName)
 		return err
-	}
-
-	if len(cachedTest.Hops) == 0 {
-		// Empty test, no further action.
-		return nil
 	}
 
 	// Check all buffered PT tests whether Client_ip in connSpec appear in

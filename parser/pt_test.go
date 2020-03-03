@@ -11,6 +11,13 @@ import (
 	"github.com/m-lab/traceroute-caller/parser"
 )
 
+func TestInitParserVersion(t *testing.T) {
+	ver := parser.InitParserVersion()
+	if ver != "local development" {
+		t.Errorf("Error in InitParserVersion")
+	}
+}
+
 func TestGetLogtime(t *testing.T) {
 	fn1 := parser.PTFileName{Name: "20160112T00:45:44Z_ALL27409.paris"}
 	t1, err1 := parser.GetLogtime(fn1)
@@ -77,6 +84,12 @@ func TestParseFirstLine(t *testing.T) {
 	protocol, dest_ip, server_ip, err = parser.ParseFirstLine("traceroute [(64.86.132.76:33461) -> (98.162.212.214:53849)], protocol yyy, algo xxx, duration 19 s")
 	if err == nil {
 		t.Errorf("Should return error for unknown first line format!\n")
+		return
+	}
+
+	protocol, dest_ip, server_ip, err = parser.ParseFirstLine("traceroute [(64.86.132.76:33461) -> (98.162.212.214:53849)], protocol icmp, algo xxx, duration 19 s")
+	if err != nil {
+		t.Errorf("algo could be something unknown and won't be an error!\n")
 		return
 	}
 }
@@ -211,6 +224,21 @@ func TestPTPollutionCheck(t *testing.T) {
 	}
 }
 
+func TestParseAndWrite(t *testing.T) {
+	pt := &parser.PTParser{}
+	rawData := []byte(`traceroute to 35.243.216.203 (35.243.216.203), 30 hops max, 30 bytes packets`)
+	err := pt.ParseAndWrite("", "testdata/20171208T22:03:54Z-104.198.139.160-60574-163.22.28.37-7999.paris", rawData)
+	if err.Error() != "empty filename" {
+		t.Fatal("fail to detect empty filename")
+	}
+
+	err = pt.ParseAndWrite("testdata/20171208T22:03:54Z-104.198.139.160-60574-163.22.28.37-7999.paris",
+		"testdata/20171208T22:03:54Z-104.198.139.160-60574-163.22.28.37-7999.paris", rawData)
+	if err.Error() != "Invalid data format in the first line." {
+		t.Fatal("fail to detect corrupted file")
+	}
+}
+
 func TestPTEmptyTest(t *testing.T) {
 	rawData, err := ioutil.ReadFile("testdata/20180201T07:57:37Z-125.212.217.215-56622-208.177.76.115-9100.paris")
 	if err != nil {
@@ -218,7 +246,7 @@ func TestPTEmptyTest(t *testing.T) {
 	}
 	_, parseErr := parser.Parse("", "testdata/20180201T07:57:37Z-125.212.217.215-56622-208.177.76.115-9100.paris", "", rawData)
 	if parseErr == nil {
-		t.Fatal("Fail to detect empty test")
+		t.Fatal("fail to detect empty test")
 	}
 }
 
@@ -226,12 +254,12 @@ func TestPTParserIllFormat(t *testing.T) {
 	rawData := []byte(`traceroute to 35.243.216.203 (35.243.216.203), 30 hops max, 30 bytes packets`)
 	_, parseErr := parser.Parse("", "testdata/20180201T07:57:37Z-125.212.217.215-56622-208.177.76.115-9100.paris", "", rawData)
 	if parseErr == nil {
-		t.Fatal("faile to detect corrupted first line")
+		t.Fatal("fail to detect corrupted first line")
 	}
 
 	_, parseErr = parser.Parse("", "testdata/xxx.paris", "", rawData)
 	if parseErr == nil {
-		t.Fatal("Fail to parse the filename")
+		t.Fatal("fail to parse the filename")
 	}
 }
 
@@ -241,7 +269,7 @@ func TestPTParserEmptyHop(t *testing.T) {
 	`)
 	_, parseErr := parser.Parse("", "testdata/20180201T07:57:37Z-125.212.217.215-56622-208.177.76.115-9100.paris", "", rawData)
 	if parseErr.Error() != "Empty test" {
-		t.Fatal("faile to detect corrupted first line")
+		t.Fatal("fail to detect corrupted first line")
 	}
 }
 
@@ -251,7 +279,7 @@ func TestPTParserRttParsingFailure(t *testing.T) {
 	`)
 	_, parseErr := parser.Parse("", "testdata/20180201T07:57:37Z-125.212.217.215-56622-208.177.76.115-9100.paris", "", rawData)
 	if parseErr.Error() != "Failed to parse rtts for icmp test. 4 numbers expected" {
-		t.Fatal("faile to detect corrupted rtt value")
+		t.Fatal("fail to detect corrupted rtt value")
 	}
 
 	rawData = []byte(`traceroute [(172.17.94.34:33456) -> (74.125.224.100:33457)], protocol tcp, algo exhaustive, duration 3 s
@@ -259,6 +287,65 @@ func TestPTParserRttParsingFailure(t *testing.T) {
 	`)
 	_, parseErr = parser.Parse("", "testdata/20180201T07:57:37Z-125.212.217.215-56622-208.177.76.115-9100.paris", "", rawData)
 	if !strings.Contains(parseErr.Error(), "strconv.ParseFloat") {
-		t.Fatal("faile to detect corrupted rtt value")
+		t.Fatal("fail to detect corrupted rtt value")
+	}
+
+	rawData = []byte(`traceroute [(173.205.3.38:33458) -> (35.188.101.1:40784)], protocol icmp, algo exhaustive, duration 14 s
+	1  P(6, 6) 172.17.95.252 (172.17.95.252)  0.523 xxs
+	`)
+	_, parseErr = parser.Parse("", "testdata/20180201T07:57:37Z-125.212.217.215-56622-208.177.76.115-9100.paris", "", rawData)
+	if parseErr.Error() != "Malformed line. Expected 'ms'" {
+		t.Fatal("fail to detect corrupted rtt value")
+	}
+
+	rawData = []byte(`traceroute [(173.205.3.38:33458) -> (139.60.160.135:2023)], protocol icmp, algo exhaustive, duration 4 s
+ 1  P(6, 6) 173.205.3.1 (173.205.3.1)  0.168/5.683/xxxy/12.295 ms
+ `)
+	_, parseErr = parser.Parse("", "testdata/20180201T07:57:37Z-125.212.217.215-56622-208.177.76.115-9100.paris", "", rawData)
+	if !strings.Contains(parseErr.Error(), "strconv.ParseFloat") {
+		t.Fatal("fail to detect corrupted rtt value")
+	}
+}
+
+func TestPTParserFlowFailure(t *testing.T) {
+	rawData := []byte(`	traceroute [(172.17.94.34:33456) -> (74.125.224.100:33457)], protocol tcp, algo exhaustive, duration 3 s
+ 1  P(6, 6) 172.17.95.252 (172.17.95.252)  0.376 ms
+ 2  P(6, 6) us-mtv-cl4-core1-gigabitethernet1-1.n.corp.google.com (172.25.252.172)  0.407 ms
+ 3  P(6, 6) us-mtv-ply1-bb1-tengigabitethernet2-3.n.corp.google.com (172.25.252.166)  0.501 ms
+ 4  P(6, 6) us-mtv-ply1-br1-xe-1-1-0-706.n.corp.google.com (172.25.253.46)  0.343 ms
+ 5  P(16, 16) pr01-xe-7-1-0.pao03.net.google.com (72.14.218.190):0,2,3,4,xx,8,10  0.530 ms  pr02-xe-3-0-1.pao03.net.google.com (72.14.196.8):1,5,7,9  0.556 ms
+ `)
+	_, parseErr := parser.Parse("", "testdata/20180201T07:57:37Z-125.212.217.215-56622-208.177.76.115-9100.paris", "", rawData)
+	if !strings.Contains(parseErr.Error(), "strconv.Atoi") {
+		t.Fatal("fail to detect corrupted flow value")
+	}
+
+	rawData = []byte(`traceroute [(172.17.94.34:33456) -> (74.125.224.100:33457)], protocol tcp, algo exhaustive, duration 3 s
+ 1  P(6, 6) 172.17.95.252 (172.17.95.252)  0.376 ms
+ 2  P(6, 6) us-mtv-cl4-core1-gigabitethernet1-1.n.corp.google.com (172.25.252.172)  0.407 ms
+ 3  P(6, 6) us-mtv-ply1-bb1-tengigabitethernet2-3.n.corp.google.com (172.25.252.166)  0.501 ms
+ 4  P(6, 6) us-mtv-ply1-br1-xe-1-1-0-706.n.corp.google.com (172.25.253.46)  0.343 ms
+ 5  P(16, 16) pr01-xe-7-1-0.pao03.net.google.com (72.14.218.190):0,2,3,4,6,8,10:xxy  0.530 ms  pr02-xe-3-0-1.pao03.net.google.com (72.14.196.8):1,5,7,9  0.556 ms
+ `)
+	_, parseErr = parser.Parse("", "testdata/20180201T07:57:37Z-125.212.217.215-56622-208.177.76.115-9100.paris", "", rawData)
+	if parseErr.Error() != "Wrong format for flow IP address" {
+		t.Fatal("fail to detect corrupted flow value")
+	}
+}
+
+func TestMiddleMessup(t *testing.T) {
+	rawData := []byte(`traceroute [(172.17.94.34:33456) -> (74.125.224.100:33457)], protocol tcp, algo exhaustive, duration 3 s
+	1  P(6, 6) 172.17.95.252 (172.17.95.252)  0.376 ms
+	2  P(6, 6) us-mtv-cl4-core1-gigabitethernet1-1.n.corp.google.com (172.25.252.172)  0.407 ms
+	3  P(6, 6) us-mtv-ply1-bb1-tengigabitethernet2-3.n.corp.google.com (172.25.252.166)  0.501 ms
+	4  P(6, 6) us-mtv-ply1-br1-xe-1-1-0-706.n.corp.google.com (172.25.253.46)  0.343 ms
+	5  P(6, 6) 74.125.224.100 (74.125.224.100)  0.895 ms
+	6  P(16, 16) pr01-xe-7-1-0.pao03.net.google.com (72.14.218.190):0,2,3,4,6,8,10  0.530 ms  pr02-xe-3-0-1.pao03.net.google.com (72.14.196.8):1,5,7,9  0.556 ms
+	7  P(16, 16) bb01-ae3.nuq04.net.google.com (216.239.49.250):0,2,3,4,6,8,10  1.386 ms  bb01-ae7.nuq04.net.google.com (72.14.232.136):1,5,7,9  1.693 ms
+	8  P(6, 6) sr05-te1-8.nuq04.net.google.com (64.233.174.109)  1.614 ms
+	`)
+	_, parseErr := parser.Parse("", "testdata/20180201T07:57:37Z-125.212.217.215-56622-208.177.76.115-9100.paris", "", rawData)
+	if parseErr != nil {
+		t.Fatal("middle mess up should be just log warning, not create error")
 	}
 }
