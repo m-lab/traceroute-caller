@@ -68,14 +68,6 @@ func GetLogtime(filename PTFileName) (time.Time, error) {
 	return time.Parse("20060102T150405Z", date)
 }
 
-// IsParsable returns the canonical test type and whether to parse data.
-func IsParsable(testName string) (string, bool) {
-	if strings.HasSuffix(testName, ".paris") || strings.HasSuffix(testName, ".jsonl") {
-		return "paris", true
-	}
-	return "unknown", false
-}
-
 // The data structure is used to store the parsed results temporarily before it is verified
 // not polluted and can be inserted into BQ tables
 type cachedPTData struct {

@@ -4,6 +4,7 @@ import (
 	"io/ioutil"
 	"log"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/m-lab/etl/schema"
@@ -27,6 +28,12 @@ func TestGetLogtime(t *testing.T) {
 	t3, err3 := parser.GetLogtime(fn3)
 	if err3 != nil || t3.String() != "2019-09-08 00:01:48 +0000 UTC" {
 		t.Errorf("Error in parsing log time from scamper Json filename!\n")
+	}
+
+	fn4 := parser.PTFileName{Name: "traceroute[(64.86.132.76:33461)Random(98.162.212.214:5384.jsonl"}
+	_, err4 := parser.GetLogtime(fn4)
+	if err4 == nil {
+		t.Errorf("Error in detecting wrong formatted filename")
 	}
 }
 
@@ -55,6 +62,23 @@ func TestParseFirstLine(t *testing.T) {
 		return
 	}
 
+	protocol, dest_ip, server_ip, err = parser.ParseFirstLine("traceroute [(123:33461) -> (:53849)], protocol icmp, algo")
+	if err == nil {
+		t.Errorf("Should return error for unknown first line format!\n")
+		return
+	}
+
+	protocol, dest_ip, server_ip, err = parser.ParseFirstLine("traceroute [(123:33461) -> (98.162.212.214:53849)], protocol icmp, algo")
+	if err == nil {
+		t.Errorf("Should return error for unknown first line format!\n")
+		return
+	}
+
+	protocol, dest_ip, server_ip, err = parser.ParseFirstLine("traceroute [(64.86.132.76:33461) -> (98.162.212.214:53849)], protocol yyy, algo xxx, duration 19 s")
+	if err == nil {
+		t.Errorf("Should return error for unknown first line format!\n")
+		return
+	}
 }
 
 func TestCreateTestId(t *testing.T) {
@@ -194,6 +218,47 @@ func TestPTEmptyTest(t *testing.T) {
 	}
 	_, parseErr := parser.Parse("", "testdata/20180201T07:57:37Z-125.212.217.215-56622-208.177.76.115-9100.paris", "", rawData)
 	if parseErr == nil {
-		t.Fatal(parseErr)
+		t.Fatal("Fail to detect empty test")
+	}
+}
+
+func TestPTParserIllFormat(t *testing.T) {
+	rawData := []byte(`traceroute to 35.243.216.203 (35.243.216.203), 30 hops max, 30 bytes packets`)
+	_, parseErr := parser.Parse("", "testdata/20180201T07:57:37Z-125.212.217.215-56622-208.177.76.115-9100.paris", "", rawData)
+	if parseErr == nil {
+		t.Fatal("faile to detect corrupted first line")
+	}
+
+	_, parseErr = parser.Parse("", "testdata/xxx.paris", "", rawData)
+	if parseErr == nil {
+		t.Fatal("Fail to parse the filename")
+	}
+}
+
+func TestPTParserEmptyHop(t *testing.T) {
+	rawData := []byte(`traceroute [(173.205.3.38:33458) -> (35.188.101.1:40784)], protocol icmp, algo exhaustive, duration 14 s
+	1  P(6, 6) 172.17.95.252
+	`)
+	_, parseErr := parser.Parse("", "testdata/20180201T07:57:37Z-125.212.217.215-56622-208.177.76.115-9100.paris", "", rawData)
+	if parseErr.Error() != "Empty test" {
+		t.Fatal("faile to detect corrupted first line")
+	}
+}
+
+func TestPTParserRttParsingFailure(t *testing.T) {
+	rawData := []byte(`traceroute [(173.205.3.38:33458) -> (35.188.101.1:40784)], protocol icmp, algo exhaustive, duration 14 s
+	1  P(6, 6) 172.17.95.252 (172.17.95.252)  xxxy ms
+	`)
+	_, parseErr := parser.Parse("", "testdata/20180201T07:57:37Z-125.212.217.215-56622-208.177.76.115-9100.paris", "", rawData)
+	if parseErr.Error() != "Failed to parse rtts for icmp test. 4 numbers expected" {
+		t.Fatal("faile to detect corrupted rtt value")
+	}
+
+	rawData = []byte(`traceroute [(172.17.94.34:33456) -> (74.125.224.100:33457)], protocol tcp, algo exhaustive, duration 3 s
+	1  P(6, 6) 172.17.95.252 (172.17.95.252)  xxxy ms
+	`)
+	_, parseErr = parser.Parse("", "testdata/20180201T07:57:37Z-125.212.217.215-56622-208.177.76.115-9100.paris", "", rawData)
+	if !strings.Contains(parseErr.Error(), "strconv.ParseFloat") {
+		t.Fatal("faile to detect corrupted rtt value")
 	}
 }
