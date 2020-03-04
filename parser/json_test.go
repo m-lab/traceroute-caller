@@ -36,6 +36,87 @@ func TestParseJsonSimple(t *testing.T) {
 	}
 }
 
+func TestParseJsonFailure(t *testing.T) {
+	testStr := `{"TracerouteCallerVersion":"bc092be"}
+		{"type":"cycle-start", "list_name":"/tmp/scamperctrl:51811", "id":1, "hostname":"ndt-plh7v", "start_time":1566691298}
+		{"type":"tracelb", "version":"0.1", "userid":0, "method":"icmp-echo", "src":"::ffff:180.87.97.101", "dst":"::ffff:1.47.236.62", "start":{"sec":1566691298, "usec":476221, "ftime":"2019-08-25 00:01:38"}, "probe_size":60, "firsthop":1, "attempts":3, "confidence":95, "tos":0, "gaplimit":3, "wait_timeout":5, "wait_probe":250, "probec":0, "probec_max":3000, "nodec":0, "linkc":0}
+		{"type":"cycle-stop", "list_name":"/tmp/scamperctrl:51811", "id":1, "hostname":"ndt-plh7v", "stop_time":1566691298}
+		`
+
+	_, err := parser.ParseJSON("xxxx.jsonl", []byte(testStr), "", "")
+
+	if err.Error() != "no date in filename" {
+		t.Fatalf("fail to detect wrong filename")
+	}
+
+	_, err = parser.ParseJSON("20190825T000138Z_ndt-plh7v_1566050090_000000000004D64D.jsonl", []byte(testStr), "", "")
+
+	if err == nil || err.Error() != "empty UUID" {
+		t.Fatalf("fail to detect missing UUID")
+	}
+
+	testStr = `{"TracerouteCallerVersion":"bc092be"}
+			   {"type":"cycle-start", "list_name":"/tmp/scamperctrl:51811", "id":1, "hostname":"ndt-plh7v", "start_time":1566691298}
+			   {"type":"tracelb", "version":"0.1", "userid":0, "method":"icmp-echo", "src":"::ffff:180.87.97.101", "dst":"::ffff:1.47.236.62", "start":{"sec":1566691298, "usec":476221, "ftime":"2019-08-25 00:01:38"}, "probe_size":60, "firsthop":1, "attempts":3, "confidence":95, "tos":0, "gaplimit":3, "wait_timeout":5, "wait_probe":250, "probec":0, "probec_max":3000, "nodec":0, "linkc":0}
+			   {"type":"cycle-stop", "list_name":"/tmp/scamperctrl:51811", "id":1, "hostname":"ndt-plh7v", "stop_time":1566691298}
+			   {"type":"cycle-extra"}
+			   `
+
+	_, err = parser.ParseJSON("20190825T000138Z_ndt-plh7v_1566050090_000000000004D64D.jsonl", []byte(testStr), "", "")
+
+	if err.Error() != "Invalid test" {
+		t.Fatalf("fail to detect corrupted test")
+	}
+
+	testStr = `{"Unknown:"bc092be"}
+{"type":"cycle-start", "list_name":"/tmp/scamperctrl:51811", "id":1, "hostname":"ndt-plh7v", "start_time":1566691298}
+{"type":"tracelb", "version":"0.1", "userid":0, "method":"icmp-echo", "src":"::ffff:180.87.97.101", "dst":"::ffff:1.47.236.62", "start":{"sec":1566691298, "usec":476221, "ftime":"2019-08-25 00:01:38"}, "probe_size":60, "firsthop":1, "attempts":3, "confidence":95, "tos":0, "gaplimit":3, "wait_timeout":5, "wait_probe":250, "probec":0, "probec_max":3000, "nodec":0, "linkc":0}
+{"type":"cycle-stop", "list_name":"/tmp/scamperctrl:51811", "id":1, "hostname":"ndt-plh7v", "stop_time":1566691298}
+`
+
+	_, err = parser.ParseJSON("20190825T000138Z_ndt-plh7v_1566050090_000000000004D64D.jsonl", []byte(testStr), "", "")
+
+	if err.Error() != "Invalid meta" {
+		t.Fatalf("fail to detect corrupted meta")
+	}
+
+	testStr = `{"UUID":"ndt-v595x_1572645241_0000000000000626"}
+{"type":"cycle-start, "list_name":"/tmp/scamperctrl:51811", "id":1, "hostname":"ndt-plh7v", "start_time":1566691298}
+{"type":"tracelb", "version":"0.1", "userid":0, "method":"icmp-echo", "src":"::ffff:180.87.97.101", "dst":"::ffff:1.47.236.62", "start":{"sec":1566691298, "usec":476221, "ftime":"2019-08-25 00:01:38"}, "probe_size":60, "firsthop":1, "attempts":3, "confidence":95, "tos":0, "gaplimit":3, "wait_timeout":5, "wait_probe":250, "probec":0, "probec_max":3000, "nodec":0, "linkc":0}
+{"type":"cycle-stop", "list_name":"/tmp/scamperctrl:51811", "id":1, "hostname":"ndt-plh7v", "stop_time":1566691298}
+`
+
+	_, err = parser.ParseJSON("20190825T000138Z_ndt-plh7v_1566050090_000000000004D64D.jsonl", []byte(testStr), "", "")
+
+	if err.Error() != "Invalid cycle-start" {
+		t.Fatalf("fail to detect corrupted cycle-start")
+	}
+
+	testStr = `{"UUID":"ndt-v595x_1572645241_0000000000000626"}
+{"type":"cycle-start", "list_name":"/tmp/scamperctrl:51811", "id":1, "hostname":"ndt-plh7v", "start_time":1566691298}
+{"type":"tracelb, "version":"0.1", "userid":0, "method":"icmp-echo", "src":"::ffff:180.87.97.101", "dst":"::ffff:1.47.236.62", "start":{"sec":1566691298, "usec":476221, "ftime":"2019-08-25 00:01:38"}, "probe_size":60, "firsthop":1, "attempts":3, "confidence":95, "tos":0, "gaplimit":3, "wait_timeout":5, "wait_probe":250, "probec":0, "probec_max":3000, "nodec":0, "linkc":0}
+{"type":"cycle-stop", "list_name":"/tmp/scamperctrl:51811", "id":1, "hostname":"ndt-plh7v", "stop_time":1566691298}
+`
+
+	_, err = parser.ParseJSON("20190825T000138Z_ndt-plh7v_1566050090_000000000004D64D.jsonl", []byte(testStr), "", "")
+
+	if err.Error() != "Invalid tracelb" {
+		t.Fatalf("fail to detect corrupted tracelb")
+	}
+
+	testStr = `{"UUID":"ndt-v595x_1572645241_0000000000000626"}
+{"type":"cycle-start", "list_name":"/tmp/scamperctrl:51811", "id":1, "hostname":"ndt-plh7v", "start_time":1566691298}
+{"type":"tracelb", "version":"0.1", "userid":0, "method":"icmp-echo", "src":"::ffff:180.87.97.101", "dst":"::ffff:1.47.236.62", "start":{"sec":1566691298, "usec":476221, "ftime":"2019-08-25 00:01:38"}, "probe_size":60, "firsthop":1, "attempts":3, "confidence":95, "tos":0, "gaplimit":3, "wait_timeout":5, "wait_probe":250, "probec":0, "probec_max":3000, "nodec":0, "linkc":0}
+{"type":"cycle-stop, "list_name":"/tmp/scamperctrl:51811", "id":1, "hostname":"ndt-plh7v", "stop_time":1566691298}
+`
+
+	_, err = parser.ParseJSON("20190825T000138Z_ndt-plh7v_1566050090_000000000004D64D.jsonl", []byte(testStr), "", "")
+
+	if err.Error() != "Invalid cycle-stop" {
+		t.Fatalf("fail to detect corrupted cycle-stop")
+	}
+}
+
 func TestParseJsonNoLinks(t *testing.T) {
 	// Last object on the "type":"tracelb" line has "linkc":1 but no "links" set.
 	testStr := `{"UUID": "ndt-plh7v_1566050090_000000000004D60F"}

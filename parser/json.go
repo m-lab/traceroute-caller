@@ -60,10 +60,10 @@ type ScamperNode struct {
 // The fourth line is defined in CyclestopLine
 
 type Metadata struct {
-	UUID                    string
-	TracerouteCallerVersion string
-	CachedResult            bool
-	CachedUUID              string
+	UUID                    string `json:"UUID" binding:"required"`
+	TracerouteCallerVersion string `json:"TracerouteCallerVersion"`
+	CachedResult            bool   `json:"CachedResult"`
+	CachedUUID              string `json:"CachedUUID"`
 }
 
 type CyclestartLine struct {
@@ -129,31 +129,26 @@ func ParseJSON(testName string, rawContent []byte, tableName string, taskFilenam
 
 	if len(jsonStrings) != 5 {
 		log.Println("Invalid test", taskFilename, "  ", testName)
-		log.Println(len(jsonStrings))
 		return schema.PTTest{}, errors.New("Invalid test")
 	}
 
 	// Parse the first line for meta info.
 	err = json.Unmarshal([]byte(jsonStrings[0]), &meta)
+	log.Println(meta)
 	if err != nil {
-		metrics.ErrorCount.WithLabelValues(
-			tableName, "pt", "corrupted json content").Inc()
-		metrics.TestCount.WithLabelValues(
-			tableName, "pt", "corrupted json content").Inc()
+		log.Println(err)
+		return schema.PTTest{}, errors.New("Invalid meta")
+	}
+	if meta.UUID == "" {
 		return schema.PTTest{}, errors.New("empty UUID")
 	}
 	uuid = meta.UUID
 	version = meta.TracerouteCallerVersion
 	resultFromCache = meta.CachedResult
 
-	// Some early stage tests only has UUID field in this meta line.
 	err = json.Unmarshal([]byte(jsonStrings[1]), &cycleStart)
 	if err != nil {
-		metrics.ErrorCount.WithLabelValues(
-			tableName, "pt", "corrupted json content").Inc()
-		metrics.TestCount.WithLabelValues(
-			tableName, "pt", "corrupted json content").Inc()
-		return schema.PTTest{}, err
+		return schema.PTTest{}, errors.New("Invalid cycle-start")
 	}
 
 	// Parse the line in struct
@@ -167,11 +162,7 @@ func ParseJSON(testName string, rawContent []byte, tableName string, taskFilenam
 		err = json.Unmarshal([]byte(output), &tracelb)
 		if err != nil {
 			// fail and return here.
-			metrics.ErrorCount.WithLabelValues(
-				tableName, "pt", "corrupted json content").Inc()
-			metrics.TestCount.WithLabelValues(
-				tableName, "pt", "corrupted json content").Inc()
-			return schema.PTTest{}, err
+			return schema.PTTest{}, errors.New("Invalid tracelb")
 		}
 	}
 	for i, _ := range tracelb.Nodes {
@@ -211,11 +202,7 @@ func ParseJSON(testName string, rawContent []byte, tableName string, taskFilenam
 
 	err = json.Unmarshal([]byte(jsonStrings[3]), &cycleStop)
 	if err != nil {
-		metrics.ErrorCount.WithLabelValues(
-			tableName, "pt", "corrupted json content").Inc()
-		metrics.TestCount.WithLabelValues(
-			tableName, "pt", "corrupted json content").Inc()
-		return schema.PTTest{}, err
+		return schema.PTTest{}, errors.New("Invalid cycle-stop")
 	}
 
 	parseInfo := schema.ParseInfo{
