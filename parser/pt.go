@@ -28,11 +28,11 @@ var gParserVersion string
 func InitParserVersion() string {
 	release, ok := os.LookupEnv("RELEASE_TAG")
 	if ok && release != "empty_tag" {
-		gParserVersion = "https://github.com/m-lab/etl/tree/" + release
+		gParserVersion = "https://github.com/m-lab/traceroute-caller/tree/" + release
 	} else {
 		hash := os.Getenv("COMMIT_HASH")
 		if len(hash) >= 8 {
-			gParserVersion = "https://github.com/m-lab/etl/tree/" + hash[0:8]
+			gParserVersion = "https://github.com/m-lab/traceroute-caller/tree/" + hash[0:8]
 		} else {
 			gParserVersion = "local development"
 		}
@@ -103,9 +103,6 @@ const PTBufferSize int = 2
 // ProcessAllNodes take the array of the Nodes, and generate one ScamperHop entry from each node.
 func ProcessAllNodes(allNodes []Node, server_IP, protocol string) []schema.ScamperHop {
 	var results []schema.ScamperHop
-	if len(allNodes) == 0 {
-		return nil
-	}
 
 	// Iterate from the end of the list of nodes to minimize cost of removing nodes.
 	for i := len(allNodes) - 1; i >= 0; i-- {

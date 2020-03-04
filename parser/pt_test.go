@@ -8,12 +8,31 @@ import (
 	"testing"
 
 	"github.com/m-lab/etl/schema"
+	"github.com/m-lab/go/osx"
 	"github.com/m-lab/traceroute-caller/parser"
 )
 
 func TestInitParserVersion(t *testing.T) {
 	ver := parser.InitParserVersion()
 	if ver != "local development" {
+		t.Errorf("Error in InitParserVersion")
+	}
+
+	revert := osx.MustSetenv("RELEASE_TAG", "v1.1")
+	defer revert()
+	ver = parser.InitParserVersion()
+	if ver != "https://github.com/m-lab/traceroute-caller/tree/v1.1" {
+		t.Errorf("Error in InitParserVersion")
+	}
+}
+
+func TestInitParserVersionCommit(t *testing.T) {
+	revert := osx.MustSetenv("RELEASE_TAG", "empty_tag")
+	revert2 := osx.MustSetenv("COMMIT_HASH", "d6e45f1fff")
+	defer revert()
+	defer revert2()
+	ver := parser.InitParserVersion()
+	if ver != "https://github.com/m-lab/traceroute-caller/tree/d6e45f1f" {
 		t.Errorf("Error in InitParserVersion")
 	}
 }
