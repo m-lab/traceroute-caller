@@ -214,13 +214,19 @@ func TestPTPollutionCheck(t *testing.T) {
 			expectedNumRows:      2,
 		},
 		{
+			fileName: "testdata/20171208T22:03:54Z-104.198.139.160-60574-163.22.28.37-8999.paris",
+			// The 6th test was buffered. Due to buffer size limit, the 4th test was inserted into BigQuery and moved out of buffer.
+			expectedBufferedTest: 2,
+			expectedNumRows:      3,
+		},
+		{
 			fileName: "testdata/20171208T22:03:59Z-139.60.160.135-1519-163.22.28.44-1101.paris",
-			// The 5th test was detected that was polluted by the 6th test.
+			// The 5th test was detected that was polluted by the 7th test.
 			// It was removed from buffer (expectedBufferedTest drop from 2 to 1).
 			// Buffer contains the 4th test now.
 			expectedBufferedTest: 1,
-			// The 6th test reached its destIP and was inserted into BigQuery.
-			expectedNumRows: 3,
+			// The 7th test reached its destIP and was inserted into BigQuery.
+			expectedNumRows: 4,
 		},
 	}
 
@@ -235,7 +241,7 @@ func TestPTPollutionCheck(t *testing.T) {
 			t.Fatalf(err.Error())
 		}
 		if pt.NumBufferedTests() != test.expectedBufferedTest {
-			t.Fatalf("Data not buffered correctly")
+			t.Fatalf("Data not buffered correctly for test " + test.fileName)
 		}
 		if pt.NumFilesForTests() != test.expectedNumRows {
 			t.Fatalf("Data of test %s not inserted into BigQuery correctly. Expect %d Actually %d", test.fileName, test.expectedNumRows, pt.NumFilesForTests())
