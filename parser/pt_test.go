@@ -18,8 +18,7 @@ func TestInitParserVersion(t *testing.T) {
 		t.Errorf("Error in InitParserVersion")
 	}
 
-	revert := osx.MustSetenv("RELEASE_TAG", "v1.1")
-	defer revert()
+	defer osx.MustSetenv("RELEASE_TAG", "v1.1")()
 	ver = parser.InitParserVersion()
 	if ver != "https://github.com/m-lab/traceroute-caller/tree/v1.1" {
 		t.Errorf("Error in InitParserVersion")
@@ -27,10 +26,8 @@ func TestInitParserVersion(t *testing.T) {
 }
 
 func TestInitParserVersionCommit(t *testing.T) {
-	revert := osx.MustSetenv("RELEASE_TAG", "empty_tag")
-	revert2 := osx.MustSetenv("COMMIT_HASH", "d6e45f1fff")
-	defer revert()
-	defer revert2()
+	defer osx.MustSetenv("RELEASE_TAG", "empty_tag")()
+	defer osx.MustSetenv("COMMIT_HASH", "d6e45f1fff")()
 	ver := parser.InitParserVersion()
 	if ver != "https://github.com/m-lab/traceroute-caller/tree/d6e45f1f" {
 		t.Errorf("Error in InitParserVersion")
