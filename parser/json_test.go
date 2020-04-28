@@ -58,10 +58,6 @@ func TestParseJsonSimple(t *testing.T) {
 	if output.ProbeSize != 60 || output.ProbeC != 0 {
 		t.Fatalf("Wrong results for probe size or probec parsing!")
 	}
-	if output.Parseinfo.Filename != "20190825T000138Z_ndt-plh7v_1566050090_000000000004D64D.jsonl" {
-		log.Println(output.Parseinfo.Filename)
-		t.Fatalf("Wrong results for filename parsing!")
-	}
 }
 func TestParseJsonFailure(t *testing.T) {
 	testStr := `{"TracerouteCallerVersion":"bc092be"}
