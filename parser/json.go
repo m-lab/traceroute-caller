@@ -296,14 +296,15 @@ func ExtractIP(rawContent []byte) []string {
 	var tracelb TracelbLine
 
 	jsonStrings := strings.Split(string(rawContent[:]), "\n")
-
+	if len(jsonStrings) < 3 {
+		return []string{}
+	}
 	// Parse the line in struct
 	err := json.Unmarshal([]byte(jsonStrings[2]), &tracelb)
 	if err != nil {
-		return IPList
+		return []string{}
 	}
 
-	log.Println(tracelb.Src)
 	IPList = append(IPList, tracelb.Src)
 	IPList = append(IPList, tracelb.Dst)
 

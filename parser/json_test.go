@@ -80,7 +80,20 @@ func TestExtractIP(t *testing.T) {
 
 	output := parser.ExtractIP([]byte(testStr))
 	if output[0] != "::ffff:180.87.97.101" || output[1] != "::ffff:1.47.236.62" {
-		t.Error("Faile to extract IPs")
+		t.Error("Fail to extract IPs")
+	}
+
+	output2 := parser.ExtractIP([]byte(`xxxx`))
+	if len(output2) != 0 {
+		t.Error("Should return empty IP list")
+	}
+
+	testStr2 := `{"UUID": "ndt-plh7v_1566050090_000000000004D64D"}
+{"type":"cycle-start", "list_name":"/tmp/scamperctrl:51811", "id":1, "hostname":"ndt-plh7v", "start_time":1566691298}
+{"type":"tracelb"`
+	output3 := parser.ExtractIP([]byte(testStr2))
+	if len(output3) != 0 {
+		t.Error("Should return empty IP list")
 	}
 }
 
