@@ -106,9 +106,6 @@ type CyclestopLine struct {
 }
 
 func GetGeoAnnotation(ann *annotator.ClientAnnotations) api.GeolocationIP {
-	if ann == nil {
-		return api.GeolocationIP{}
-	}
 	return api.GeolocationIP{
 		ContinentCode:    ann.Geo.ContinentCode,
 		CountryCode:      ann.Geo.CountryCode,
