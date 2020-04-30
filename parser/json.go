@@ -302,6 +302,7 @@ func ExtractIP(rawContent []byte) []string {
 	// Parse the line in struct
 	err := json.Unmarshal([]byte(jsonStrings[2]), &tracelb)
 	if err != nil {
+		log.Println(err)
 		return []string{}
 	}
 
