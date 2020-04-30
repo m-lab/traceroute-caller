@@ -10,6 +10,7 @@ import (
 	"github.com/google/go-jsonnet"
 	"github.com/m-lab/annotation-service/api"
 	"github.com/m-lab/etl/schema"
+	"github.com/m-lab/go/rtx"
 	"github.com/m-lab/uuid-annotator/annotator"
 )
 
@@ -130,10 +131,8 @@ func InsertAnnotation(ann map[string]*annotator.ClientAnnotations,
 	}
 
 	outputString, err := json.Marshal(PTTest)
-	if err == nil {
-		return []byte(outputString), nil
-	}
-	return []byte{}, errors.New("Cannot marshal into json")
+	rtx.Must(err, "cannot marshal the output")
+	return []byte(outputString), nil
 }
 
 func ParseAndInsertAnnotation(ann map[string]*annotator.ClientAnnotations,
@@ -302,7 +301,6 @@ func ExtractIP(rawContent []byte) []string {
 	// Parse the line in struct
 	err := json.Unmarshal([]byte(jsonStrings[2]), &tracelb)
 	if err != nil {
-		log.Println(err)
 		return []string{}
 	}
 
