@@ -6,11 +6,12 @@ import (
 	"log"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/google/go-jsonnet"
-	"github.com/m-lab/etl/metrics"
+	"github.com/m-lab/annotation-service/api"
 	"github.com/m-lab/etl/schema"
+	"github.com/m-lab/go/rtx"
+	"github.com/m-lab/uuid-annotator/annotator"
 )
 
 // Parse Scamper JSON filename like
@@ -105,18 +106,37 @@ type CyclestopLine struct {
 	Stop_time float64 `json:"stop_time"`
 }
 
-// ParseJSON the raw jsonl test file into schema.PTTest.
-func ParseJSON(testName string, rawContent []byte, tableName string, taskFilename string) (schema.PTTest, error) {
-	metrics.WorkerState.WithLabelValues(tableName, "pt-json-parse").Inc()
-	defer metrics.WorkerState.WithLabelValues(tableName, "pt-json-parse").Dec()
+func GetGeoAnnotation(ann *annotator.ClientAnnotations) api.GeolocationIP {
+	return api.GeolocationIP{
+		ContinentCode:    ann.Geo.ContinentCode,
+		CountryCode:      ann.Geo.CountryCode,
+		CountryCode3:     ann.Geo.CountryCode3,
+		CountryName:      ann.Geo.CountryName,
+		Region:           ann.Geo.Region,
+		MetroCode:        ann.Geo.MetroCode,
+		City:             ann.Geo.City,
+		AreaCode:         ann.Geo.AreaCode,
+		PostalCode:       ann.Geo.PostalCode,
+		Latitude:         ann.Geo.Latitude,
+		Longitude:        ann.Geo.Longitude,
+		AccuracyRadiusKm: ann.Geo.AccuracyRadiusKm,
+	}
+}
 
-	// Get the logtime
-	logTime, err := GetLogtime(PTFileName{Name: filepath.Base(testName)})
+func InsertAnnotation(ann map[string]*annotator.ClientAnnotations,
+	data []byte) ([]byte, error) {
+	PTTest, err := ParseAndInsertAnnotation(ann, data)
 	if err != nil {
-		return schema.PTTest{}, err
+		return []byte{}, err
 	}
 
-	// Split the JSON file and parse it line by line.
+	outputString, err := json.Marshal(PTTest)
+	rtx.Must(err, "cannot marshal the output")
+	return []byte(outputString), nil
+}
+
+func ParseAndInsertAnnotation(ann map[string]*annotator.ClientAnnotations,
+	data []byte) (schema.PTTest, error) {
 	var uuid, version string
 	var resultFromCache bool
 	var hops []schema.ScamperHop
@@ -125,15 +145,14 @@ func ParseJSON(testName string, rawContent []byte, tableName string, taskFilenam
 	var tracelb TracelbLine
 	var cycleStop CyclestopLine
 
-	jsonStrings := strings.Split(string(rawContent[:]), "\n")
-
+	jsonStrings := strings.Split(string(data[:]), "\n")
 	if len(jsonStrings) != 5 {
-		log.Println("Invalid test", taskFilename, "  ", testName)
+		log.Println("Invalid test")
 		return schema.PTTest{}, errors.New("Invalid test")
 	}
 
 	// Parse the first line for meta info.
-	err = json.Unmarshal([]byte(jsonStrings[0]), &meta)
+	err := json.Unmarshal([]byte(jsonStrings[0]), &meta)
 	log.Println(meta)
 	if err != nil {
 		log.Println(err)
@@ -192,6 +211,19 @@ func ParseJSON(testName string, rawContent []byte, tableName string, taskFilenam
 			}
 			links = append(links, schema.HopLink{HopDstIP: oneLink.Addr, TTL: ttl, Probes: probes})
 		}
+		// Extract Hop Geolocation for hop IP
+		if ann[oneNode.Addr] != nil {
+			hopAnn := ann[oneNode.Addr]
+			hops = append(hops, schema.ScamperHop{
+				Source: schema.HopIP{IP: oneNode.Addr,
+					City:        hopAnn.Geo.City,
+					CountryCode: hopAnn.Geo.CountryCode,
+					ASN:         hopAnn.Network.ASNumber,
+					Hostname:    oneNode.Name},
+				Linkc: oneNode.Linkc,
+				Links: links,
+			})
+		}
 		hops = append(hops, schema.ScamperHop{
 			Source: schema.HopIP{IP: oneNode.Addr, Hostname: oneNode.Name},
 			Linkc:  oneNode.Linkc,
@@ -205,26 +237,97 @@ func ParseJSON(testName string, rawContent []byte, tableName string, taskFilenam
 		return schema.PTTest{}, errors.New("Invalid cycle-stop")
 	}
 
-	parseInfo := schema.ParseInfo{
-		TaskFileName:  taskFilename,
-		ParseTime:     time.Now(),
-		ParserVersion: Version(),
-		Filename:      testName,
+	var source schema.ServerInfo
+	if ann[tracelb.Src] == nil {
+		source = schema.ServerInfo{
+			IP:      tracelb.Src,
+			Geo:     nil,
+			Network: nil,
+		}
+	} else {
+		srcGeo := GetGeoAnnotation(ann[tracelb.Src])
+		srcNetwork := api.ASData{
+			Systems: []api.System{api.System{ASNs: []uint32{ann[tracelb.Src].Network.ASNumber}}},
+		}
+		source = schema.ServerInfo{
+			IP:      tracelb.Src,
+			Geo:     &srcGeo,
+			Network: &srcNetwork,
+		}
 	}
 
-	return schema.PTTest{
+	var dest schema.ClientInfo
+	if ann[tracelb.Dst] == nil {
+		dest = schema.ClientInfo{
+			IP:      tracelb.Dst,
+			Geo:     nil,
+			Network: nil,
+		}
+	} else {
+		destGeo := GetGeoAnnotation(ann[tracelb.Dst])
+		destNetwork := api.ASData{
+			Systems: []api.System{api.System{ASNs: []uint32{ann[tracelb.Dst].Network.ASNumber}}},
+		}
+		dest = schema.ClientInfo{
+			IP:      tracelb.Dst,
+			Geo:     &destGeo,
+			Network: &destNetwork,
+		}
+	}
+	output := schema.PTTest{
 		UUID:           uuid,
-		TestTime:       logTime,
-		Parseinfo:      parseInfo,
 		StartTime:      int64(cycleStart.Start_time),
 		StopTime:       int64(cycleStop.Stop_time),
 		ScamperVersion: tracelb.Version,
-		Source:         schema.ServerInfo{IP: tracelb.Src},
-		Destination:    schema.ClientInfo{IP: tracelb.Dst},
+		Source:         source,
+		Destination:    dest,
 		ProbeSize:      int64(tracelb.Probe_size),
 		ProbeC:         int64(tracelb.Probec),
 		Hop:            hops,
 		ExpVersion:     version,
 		CachedResult:   resultFromCache,
-	}, nil
+	}
+	return output, nil
+}
+
+func ExtractIP(rawContent []byte) []string {
+	var IPList []string
+	var tracelb TracelbLine
+
+	jsonStrings := strings.Split(string(rawContent[:]), "\n")
+	if len(jsonStrings) < 3 {
+		return []string{}
+	}
+	// Parse the line in struct
+	err := json.Unmarshal([]byte(jsonStrings[2]), &tracelb)
+	if err != nil {
+		return []string{}
+	}
+
+	IPList = append(IPList, tracelb.Src)
+	IPList = append(IPList, tracelb.Dst)
+
+	for i, _ := range tracelb.Nodes {
+		oneNode := &tracelb.Nodes[i]
+		IPList = append(IPList, oneNode.Addr)
+	}
+	return IPList
+}
+
+// ParseJSON the raw jsonl test file into schema.PTTest.
+func ParseJSON(testName string, rawContent []byte) (schema.PTTest, error) {
+	// Get the logtime
+	logTime, err := GetLogtime(PTFileName{Name: filepath.Base(testName)})
+	if err != nil {
+		return schema.PTTest{}, err
+	}
+
+	emptyAnn := make(map[string]*annotator.ClientAnnotations)
+	PTTest, err := ParseAndInsertAnnotation(emptyAnn, rawContent)
+
+	if err != nil {
+		return schema.PTTest{}, err
+	}
+	PTTest.TestTime = logTime
+	return PTTest, nil
 }
