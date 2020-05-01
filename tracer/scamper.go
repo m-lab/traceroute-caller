@@ -4,6 +4,7 @@ package tracer
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -15,9 +16,12 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/m-lab/etl/schema"
 	"github.com/m-lab/go/rtx"
 	"github.com/m-lab/traceroute-caller/connection"
+	"github.com/m-lab/traceroute-caller/parser"
 	"github.com/m-lab/uuid"
+	"github.com/m-lab/uuid-annotator/ipservice"
 	pipe "gopkg.in/m-lab/pipe.v3"
 )
 
@@ -32,14 +36,44 @@ type Scamper struct {
 func (*Scamper) generateFilename(cookie string, t time.Time) string {
 	c, err := strconv.ParseInt(cookie, 16, 64)
 	rtx.PanicOnError(err, "Could not turn cookie into number")
-	return t.Format("20060102T150405Z") + "_" + uuid.FromCookie(uint64(c)) + ".jsonl"
+	return t.Format("20060102T150405Z") + "_" + uuid.FromCookie(uint64(c)) + ".json"
+}
+
+// New version that create test from cached trace
+func (s *Scamper) TraceFromCachedTrace(conn connection.Connection, t time.Time, cachedTest string) error {
+	dir, err := createTimePath(s.OutputPath, t)
+	if err != nil {
+		log.Println("Could not create directories")
+		tracerCacheErrors.WithLabelValues("scamper", "baddir").Inc()
+		return err
+	}
+	filename := dir + s.generateFilename(conn.Cookie, t)
+	log.Println("Starting a cached trace to be put in", filename)
+
+	// remove the first line of cachedTest
+	var cachedTestJson schema.PTTest
+	err = json.Unmarshal([]byte(cachedTest), &cachedTestJson)
+
+	if err != nil {
+		log.Println("Invalid cached test")
+		tracerCacheErrors.WithLabelValues("scamper", "badcache").Inc()
+		return errors.New("Invalid cached test")
+	}
+
+	cachedTestJson.CachedResult = true
+	cachedTestJson.UUID, err = conn.UUID()
+	newTest, err := json.Marshal(cachedTestJson)
+	if err == nil {
+		return ioutil.WriteFile(filename, []byte(newTest), 0666)
+	}
+	return err
 }
 
 // TraceFromCachedTrace creates a file containing traceroute results that came from a
 // cache result, rather than performing the traceroute with scamper. Because
 // scamper-in-standalone and scamper-as-daemon use the same output format, this
 // function is the same code for both.
-func (s *Scamper) TraceFromCachedTrace(conn connection.Connection, t time.Time, cachedTest string) error {
+func (s *Scamper) TraceFromCachedTraceLegacy(conn connection.Connection, t time.Time, cachedTest string) error {
 	dir, err := createTimePath(s.OutputPath, t)
 	if err != nil {
 		log.Println("Could not create directories")
@@ -109,6 +143,20 @@ func (s *Scamper) trace(conn connection.Connection, t time.Time) (string, error)
 	}
 
 	rtx.PanicOnError(err, "Command %v failed", cmd)
+	// Parse the buffer to get the IP list
+	iplist := parser.ExtractIP(buff.Bytes())
+	// Fetch annoatation for the IPs
+	client := ipservice.NewClient(*ipservice.SocketFilename)
+	ann, err := client.Annotate(context.Background(), iplist)
+	if err == nil {
+		// add annotation to the final output
+		AnnotatedBuff, err := parser.InsertAnnotation(ann, buff.Bytes())
+		if err == nil {
+			rtx.PanicOnError(ioutil.WriteFile(filename, AnnotatedBuff, 0666), "Could not save output to file")
+			return string(AnnotatedBuff), nil
+		}
+	}
+
 	rtx.PanicOnError(ioutil.WriteFile(filename, buff.Bytes(), 0666), "Could not save output to file")
 	return string(buff.Bytes()), nil
 }
@@ -216,6 +264,25 @@ func (d *ScamperDaemon) trace(conn connection.Connection, t time.Time) (string, 
 	if err != nil && err.Error() == pipe.ErrTimeout.Error() {
 		log.Println("TimeOut for Trace: ", cmd)
 		return "", err
+	}
+	log.Println("test done!!!!!!!!!!!!!")
+	// Parse the buffer to get the IP list
+	iplist := parser.ExtractIP(buff.Bytes())
+	log.Println("extract IPs: ")
+	log.Println(iplist)
+	// Fetch annoatation for the IPs
+	client := ipservice.NewClient("/var/local/uuidannotatorsocket/annotator.sock")
+	ann, err := client.Annotate(context.Background(), iplist)
+	log.Println(*ipservice.SocketFilename)
+	log.Println(err)
+	log.Println(ann)
+	if err == nil {
+		// add annotation to the final output
+		AnnotatedBuff, err := parser.InsertAnnotation(ann, buff.Bytes())
+		if err == nil {
+			rtx.PanicOnError(ioutil.WriteFile(filename, AnnotatedBuff, 0666), "Could not save output to file")
+			return string(AnnotatedBuff), nil
+		}
 	}
 
 	rtx.PanicOnError(err, "Command %v failed", cmd)
