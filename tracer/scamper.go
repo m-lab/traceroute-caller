@@ -21,6 +21,7 @@ import (
 	"github.com/m-lab/traceroute-caller/connection"
 	"github.com/m-lab/traceroute-caller/parser"
 	"github.com/m-lab/uuid"
+	"github.com/m-lab/uuid-annotator/annotator"
 	"github.com/m-lab/uuid-annotator/ipservice"
 	pipe "gopkg.in/m-lab/pipe.v3"
 )
@@ -266,26 +267,32 @@ func (d *ScamperDaemon) trace(conn connection.Connection, t time.Time) (string, 
 		return "", err
 	}
 	log.Println("test done!!!!!!!!!!!!!")
+	log.Println(string(buff.Bytes()))
 	// Parse the buffer to get the IP list
 	iplist := parser.ExtractIP(buff.Bytes())
-	log.Println("extract IPs: ")
-	log.Println(iplist)
 	// Fetch annoatation for the IPs
-	client := ipservice.NewClient("/var/local/uuidannotatorsocket/annotator.sock")
-	ann, err := client.Annotate(context.Background(), iplist)
-	log.Println(*ipservice.SocketFilename)
-	log.Println(err)
-	log.Println(ann)
-	if err == nil {
-		// add annotation to the final output
-		AnnotatedBuff, err := parser.InsertAnnotation(ann, buff.Bytes())
-		if err == nil {
-			rtx.PanicOnError(ioutil.WriteFile(filename, AnnotatedBuff, 0666), "Could not save output to file")
-			return string(AnnotatedBuff), nil
+	ann := make(map[string]*annotator.ClientAnnotations)
+	if len(iplist) > 0 {
+		client := ipservice.NewClient("/var/local/uuidannotatorsocket/annotator.sock")
+		ann, err = client.Annotate(context.Background(), iplist)
+		log.Println(err)
+		log.Println(ann)
+		if err != nil {
+			log.Println("Cannot fetch annotation from ip service")
 		}
 	}
 
-	rtx.PanicOnError(err, "Command %v failed", cmd)
+	// add annotation to the final output
+	AnnotatedBuff, err := parser.InsertAnnotation(ann, buff.Bytes())
+	if err == nil {
+		rtx.PanicOnError(ioutil.WriteFile(filename, AnnotatedBuff, 0666), "Could not save output to file")
+		return string(AnnotatedBuff), nil
+	}
+
+	if err != nil {
+		log.Println("parse and insert annotation failed")
+		return "", err
+	}
 	rtx.PanicOnError(ioutil.WriteFile(filename, buff.Bytes(), 0666), "Could not save output to file")
 	return string(buff.Bytes()), nil
 }

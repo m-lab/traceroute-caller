@@ -153,7 +153,6 @@ func TestExistingFileStopsDaemonCreation(t *testing.T) {
 	d.MustStart(context.Background())
 }
 
-/*
 func TestTraceWritesMeta(t *testing.T) {
 	tempdir, err := ioutil.TempDir("", "TestTraceWritesUUID")
 	rtx.Must(err, "Could not create tempdir")
@@ -183,31 +182,10 @@ func TestTraceWritesMeta(t *testing.T) {
 	prometheusx.GitShortCommit = "Fake Version"
 	_, err = d.Trace(c, faketime)
 
-	if err != nil {
-		t.Error("Trace not done correctly.")
-	}
-	// Unmarshal the first line of the output file.
-	b, err := ioutil.ReadFile(tempdir + "/2019/04/01/20190401T034551Z_" + prefix.UnsafeString() + "_0000000000000001.json")
-	rtx.Must(err, "Could not read file")
-
-	m := Metadata{}
-	lines := strings.Split(string(b), "\n")
-	if len(lines) < 2 {
-		t.Error("Not enough lines in", lines)
-	}
-	rtx.Must(json.Unmarshal([]byte(lines[0]), &m), "Could not unmarshal")
-
-	uuidChunks := strings.Split(m.UUID, "_")
-
-	if uuidChunks[len(uuidChunks)-1] != "0000000000000001" {
-		t.Error("Bad uuid:", m.UUID)
-	}
-
-	if m.TracerouteCallerVersion != "Fake Version" {
-		t.Error("Bad traceroute caller version:", m.TracerouteCallerVersion)
+	if err == nil || err.Error() != "Invalid test" {
+		t.Error("Trace should fail with meta line only.")
 	}
 }
-*/
 
 func TestTraceTimeout(t *testing.T) {
 	tempdir, err := ioutil.TempDir("", "TestTimeoutTrace")
