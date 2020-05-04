@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/m-lab/etl/etl"
-	"github.com/m-lab/etl/metrics"
 	"github.com/m-lab/etl/schema"
 )
 
@@ -409,7 +408,6 @@ func Parse(fileName string, testName string, testId string, rawContent []byte) (
 	// Check whether the last hop is the destIP
 
 	iataCode := etl.GetIATACode(fileName)
-	metrics.PTTestCount.WithLabelValues(iataCode).Inc()
 
 	if allNodes[len(allNodes)-1].ip != destIP && !strings.Contains(lastValidHopLine, destIP) {
 		// This is the case that we consider the test did not reach destIP at the last hop.
