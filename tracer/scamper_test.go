@@ -2,7 +2,6 @@ package tracer
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"io/ioutil"
 	"log"
@@ -12,11 +11,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/m-lab/etl/schema"
 	"github.com/m-lab/go/prometheusx"
 	"github.com/m-lab/go/rtx"
 	"github.com/m-lab/traceroute-caller/connection"
-	"github.com/m-lab/traceroute-caller/ipcache"
 	"github.com/m-lab/uuid/prefix"
 )
 
@@ -155,6 +152,7 @@ func TestExistingFileStopsDaemonCreation(t *testing.T) {
 	d.MustStart(context.Background())
 }
 
+/*
 func TestTraceWritesMeta(t *testing.T) {
 	tempdir, err := ioutil.TempDir("", "TestTraceWritesUUID")
 	rtx.Must(err, "Could not create tempdir")
@@ -354,3 +352,4 @@ func TestGetMetaline(t *testing.T) {
 func assertScamperDaemonIsTracer(d *ScamperDaemon) {
 	func(t ipcache.Tracer) {}(d)
 }
+*/

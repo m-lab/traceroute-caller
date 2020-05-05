@@ -115,22 +115,13 @@ func (s *Scamper) trace(conn connection.Connection, t time.Time) (string, error)
 	}
 
 	rtx.PanicOnError(err, "Command %v failed", cmd)
-	// Parse the buffer to get the IP list
-	iplist := parser.ExtractIP(buff.Bytes())
-	// Fetch annoatation for the IPs
-	client := ipservice.NewClient(*ipservice.SocketFilename)
-	ann, err := client.Annotate(context.Background(), iplist)
-	if err == nil {
-		// add annotation to the final output
-		AnnotatedBuff, err := parser.InsertAnnotation(ann, buff.Bytes())
-		if err == nil {
-			rtx.PanicOnError(ioutil.WriteFile(filename, AnnotatedBuff, 0666), "Could not save output to file")
-			return string(AnnotatedBuff), nil
-		}
-	}
 
-	rtx.PanicOnError(ioutil.WriteFile(filename, buff.Bytes(), 0666), "Could not save output to file")
-	return string(buff.Bytes()), nil
+	converted, err := ConvertTrace(buff.Bytes())
+	if err != nil {
+		return "", err
+	}
+	rtx.PanicOnError(ioutil.WriteFile(filename, converted, 0666), "Could not save output to file")
+	return string(converted), nil
 }
 
 // ScamperDaemon contains a single instance of a scamper process. Once the ScamperDaemon has
@@ -212,6 +203,27 @@ func (d *ScamperDaemon) TraceAll(connections []connection.Connection) {
 	}
 }
 
+// ConvertTrace extracts the IPs from the original jsonl output,
+// fetch annotation from IP service provided by uuid annotation,
+// and convert it to schema.PTTest format with annotation inserted.
+func ConvertTrace(buff []byte) ([]byte, error) {
+	// Parse the buffer to get the IP list
+	iplist := parser.ExtractIP(buff)
+	// Fetch annoatation for the IPs
+	ann := make(map[string]*annotator.ClientAnnotations)
+	var err error
+	if len(iplist) > 0 {
+		client := ipservice.NewClient("/var/local/uuidannotatorsocket/annotator.sock")
+		ann, err = client.Annotate(context.Background(), iplist)
+		if err != nil {
+			log.Println("Cannot fetch annotation from ip service")
+		}
+	}
+
+	// add annotation to the final output
+	return parser.InsertAnnotation(ann, buff)
+}
+
 func (d *ScamperDaemon) trace(conn connection.Connection, t time.Time) (string, error) {
 	dir, err := createTimePath(d.OutputPath, t)
 	rtx.PanicOnError(err, "Could not create directory")
@@ -238,29 +250,10 @@ func (d *ScamperDaemon) trace(conn connection.Connection, t time.Time) (string, 
 		return "", err
 	}
 
-	// Parse the buffer to get the IP list
-	iplist := parser.ExtractIP(buff.Bytes())
-	// Fetch annoatation for the IPs
-	ann := make(map[string]*annotator.ClientAnnotations)
-	if len(iplist) > 0 {
-		client := ipservice.NewClient("/var/local/uuidannotatorsocket/annotator.sock")
-		ann, err = client.Annotate(context.Background(), iplist)
-		if err != nil {
-			log.Println("Cannot fetch annotation from ip service")
-		}
-	}
-
-	// add annotation to the final output
-	AnnotatedBuff, err := parser.InsertAnnotation(ann, buff.Bytes())
-	if err == nil {
-		rtx.PanicOnError(ioutil.WriteFile(filename, AnnotatedBuff, 0666), "Could not save output to file")
-		return string(AnnotatedBuff), nil
-	}
-
+	converted, err := ConvertTrace(buff.Bytes())
 	if err != nil {
-		log.Println("parse and insert annotation failed")
 		return "", err
 	}
-	rtx.PanicOnError(ioutil.WriteFile(filename, buff.Bytes(), 0666), "Could not save output to file")
-	return string(buff.Bytes()), nil
+	rtx.PanicOnError(ioutil.WriteFile(filename, converted, 0666), "Could not save output to file")
+	return string(converted), nil
 }
