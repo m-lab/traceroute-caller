@@ -237,8 +237,7 @@ func (d *ScamperDaemon) trace(conn connection.Connection, t time.Time) (string, 
 		log.Println("TimeOut for Trace: ", cmd)
 		return "", err
 	}
-	log.Println("test done!!!!!!!!!!!!!")
-	log.Println(string(buff.Bytes()))
+
 	// Parse the buffer to get the IP list
 	iplist := parser.ExtractIP(buff.Bytes())
 	// Fetch annoatation for the IPs
@@ -246,8 +245,6 @@ func (d *ScamperDaemon) trace(conn connection.Connection, t time.Time) (string, 
 	if len(iplist) > 0 {
 		client := ipservice.NewClient("/var/local/uuidannotatorsocket/annotator.sock")
 		ann, err = client.Annotate(context.Background(), iplist)
-		log.Println(err)
-		log.Println(ann)
 		if err != nil {
 			log.Println("Cannot fetch annotation from ip service")
 		}
