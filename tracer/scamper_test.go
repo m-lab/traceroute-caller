@@ -2,6 +2,7 @@ package tracer
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"io/ioutil"
 	"log"
@@ -11,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/m-lab/etl/schema"
 	"github.com/m-lab/go/prometheusx"
 	"github.com/m-lab/go/rtx"
 	"github.com/m-lab/traceroute-caller/connection"
@@ -224,7 +226,6 @@ func TestTraceTimeout(t *testing.T) {
 	}
 }
 
-/*
 func TestCreateCacheTest(t *testing.T) {
 	tempdir, err := ioutil.TempDir("", "TestCachedTrace")
 	rtx.Must(err, "Could not create tempdir")
@@ -252,10 +253,7 @@ func TestCreateCacheTest(t *testing.T) {
 
 	faketime := time.Date(2019, time.April, 1, 3, 45, 51, 0, time.UTC)
 	prometheusx.GitShortCommit = "Fake Version"
-	cachedTest := `{"UUID": "ndt-plh7v_1566050090_000000000004D64D"}
-	{"type":"cycle-start", "list_name":"/tmp/scamperctrl:51811", "id":1, "hostname":"ndt-plh7v", "start_time":1566691298}
-	{"type":"tracelb", "version":"0.1", "userid":0, "method":"icmp-echo", "src":"::ffff:180.87.97.101", "dst":"::ffff:1.47.236.62", "start":{"sec":1566691298, "usec":476221, "ftime":"2019-08-25 00:01:38"}, "probe_size":60, "firsthop":1, "attempts":3, "confidence":95, "tos":0, "gaplimit":3, "wait_timeout":5, "wait_probe":250, "probec":0, "probec_max":3000, "nodec":0, "linkc":0}
-	{"type":"cycle-stop", "list_name":"/tmp/scamperctrl:51811", "id":1, "hostname":"ndt-plh7v", "stop_time":1566691298}`
+	cachedTest := `{"uuid":"\"ndt-plh7v_1566050090_000000000004D64D\"","testtime":"0001-01-01T00:00:00Z","parseinfo":{"TaskFileName":"","ParseTime":"0001-01-01T00:00:00Z","ParserVersion":"","Filename":""},"start_time":1566691298,"stop_time":1566691298,"scamper_version":"\"0.1\"","source":{"IP":"::ffff:180.87.97.101","Port":0,"IATA":"","Geo":null,"Network":null},"destination":{"IP":"::ffff:1.47.236.62","Port":0,"Geo":null,"Network":null},"probe_size":60,"probec":0,"hop":null,"exp_version":"\"\"","cached_result":false}`
 
 	d.TraceFromCachedTrace(c, faketime, "Broken cached test")
 	_, errInvalidTest := ioutil.ReadFile(tempdir + "/2019/04/01/20190401T034551Z_" + prefix.UnsafeString() + "_0000000000000001.jsonl")
@@ -263,7 +261,7 @@ func TestCreateCacheTest(t *testing.T) {
 		t.Error("should fail to generate cached test")
 	}
 
-	d.TraceFromCachedTrace(c, faketime, cachedTest)
+	d.TraceFromCachedTrace(c, faketime, string(cachedTest))
 
 	// Unmarshal the first line of the output file.
 	b, err := ioutil.ReadFile(tempdir + "/2019/04/01/20190401T034551Z_" + prefix.UnsafeString() + "_0000000000000001.json")
@@ -279,7 +277,7 @@ func TestCreateCacheTest(t *testing.T) {
 		t.Error("Bad uuid:", m.UUID)
 	}
 
-	if m.ScamperVersion != "Fake Version" {
+	if m.ScamperVersion != "0.1" {
 		t.Error("Bad traceroute caller version:", m.ScamperVersion)
 	}
 
@@ -294,7 +292,6 @@ func TestCreateCacheTest(t *testing.T) {
 	}
 }
 
-*/
 func TestRecovery(t *testing.T) {
 	tempdir, err := ioutil.TempDir("", "TestRecovery")
 	rtx.Must(err, "Could not create tempdir")
