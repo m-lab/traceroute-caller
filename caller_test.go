@@ -14,8 +14,8 @@ import (
 	"github.com/m-lab/tcp-info/eventsocket"
 )
 
-func XTestMetrics(t *testing.T) {
-	promtest.LintMetrics(t)
+func TestMetrics(t *testing.T) {
+	promtest.LintMetrics(nil)
 }
 
 func TestMain(t *testing.T) {
