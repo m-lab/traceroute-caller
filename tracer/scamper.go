@@ -70,34 +70,6 @@ func (s *Scamper) TraceFromCachedTrace(conn connection.Connection, t time.Time, 
 	return err
 }
 
-// TraceFromCachedTrace creates a file containing traceroute results that came from a
-// cache result, rather than performing the traceroute with scamper. Because
-// scamper-in-standalone and scamper-as-daemon use the same output format, this
-// function is the same code for both.
-func (s *Scamper) TraceFromCachedTraceLegacy(conn connection.Connection, t time.Time, cachedTest string) error {
-	dir, err := createTimePath(s.OutputPath, t)
-	if err != nil {
-		log.Println("Could not create directories")
-		tracerCacheErrors.WithLabelValues("scamper", "baddir").Inc()
-		return err
-	}
-	filename := dir + s.generateFilename(conn.Cookie, t)
-	log.Println("Starting a cached trace to be put in", filename)
-
-	// remove the first line of cachedTest
-	split := strings.Index(cachedTest, "\n")
-
-	if split <= 0 || split == len(cachedTest) {
-		log.Println("Invalid cached test")
-		tracerCacheErrors.WithLabelValues("scamper", "badcache").Inc()
-		return errors.New("Invalid cached test")
-	}
-
-	// Get the uuid from the first line of cachedTest
-	newTest := GetMetaline(conn, true, extractUUID(cachedTest[:split])) + cachedTest[split+1:]
-	return ioutil.WriteFile(filename, []byte(newTest), 0666)
-}
-
 // DontTrace does not perform a trace that would have been performed, had the
 // previous round not already returned an error. This should increment a counter
 // that tracks the number of tests which have been "transitively failed".
