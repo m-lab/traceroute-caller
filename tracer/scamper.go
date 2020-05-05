@@ -118,7 +118,9 @@ func (s *Scamper) trace(conn connection.Connection, t time.Time) (string, error)
 
 	converted, err := ConvertTrace(buff.Bytes())
 	if err != nil {
-		return "", err
+		// Here we allow the original test sent back for cached test
+		// when adding annotation did not succeed.
+		return string(buff.Bytes()), err
 	}
 	rtx.PanicOnError(ioutil.WriteFile(filename, converted, 0666), "Could not save output to file")
 	return string(converted), nil

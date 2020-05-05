@@ -2,6 +2,7 @@ package tracer
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"io/ioutil"
 	"log"
@@ -11,9 +12,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/m-lab/etl/schema"
 	"github.com/m-lab/go/prometheusx"
 	"github.com/m-lab/go/rtx"
 	"github.com/m-lab/traceroute-caller/connection"
+	"github.com/m-lab/traceroute-caller/ipcache"
 	"github.com/m-lab/uuid/prefix"
 )
 
@@ -40,8 +43,8 @@ func TestScamper(t *testing.T) {
 
 	// Test Trace
 	out, err := s.Trace(conn, now)
-	if err != nil {
-		t.Error(err)
+	if err == nil || err.Error() != "Invalid test" {
+		t.Error("The faked test should fail the parsing for annotation")
 	}
 	uuid, err := conn.UUID()
 	rtx.Must(err, "Could not make uuid")
@@ -50,11 +53,6 @@ func TestScamper(t *testing.T) {
 `
 	if strings.TrimSpace(out) != strings.TrimSpace(expected) {
 		t.Error("Bad output:", out)
-	}
-	contents, err := ioutil.ReadFile(dir + "/2003/11/09/20031109T155559Z_" + prefix.UnsafeString() + "_00000000000012AB.json")
-	rtx.Must(err, "Could not read file")
-	if string(contents) != out {
-		t.Error("The contents of the file should equal the returned values from scraper")
 	}
 
 	s.Binary = "false"
@@ -152,7 +150,6 @@ func TestExistingFileStopsDaemonCreation(t *testing.T) {
 	d.MustStart(context.Background())
 }
 
-/*
 func TestTraceWritesMeta(t *testing.T) {
 	tempdir, err := ioutil.TempDir("", "TestTraceWritesUUID")
 	rtx.Must(err, "Could not create tempdir")
@@ -352,4 +349,3 @@ func TestGetMetaline(t *testing.T) {
 func assertScamperDaemonIsTracer(d *ScamperDaemon) {
 	func(t ipcache.Tracer) {}(d)
 }
-*/
