@@ -106,8 +106,8 @@ type CyclestopLine struct {
 	Stop_time float64 `json:"stop_time"`
 }
 
-func GetGeoAnnotation(ann *annotator.ClientAnnotations) api.GeolocationIP {
-	return api.GeolocationIP{
+func GetGeoAnnotation(ann *annotator.ClientAnnotations) annotator.Geolocation {
+	return annotator.Geolocation{
 		ContinentCode:    ann.Geo.ContinentCode,
 		CountryCode:      ann.Geo.CountryCode,
 		CountryCode3:     ann.Geo.CountryCode3,
@@ -246,8 +246,8 @@ func ParseAndInsertAnnotation(ann map[string]*annotator.ClientAnnotations,
 		}
 	} else {
 		srcGeo := GetGeoAnnotation(ann[tracelb.Src])
-		srcNetwork := api.ASData{
-			Systems: []api.System{api.System{ASNs: []uint32{ann[tracelb.Src].Network.ASNumber}}},
+		srcNetwork := annotator.Network{
+			Systems: []annotator.System{annotator.System{ASNs: []uint32{ann[tracelb.Src].Network.ASNumber}}},
 		}
 		source = schema.ServerInfo{
 			IP:      tracelb.Src,
