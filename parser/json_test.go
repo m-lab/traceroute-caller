@@ -8,8 +8,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/m-lab/etl/schema"
 	"github.com/m-lab/traceroute-caller/parser"
+	"github.com/m-lab/traceroute-caller/schema"
 	"github.com/m-lab/uuid-annotator/annotator"
 )
 
@@ -54,19 +54,10 @@ func TestInsertAnnotation(t *testing.T) {
 		log.Println(err)
 		t.Error("Cannot insert annotation")
 	}
-	var pttest schema.PTTest
+	var pttest schema.PTTestRaw
 	err = json.Unmarshal(output, &pttest)
 	if err != nil {
 		t.Error("Cannot unmarshal output")
-	}
-	if pttest.Source.Geo.ContinentCode != "NA" {
-		t.Error("Geo annotation not inserted correctly")
-	}
-	if pttest.Source.Network.Systems[0].ASNs[0] != 1234 {
-		t.Error("ASN annotation not inserted correctly")
-	}
-	if pttest.Destination.Network.Systems[0].ASNs[0] != 5678 {
-		t.Error("ASN annotation not inserted correctly")
 	}
 
 	// Test insert annotation for hops
@@ -89,7 +80,7 @@ func TestInsertAnnotation(t *testing.T) {
 		log.Println(err)
 		t.Error("Cannot insert annotation")
 	}
-	var pttest2 schema.PTTest
+	var pttest2 schema.PTTestRaw
 	err = json.Unmarshal(output2, &pttest2)
 	if err != nil {
 		t.Error("Cannot unmarshal output")
@@ -107,8 +98,8 @@ func TestExtractIP(t *testing.T) {
 		`
 
 	output := parser.ExtractIP([]byte(testStr))
-	if output[0] != "::ffff:180.87.97.101" || output[1] != "::ffff:1.47.236.62" {
-		t.Error("Fail to extract IPs")
+	if len(output) != 0 {
+		t.Error("Should be no hop IPs")
 	}
 
 	output2 := parser.ExtractIP([]byte(`xxxx`))
@@ -130,7 +121,7 @@ func TestExtractIP(t *testing.T) {
 	{"type":"cycle-stop", "list_name":"/tmp/scamperctrl:51803", "id":1, "hostname":"ndt-plh7v", "stop_time":1566691541}
 	`
 	output4 := parser.ExtractIP([]byte(testStr4))
-	if len(output4) != 8 || output4[7] != "2001:4888:3f:6092:3a2:26:0:1" {
+	if len(output4) != 6 || output4[5] != "2001:4888:3f:6092:3a2:26:0:1" {
 		t.Error("Faile to extract hop IPs")
 	}
 }
@@ -148,7 +139,7 @@ func TestParseJsonSimple(t *testing.T) {
 	if output.UUID != "ndt-plh7v_1566050090_000000000004D64D" {
 		t.Fatalf("Wrong results for UUID parsing!")
 	}
-	if output.Source.IP != "::ffff:180.87.97.101" || output.Destination.IP != "::ffff:1.47.236.62" {
+	if output.ServerIP != "::ffff:180.87.97.101" || output.ClientIP != "::ffff:1.47.236.62" {
 		t.Fatalf("Wrong results for source/destination IP parsing!")
 	}
 	if output.ProbeSize != 60 || output.ProbeC != 0 {
@@ -260,7 +251,7 @@ func TestParseJsonComplex(t *testing.T) {
 	if output.UUID != "ndt-plh7v_1566050090_000000000004D60F" {
 		t.Fatalf("Wrong results for UUID parsing!")
 	}
-	if output.Source.IP != "2001:550:1b01:1:e41d:2d00:151:f6c0" || output.Destination.IP != "2600:1009:b013:1a59:c369:b528:98fd:ab43" {
+	if output.ServerIP != "2001:550:1b01:1:e41d:2d00:151:f6c0" || output.ClientIP != "2600:1009:b013:1a59:c369:b528:98fd:ab43" {
 		t.Fatalf("Wrong results for source/destination IP parsing!")
 	}
 	if output.ProbeSize != 60 || output.ProbeC != 85 {
