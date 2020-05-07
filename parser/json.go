@@ -220,6 +220,7 @@ func ParseAndInsertAnnotation(ann map[string]*annotator.ClientAnnotations,
 	}
 
 	output := schema.PTTestRaw{
+		SchemaVersion:          "1",
 		UUID:                   uuid,
 		StartTime:              int64(cycleStart.Start_time),
 		StopTime:               int64(cycleStop.Stop_time),
