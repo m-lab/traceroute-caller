@@ -220,17 +220,17 @@ func ParseAndInsertAnnotation(ann map[string]*annotator.ClientAnnotations,
 	}
 
 	output := schema.PTTestRaw{
-		UUID:           uuid,
-		StartTime:      int64(cycleStart.Start_time),
-		StopTime:       int64(cycleStop.Stop_time),
-		ScamperVersion: tracelb.Version,
-		ServerIP:       tracelb.Src,
-		ClientIP:       tracelb.Dst,
-		ProbeSize:      int64(tracelb.Probe_size),
-		ProbeC:         int64(tracelb.Probec),
-		Hop:            hops,
-		ExpVersion:     version,
-		CachedResult:   resultFromCache,
+		UUID:                   uuid,
+		StartTime:              int64(cycleStart.Start_time),
+		StopTime:               int64(cycleStop.Stop_time),
+		ScamperVersion:         tracelb.Version,
+		ServerIP:               tracelb.Src,
+		ClientIP:               tracelb.Dst,
+		ProbeSize:              int64(tracelb.Probe_size),
+		ProbeC:                 int64(tracelb.Probec),
+		Hop:                    hops,
+		TracerouteCallerCommit: version,
+		CachedResult:           resultFromCache,
 	}
 	return output, nil
 }
