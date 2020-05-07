@@ -13,7 +13,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/m-lab/etl/etl"
 	"github.com/m-lab/traceroute-caller/schema"
 )
 
@@ -71,7 +70,6 @@ type cachedPTData struct {
 	ServerIP         string
 	ClientIP         string
 	LastValidHopLine string
-	MetroName        string
 	UUID             string
 }
 
@@ -402,8 +400,6 @@ func Parse(fileName string, testName string, testId string, rawContent []byte) (
 	}
 	// Check whether the last hop is the destIP
 
-	iataCode := etl.GetIATACode(fileName)
-
 	if allNodes[len(allNodes)-1].ip != destIP && !strings.Contains(lastValidHopLine, destIP) {
 		// This is the case that we consider the test did not reach destIP at the last hop.
 		if reachedDest {
@@ -426,7 +422,6 @@ func Parse(fileName string, testName string, testId string, rawContent []byte) (
 		ServerIP:         serverIP,
 		ClientIP:         destIP,
 		LastValidHopLine: lastValidHopLine,
-		MetroName:        iataCode,
 	}, nil
 }
 
