@@ -40,11 +40,6 @@ func InitParserVersion() string {
 	return gParserVersion
 }
 
-// Version returns the parser version used by parsers to annotate data rows.
-func Version() string {
-	return gParserVersion
-}
-
 type PTFileName struct {
 	Name string
 }
