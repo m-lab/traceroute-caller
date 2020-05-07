@@ -15,10 +15,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/m-lab/etl/schema"
 	"github.com/m-lab/go/rtx"
 	"github.com/m-lab/traceroute-caller/connection"
 	"github.com/m-lab/traceroute-caller/parser"
+	"github.com/m-lab/traceroute-caller/schema"
 	"github.com/m-lab/uuid"
 	"github.com/m-lab/uuid-annotator/annotator"
 	"github.com/m-lab/uuid-annotator/ipservice"
@@ -51,7 +51,7 @@ func (s *Scamper) TraceFromCachedTrace(conn connection.Connection, t time.Time, 
 	log.Println("Starting a cached trace to be put in", filename)
 
 	// remove the first line of cachedTest
-	var cachedTestJson schema.PTTest
+	var cachedTestJson schema.PTTestRaw
 	err = json.Unmarshal([]byte(cachedTest), &cachedTestJson)
 
 	if err != nil {
@@ -61,6 +61,7 @@ func (s *Scamper) TraceFromCachedTrace(conn connection.Connection, t time.Time, 
 	}
 
 	cachedTestJson.CachedResult = true
+	cachedTestJson.CachedUUID = cachedTestJson.UUID
 	cachedTestJson.UUID, err = conn.UUID()
 	newTest, err := json.Marshal(cachedTestJson)
 	if err == nil {
