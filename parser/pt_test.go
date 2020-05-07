@@ -7,9 +7,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/m-lab/etl/schema"
 	"github.com/m-lab/go/osx"
 	"github.com/m-lab/traceroute-caller/parser"
+	"github.com/m-lab/traceroute-caller/schema"
 )
 
 func TestInitParserVersion(t *testing.T) {
@@ -129,11 +129,11 @@ func TestPTParser(t *testing.T) {
 		t.Fatalf("Do not process log time correctly.")
 	}
 
-	if cachedTest.Source.IP != "172.17.94.34" {
+	if cachedTest.ServerIP != "172.17.94.34" {
 		t.Fatalf("Wrong results for Server IP.")
 	}
 
-	if cachedTest.Destination.IP != "74.125.224.100" {
+	if cachedTest.ClientIP != "74.125.224.100" {
 		t.Fatalf("Wrong results for Client IP.")
 	}
 

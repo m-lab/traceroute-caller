@@ -15,7 +15,7 @@ import (
 )
 
 func TestMetrics(t *testing.T) {
-	promtest.LintMetrics(nil)
+	promtest.LintMetrics(t)
 }
 
 func TestMain(t *testing.T) {

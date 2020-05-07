@@ -14,7 +14,7 @@ import (
 	"time"
 
 	"github.com/m-lab/etl/etl"
-	"github.com/m-lab/etl/schema"
+	"github.com/m-lab/traceroute-caller/schema"
 )
 
 func init() {
@@ -68,8 +68,8 @@ type cachedPTData struct {
 	TestID           string
 	Hops             []schema.ScamperHop
 	LogTime          time.Time
-	Source           schema.ServerInfo
-	Destination      schema.ClientInfo
+	ServerIP         string
+	ClientIP         string
 	LastValidHopLine string
 	MetroName        string
 	UUID             string
@@ -417,21 +417,14 @@ func Parse(fileName string, testName string, testId string, rawContent []byte) (
 	// Generate Hops from allNodes
 	PTHops := ProcessAllNodes(allNodes, serverIP, protocol)
 
-	source := schema.ServerInfo{
-		IP: serverIP,
-	}
-	destination := schema.ClientInfo{
-		IP: destIP,
-	}
-
 	// TODO: Add annotation to the IP of source, destination and hops.
 
 	return cachedPTData{
 		TestID:           testId,
 		Hops:             PTHops,
 		LogTime:          logTime,
-		Source:           source,
-		Destination:      destination,
+		ServerIP:         serverIP,
+		ClientIP:         destIP,
 		LastValidHopLine: lastValidHopLine,
 		MetroName:        iataCode,
 	}, nil
@@ -467,12 +460,12 @@ func (pt *PTParser) ParseAndWrite(fileName string, testName string, rawContent [
 	// If it does appear, then the buffered test was polluted, and it will
 	// be discarded from buffer.
 	// If it does not appear, then no pollution detected.
-	destIP := cachedTest.Destination.IP
+	destIP := cachedTest.ClientIP
 	for index, PTTest := range pt.previousTests {
 		// array of hops was built in reverse order from list of nodes
 		// (in func ProcessAllNodes()). So the final parsed hop is Hops[0].
 		finalHop := PTTest.Hops[0]
-		if PTTest.Destination.IP != destIP && len(finalHop.Links) > 0 &&
+		if PTTest.ClientIP != destIP && len(finalHop.Links) > 0 &&
 			(finalHop.Links[0].HopDstIP == destIP || strings.Contains(PTTest.LastValidHopLine, destIP)) {
 			// Discard pt.previousTests[index]
 			pt.previousTests = append(pt.previousTests[:index], pt.previousTests[index+1:]...)
