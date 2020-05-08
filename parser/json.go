@@ -268,7 +268,6 @@ func ExtractIP(rawContent []byte) []string {
 
 	for i, _ := range tracelb.Nodes {
 		oneNode := &tracelb.Nodes[i]
-		log.Println("Extract IP :" + oneNode.Addr)
 		IPList = append(IPList, oneNode.Addr)
 	}
 	return IPList
