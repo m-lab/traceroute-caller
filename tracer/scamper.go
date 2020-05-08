@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"flag"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -24,6 +25,11 @@ import (
 	"github.com/m-lab/uuid-annotator/ipservice"
 	pipe "gopkg.in/m-lab/pipe.v3"
 )
+
+var IPServiceSocketFilename = flag.String(
+	"ipservice.socketname",
+	"/var/local/uuidannotatorsocket/annotator.sock",
+	"The filename to use as a UNIX domain socket for the local annotation service.")
 
 // Scamper uses scamper in non-daemon mode to perform traceroutes. This is much
 // less efficient, but when scamper crashes, it has a much lower "blast radius".
@@ -215,14 +221,18 @@ func ConvertTrace(buff []byte) ([]byte, error) {
 	// Fetch annoatation for the IPs
 	ann := make(map[string]*annotator.ClientAnnotations)
 	var err error
+	log.Print(iplist)
 	if len(iplist) > 0 {
-		client := ipservice.NewClient("/var/local/uuidannotatorsocket/annotator.sock")
+		log.Println(*IPServiceSocketFilename)
+		client := ipservice.NewClient(*IPServiceSocketFilename)
 		ann, err = client.Annotate(context.Background(), iplist)
 		if err != nil {
 			log.Println("Cannot fetch annotation from ip service")
 		}
 	}
 
+	log.Println("check fake service")
+	log.Println(ann["1.2.3.4"])
 	// add annotation to the final output
 	return parser.InsertAnnotation(ann, buff)
 }

@@ -170,10 +170,25 @@ func ParseAndInsertAnnotation(ann map[string]*annotator.ClientAnnotations,
 		oneNode := &tracelb.Nodes[i]
 		var links []schema.HopLink
 		if len(oneNode.Links) == 0 {
-			hops = append(hops, schema.ScamperHop{
-				Source: schema.HopIP{IP: oneNode.Addr, Hostname: oneNode.Name},
-				Linkc:  oneNode.Linkc,
-			})
+			if ann[oneNode.Addr] != nil {
+				hopAnn := ann[oneNode.Addr]
+				hops = append(hops, schema.ScamperHop{
+					Source: schema.HopIP{
+						IP:          oneNode.Addr,
+						City:        hopAnn.Geo.City,
+						CountryCode: hopAnn.Geo.CountryCode,
+						ASN:         hopAnn.Network.ASNumber,
+						Hostname:    oneNode.Name},
+					Linkc: oneNode.Linkc,
+				})
+			} else {
+				hops = append(hops, schema.ScamperHop{
+					Source: schema.HopIP{
+						IP:       oneNode.Addr,
+						Hostname: oneNode.Name},
+					Linkc: oneNode.Linkc,
+				})
+			}
 			continue
 		}
 		if len(oneNode.Links) != 1 {
@@ -247,11 +262,13 @@ func ExtractIP(rawContent []byte) []string {
 	// Parse the line in struct
 	err := json.Unmarshal([]byte(jsonStrings[2]), &tracelb)
 	if err != nil {
+		log.Println("cannot unmarshall tracelb line for extracting IPs")
 		return []string{}
 	}
 
 	for i, _ := range tracelb.Nodes {
 		oneNode := &tracelb.Nodes[i]
+		log.Println("Extract IP :" + oneNode.Addr)
 		IPList = append(IPList, oneNode.Addr)
 	}
 	return IPList
