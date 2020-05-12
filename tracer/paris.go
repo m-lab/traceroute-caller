@@ -28,13 +28,13 @@ func (p *Paris) filename(uuid string, t time.Time, cached bool) string {
 
 // Trace runs a traceroute to the remote host and port from the loal source port
 // using paris-traceroute.
-func (p *Paris) Trace(conn connection.Connection, t time.Time) (string, error) {
+func (p *Paris) Trace(conn connection.Connection, t time.Time) ([]byte, error) {
 	tracesInProgress.WithLabelValues("paris-traceroute").Inc()
 	defer tracesInProgress.WithLabelValues("paris-traceroute").Dec()
 
 	uuid, err := conn.UUID()
 	if err != nil {
-		return "", err
+		return []byte{}, err
 	}
 
 	buff := bytes.Buffer{}
@@ -50,23 +50,23 @@ func (p *Paris) Trace(conn connection.Connection, t time.Time) (string, error) {
 	tracesPerformed.WithLabelValues("paris-traceroute").Inc()
 	if err != nil {
 		crashedTraces.WithLabelValues("paris-traceroute").Inc()
-		return "", err
+		return []byte{}, err
 	}
 	dir, err := createTimePath(p.OutputPath, t)
 	if err != nil {
 		crashedTraces.WithLabelValues("paris-traceroute").Inc()
-		return "", err
+		return []byte{}, err
 	}
 	fn := p.filename(uuid, t, false)
 	data := buff.Bytes()
 	err = ioutil.WriteFile(dir+fn, data, 0446)
 	log.Println("Wrote file", dir+fn)
-	return string(data), err
+	return data, err
 }
 
 // TraceFromCachedTrace creates a file from a previously-existing traceroute
 // result, rather than rerunning the current test.
-func (p *Paris) TraceFromCachedTrace(conn connection.Connection, t time.Time, cachedTest string) error {
+func (p *Paris) TraceFromCachedTrace(conn connection.Connection, t time.Time, cachedTest []byte) error {
 	uuid, err := conn.UUID()
 	if err != nil {
 		tracerCacheErrors.WithLabelValues("paris-traceroute", "uuid").Inc()

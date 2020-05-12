@@ -20,15 +20,15 @@ var (
 
 // Tracer is the generic interface for all things that can perform a traceroute.
 type Tracer interface {
-	Trace(conn connection.Connection, t time.Time) (string, error)
-	TraceFromCachedTrace(conn connection.Connection, t time.Time, cachedTest string) error
+	Trace(conn connection.Connection, t time.Time) ([]byte, error)
+	TraceFromCachedTrace(conn connection.Connection, t time.Time, cachedTest []byte) error
 	DontTrace(conn connection.Connection, err error)
 }
 
 // cachedTest is a single entry in the cache of traceroute results.
 type cachedTest struct {
 	timeStamp time.Time
-	data      string
+	data      []byte
 	dataReady chan struct{}
 	err       error
 }
@@ -65,7 +65,7 @@ func (rc *RecentIPCache) getTracer() Tracer {
 // Trace performs a trace and adds it to the cache. It calls the methods of the
 // tracer, so if those create files on disk, then files on disk will be created
 // as a side effect.
-func (rc *RecentIPCache) Trace(conn connection.Connection) (string, error) {
+func (rc *RecentIPCache) Trace(conn connection.Connection) ([]byte, error) {
 	c, cached := rc.getEntry(conn.RemoteIP)
 	t := rc.getTracer()
 	if cached {
@@ -75,7 +75,7 @@ func (rc *RecentIPCache) Trace(conn connection.Connection) (string, error) {
 			return c.data, nil
 		}
 		t.DontTrace(conn, c.err)
-		return "", c.err
+		return []byte{}, c.err
 	}
 	c.data, c.err = t.Trace(conn, c.timeStamp)
 	close(c.dataReady)

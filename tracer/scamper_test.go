@@ -55,7 +55,7 @@ func TestScamper(t *testing.T) {
 	expected := `{"UUID":"` + uuid + `","TracerouteCallerVersion":"` + prometheusx.GitShortCommit + `","CachedResult":false,"CachedUUID":""}
 -I tracelb -P icmp-echo -q 3 -O ptr 10.1.1.1 -o- -O json
 `
-	if strings.TrimSpace(out) != strings.TrimSpace(expected) {
+	if strings.TrimSpace(string(out)) != strings.TrimSpace(expected) {
 		t.Error("Bad output:", out)
 	}
 
@@ -220,7 +220,7 @@ func TestTraceTimeout(t *testing.T) {
 	if err.Error() != "timeout" {
 		t.Error("Should return TimeOut err, not ", err)
 	}
-	if data != "" {
+	if len(data) != 0 {
 		t.Error("Should return empty string when TimeOut")
 	}
 }
@@ -254,13 +254,13 @@ func TestCreateCacheTest(t *testing.T) {
 	prometheusx.GitShortCommit = "Fake Version"
 	cachedTest := `{"uuid":"\"ndt-plh7v_1566050090_000000000004D64D\"","testtime":"0001-01-01T00:00:00Z","parseinfo":{"TaskFileName":"","ParseTime":"0001-01-01T00:00:00Z","ParserVersion":"","Filename":""},"start_time":1566691298,"stop_time":1566691298,"scamper_version":"\"0.1\"","source":{"IP":"::ffff:180.87.97.101","Port":0,"IATA":"","Geo":null,"Network":null},"destination":{"IP":"::ffff:1.47.236.62","Port":0,"Geo":null,"Network":null},"probe_size":60,"probec":0,"hop":null,"exp_version":"\"\"","cached_result":false}`
 
-	d.TraceFromCachedTrace(c, faketime, "Broken cached test")
+	d.TraceFromCachedTrace(c, faketime, []byte(`Broken cached test`))
 	_, errInvalidTest := ioutil.ReadFile(tempdir + "/2019/04/01/20190401T034551Z_" + prefix.UnsafeString() + "_0000000000000001.jsonl")
 	if errInvalidTest == nil {
 		t.Error("should fail to generate cached test")
 	}
 
-	d.TraceFromCachedTrace(c, faketime, string(cachedTest))
+	d.TraceFromCachedTrace(c, faketime, []byte(cachedTest))
 
 	// Unmarshal the first line of the output file.
 	b, err := ioutil.ReadFile(tempdir + "/2019/04/01/20190401T034551Z_" + prefix.UnsafeString() + "_0000000000000001.json")
@@ -286,7 +286,7 @@ func TestCreateCacheTest(t *testing.T) {
 
 	// Now test an error condition.
 	d.OutputPath = "/dev/null"
-	if d.TraceFromCachedTrace(c, faketime, cachedTest) == nil {
+	if d.TraceFromCachedTrace(c, faketime, []byte(cachedTest)) == nil {
 		t.Error("Should have had a test failure tryin gto write to /dev/null")
 	}
 }

@@ -40,7 +40,7 @@ func (*Scamper) generateFilename(cookie string, t time.Time) string {
 }
 
 // New version that create test from cached trace
-func (s *Scamper) TraceFromCachedTrace(conn connection.Connection, t time.Time, cachedTest string) error {
+func (s *Scamper) TraceFromCachedTrace(conn connection.Connection, t time.Time, cachedTest []byte) error {
 	dir, err := createTimePath(s.OutputPath, t)
 	if err != nil {
 		log.Println("Could not create directories")
@@ -80,7 +80,7 @@ func (*Scamper) DontTrace(conn connection.Connection, err error) {
 // Trace starts a new scamper process running the paris-traceroute algorithm to
 // every node. This uses more resources per-traceroute, but segfaults in the
 // called binaries have a much smaller "blast radius".
-func (s *Scamper) Trace(conn connection.Connection, t time.Time) (out string, err error) {
+func (s *Scamper) Trace(conn connection.Connection, t time.Time) (out []byte, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			log.Printf("Recovered (%v) a crashed trace for %v at %v\n", r, conn, t)
@@ -94,7 +94,7 @@ func (s *Scamper) Trace(conn connection.Connection, t time.Time) (out string, er
 }
 
 // trace a single connection using scamper as a standalone binary.
-func (s *Scamper) trace(conn connection.Connection, t time.Time) (string, error) {
+func (s *Scamper) trace(conn connection.Connection, t time.Time) ([]byte, error) {
 	dir, err := createTimePath(s.OutputPath, t)
 	rtx.PanicOnError(err, "Could not create directory")
 	filename := dir + s.generateFilename(conn.Cookie, t)
@@ -112,7 +112,7 @@ func (s *Scamper) trace(conn connection.Connection, t time.Time) (string, error)
 	tracesPerformed.WithLabelValues("scamper").Inc()
 	if err != nil && err.Error() == pipe.ErrTimeout.Error() {
 		log.Println("TimeOut for Trace: ", cmd)
-		return "", err
+		return []byte{}, err
 	}
 
 	rtx.PanicOnError(err, "Command %v failed", cmd)
@@ -123,10 +123,10 @@ func (s *Scamper) trace(conn connection.Connection, t time.Time) (string, error)
 	if err != nil {
 		// Here we allow the original test sent back for cached test
 		// when adding annotation did not succeed.
-		return string(buff.Bytes()), err
+		return buff.Bytes(), err
 	}
 	rtx.PanicOnError(ioutil.WriteFile(filename, converted, 0666), "Could not save output to file")
-	return string(converted), nil
+	return converted, nil
 }
 
 // ScamperDaemon contains a single instance of a scamper process. Once the ScamperDaemon has
@@ -191,7 +191,7 @@ func (d *ScamperDaemon) MustStart(ctx context.Context) {
 // All checks inside of this function and its subfunctions should call
 // PanicOnError instead of Must because each trace is independent of the others,
 // so we should prevent a single failed trace from crashing everything.
-func (d *ScamperDaemon) Trace(conn connection.Connection, t time.Time) (out string, err error) {
+func (d *ScamperDaemon) Trace(conn connection.Connection, t time.Time) (out []byte, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			log.Printf("Recovered (%v) a crashed trace for %v at %v\n", r, conn, t)
@@ -233,7 +233,7 @@ func ConvertTrace(buff []byte, client ipservice.Client) ([]byte, error) {
 	return parser.InsertAnnotation(ann, buff)
 }
 
-func (d *ScamperDaemon) trace(conn connection.Connection, t time.Time) (string, error) {
+func (d *ScamperDaemon) trace(conn connection.Connection, t time.Time) ([]byte, error) {
 	dir, err := createTimePath(d.OutputPath, t)
 	rtx.PanicOnError(err, "Could not create directory")
 	filename := dir + d.generateFilename(conn.Cookie, t)
@@ -256,13 +256,13 @@ func (d *ScamperDaemon) trace(conn connection.Connection, t time.Time) (string, 
 	tracesPerformed.WithLabelValues("scamper-daemon").Inc()
 	if err != nil && err.Error() == pipe.ErrTimeout.Error() {
 		log.Println("TimeOut for Trace: ", cmd)
-		return "", err
+		return []byte{}, err
 	}
 
 	converted, err := ConvertTrace(buff.Bytes(), d.AnnotationClient)
 	if err != nil {
-		return "", err
+		return []byte{}, err
 	}
 	rtx.PanicOnError(ioutil.WriteFile(filename, converted, 0666), "Could not save output to file")
-	return string(converted), nil
+	return converted, nil
 }
