@@ -6,7 +6,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"flag"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -94,29 +93,6 @@ func (s *Scamper) Trace(conn connection.Connection, t time.Time) (out string, er
 	return s.trace(conn, t)
 }
 
-// ConvertTrace extracts the IPs from the original jsonl output,
-// fetch annotation from IP service provided by uuid annotation,
-// and convert it to schema.PTTest format with annotation inserted.
-func (s *Scamper) ConvertTrace(buff []byte) ([]byte, error) {
-	// Parse the buffer to get the IP list
-	iplist := parser.ExtractIP(buff)
-	// Fetch annoatation for the IPs
-	ann := make(map[string]*annotator.ClientAnnotations)
-	var err error
-	if len(iplist) > 0 {
-		*ipservice.SocketFilename = "/var/local/uuidannotatorsocket/annotator.sock"
-	        client = ipservice.NewClient(*ipservice.SocketFilename)
-		ann, err = client.Annotate(context.Background(), iplist)
-		log.Println(err)
-		if err != nil {
-			log.Println("Cannot fetch annotation from ip service")
-		}
-	}
-
-	// add annotation to the final output
-	return parser.InsertAnnotation(ann, buff)
-}
-
 // trace a single connection using scamper as a standalone binary.
 func (s *Scamper) trace(conn connection.Connection, t time.Time) (string, error) {
 	dir, err := createTimePath(s.OutputPath, t)
@@ -141,7 +117,9 @@ func (s *Scamper) trace(conn connection.Connection, t time.Time) (string, error)
 
 	rtx.PanicOnError(err, "Command %v failed", cmd)
 
-	converted, err := s.ConvertTrace(buff.Bytes())
+	*ipservice.SocketFilename = "/var/local/uuidannotatorsocket/annotator.sock"
+	client := ipservice.NewClient(*ipservice.SocketFilename)
+	converted, err := ConvertTrace(buff.Bytes(), client)
 	if err != nil {
 		// Here we allow the original test sent back for cached test
 		// when adding annotation did not succeed.
@@ -162,7 +140,7 @@ func (s *Scamper) trace(conn connection.Connection, t time.Time) (string, error)
 type ScamperDaemon struct {
 	*Scamper
 	AttachBinary, Warts2JSONBinary, ControlSocket string
-	AnnotationClient   ipservice.Client
+	AnnotationClient                              ipservice.Client
 }
 
 // MustStart starts a scamper binary running and listening to the given context.
@@ -184,7 +162,7 @@ func (d *ScamperDaemon) MustStart(ctx context.Context) {
 	command := exec.Command(d.Binary, "-U", d.ControlSocket)
 	// Start is non-blocking.
 	rtx.Must(command.Start(), "Could not start daemon")
-	
+
 	*ipservice.SocketFilename = "/var/local/uuidannotatorsocket/annotator.sock"
 	d.AnnotationClient = ipservice.NewClient(*ipservice.SocketFilename)
 
@@ -237,14 +215,14 @@ func (d *ScamperDaemon) TraceAll(connections []connection.Connection) {
 // ConvertTrace extracts the IPs from the original jsonl output,
 // fetch annotation from IP service provided by uuid annotation,
 // and convert it to schema.PTTest format with annotation inserted.
-func (d *ScamperDaemon) ConvertTrace(buff []byte) ([]byte, error) {
+func ConvertTrace(buff []byte, client ipservice.Client) ([]byte, error) {
 	// Parse the buffer to get the IP list
 	iplist := parser.ExtractIP(buff)
 	// Fetch annoatation for the IPs
 	ann := make(map[string]*annotator.ClientAnnotations)
 	var err error
 	if len(iplist) > 0 {
-		ann, err = d.AnnoationClient.Annotate(context.Background(), iplist)
+		ann, err = client.Annotate(context.Background(), iplist)
 		log.Println(err)
 		if err != nil {
 			log.Println("Cannot fetch annotation from ip service")
@@ -281,7 +259,7 @@ func (d *ScamperDaemon) trace(conn connection.Connection, t time.Time) (string, 
 		return "", err
 	}
 
-	converted, err := d.ConvertTrace(buff.Bytes())
+	converted, err := ConvertTrace(buff.Bytes(), d.AnnotationClient)
 	if err != nil {
 		return "", err
 	}
