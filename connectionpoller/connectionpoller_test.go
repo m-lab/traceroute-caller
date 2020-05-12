@@ -126,11 +126,11 @@ type testTracer struct {
 	answers []map[connection.Connection]struct{}
 }
 
-func (tt *testTracer) Trace(conn connection.Connection, t time.Time) (string, error) {
-	return "Fake Trace test", nil
+func (tt *testTracer) Trace(conn connection.Connection, t time.Time) ([]byte, error) {
+	return []byte("Fake Trace test"), nil
 }
 
-func (tt *testTracer) TraceFromCachedTrace(conn connection.Connection, t time.Time, cachedTest string) error {
+func (tt *testTracer) TraceFromCachedTrace(conn connection.Connection, t time.Time, cachedTest []byte) error {
 	return nil
 }
 
