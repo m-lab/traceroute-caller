@@ -17,6 +17,7 @@ import (
 
 	"github.com/m-lab/go/rtx"
 	"github.com/m-lab/traceroute-caller/connection"
+	"github.com/m-lab/traceroute-caller/ipcache"
 	"github.com/m-lab/traceroute-caller/parser"
 	"github.com/m-lab/traceroute-caller/schema"
 	"github.com/m-lab/uuid"
@@ -24,6 +25,37 @@ import (
 	"github.com/m-lab/uuid-annotator/ipservice"
 	pipe "gopkg.in/m-lab/pipe.v3"
 )
+
+// ScamperData implement ipcache.TracerouteData
+type ScamperData struct {
+	data []byte
+}
+
+func (sd *ScamperData) Serialize() string {
+	return string(sd.data)
+}
+
+func (sd *ScamperData) GetData() []byte {
+	return sd.data
+}
+
+func (sd *ScamperData) AnnotateHops(client ipservice.Client) error {
+	iplist := parser.ExtractIP(sd.data)
+	// Fetch annoatation for the IPs
+	ann := make(map[string]*annotator.ClientAnnotations)
+	var err error
+	if len(iplist) > 0 {
+		ann, err = client.Annotate(context.Background(), iplist)
+		log.Println(err)
+		if err != nil {
+			log.Println("Cannot fetch annotation from ip service")
+		}
+	}
+
+	// add annotation to the final output
+	sd.data, err = parser.InsertAnnotation(ann, sd.data)
+	return err
+}
 
 // Scamper uses scamper in non-daemon mode to perform traceroutes. This is much
 // less efficient, but when scamper crashes, it has a much lower "blast radius".
@@ -40,7 +72,7 @@ func (*Scamper) generateFilename(cookie string, t time.Time) string {
 }
 
 // New version that create test from cached trace
-func (s *Scamper) TraceFromCachedTrace(conn connection.Connection, t time.Time, cachedTest []byte) error {
+func (s *Scamper) TraceFromCachedTrace(conn connection.Connection, t time.Time, cachedTest ipcache.TracerouteData) error {
 	dir, err := createTimePath(s.OutputPath, t)
 	if err != nil {
 		log.Println("Could not create directories")
@@ -52,7 +84,7 @@ func (s *Scamper) TraceFromCachedTrace(conn connection.Connection, t time.Time, 
 
 	// remove the first line of cachedTest
 	var cachedTestJson schema.PTTestRaw
-	err = json.Unmarshal([]byte(cachedTest), &cachedTestJson)
+	err = json.Unmarshal(cachedTest.(*ScamperData).GetData(), &cachedTestJson)
 
 	if err != nil {
 		log.Println("Invalid cached test")
@@ -80,7 +112,7 @@ func (*Scamper) DontTrace(conn connection.Connection, err error) {
 // Trace starts a new scamper process running the paris-traceroute algorithm to
 // every node. This uses more resources per-traceroute, but segfaults in the
 // called binaries have a much smaller "blast radius".
-func (s *Scamper) Trace(conn connection.Connection, t time.Time) (out []byte, err error) {
+func (s *Scamper) Trace(conn connection.Connection, t time.Time) (out ipcache.TracerouteData, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			log.Printf("Recovered (%v) a crashed trace for %v at %v\n", r, conn, t)
@@ -94,7 +126,7 @@ func (s *Scamper) Trace(conn connection.Connection, t time.Time) (out []byte, er
 }
 
 // trace a single connection using scamper as a standalone binary.
-func (s *Scamper) trace(conn connection.Connection, t time.Time) ([]byte, error) {
+func (s *Scamper) trace(conn connection.Connection, t time.Time) (ipcache.TracerouteData, error) {
 	dir, err := createTimePath(s.OutputPath, t)
 	rtx.PanicOnError(err, "Could not create directory")
 	filename := dir + s.generateFilename(conn.Cookie, t)
@@ -112,21 +144,20 @@ func (s *Scamper) trace(conn connection.Connection, t time.Time) ([]byte, error)
 	tracesPerformed.WithLabelValues("scamper").Inc()
 	if err != nil && err.Error() == pipe.ErrTimeout.Error() {
 		log.Println("TimeOut for Trace: ", cmd)
-		return []byte{}, err
+		return nil, err
 	}
 
 	rtx.PanicOnError(err, "Command %v failed", cmd)
 
 	*ipservice.SocketFilename = "/var/local/uuidannotatorsocket/annotator.sock"
 	client := ipservice.NewClient(*ipservice.SocketFilename)
-	converted, err := ConvertTrace(buff.Bytes(), client)
+	sd := ScamperData{data: buff.Bytes()}
+	err = sd.AnnotateHops(client)
 	if err != nil {
-		// Here we allow the original test sent back for cached test
-		// when adding annotation did not succeed.
-		return buff.Bytes(), err
+		return nil, err
 	}
-	rtx.PanicOnError(ioutil.WriteFile(filename, converted, 0666), "Could not save output to file")
-	return converted, nil
+	rtx.PanicOnError(ioutil.WriteFile(filename, sd.GetData(), 0666), "Could not save output to file")
+	return &sd, nil
 }
 
 // ScamperDaemon contains a single instance of a scamper process. Once the ScamperDaemon has
@@ -191,7 +222,7 @@ func (d *ScamperDaemon) MustStart(ctx context.Context) {
 // All checks inside of this function and its subfunctions should call
 // PanicOnError instead of Must because each trace is independent of the others,
 // so we should prevent a single failed trace from crashing everything.
-func (d *ScamperDaemon) Trace(conn connection.Connection, t time.Time) (out []byte, err error) {
+func (d *ScamperDaemon) Trace(conn connection.Connection, t time.Time) (out ipcache.TracerouteData, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			log.Printf("Recovered (%v) a crashed trace for %v at %v\n", r, conn, t)
@@ -212,28 +243,7 @@ func (d *ScamperDaemon) TraceAll(connections []connection.Connection) {
 	}
 }
 
-// ConvertTrace extracts the IPs from the original jsonl output,
-// fetch annotation from IP service provided by uuid annotation,
-// and convert it to schema.PTTest format with annotation inserted.
-func ConvertTrace(buff []byte, client ipservice.Client) ([]byte, error) {
-	// Parse the buffer to get the IP list
-	iplist := parser.ExtractIP(buff)
-	// Fetch annoatation for the IPs
-	ann := make(map[string]*annotator.ClientAnnotations)
-	var err error
-	if len(iplist) > 0 {
-		ann, err = client.Annotate(context.Background(), iplist)
-		log.Println(err)
-		if err != nil {
-			log.Println("Cannot fetch annotation from ip service")
-		}
-	}
-
-	// add annotation to the final output
-	return parser.InsertAnnotation(ann, buff)
-}
-
-func (d *ScamperDaemon) trace(conn connection.Connection, t time.Time) ([]byte, error) {
+func (d *ScamperDaemon) trace(conn connection.Connection, t time.Time) (ipcache.TracerouteData, error) {
 	dir, err := createTimePath(d.OutputPath, t)
 	rtx.PanicOnError(err, "Could not create directory")
 	filename := dir + d.generateFilename(conn.Cookie, t)
@@ -256,13 +266,15 @@ func (d *ScamperDaemon) trace(conn connection.Connection, t time.Time) ([]byte, 
 	tracesPerformed.WithLabelValues("scamper-daemon").Inc()
 	if err != nil && err.Error() == pipe.ErrTimeout.Error() {
 		log.Println("TimeOut for Trace: ", cmd)
-		return []byte{}, err
+		return nil, err
 	}
 
-	converted, err := ConvertTrace(buff.Bytes(), d.AnnotationClient)
+	sd := ScamperData{data: buff.Bytes()}
+	sd.AnnotateHops(d.AnnotationClient)
+
 	if err != nil {
-		return []byte{}, err
+		return nil, err
 	}
-	rtx.PanicOnError(ioutil.WriteFile(filename, converted, 0666), "Could not save output to file")
-	return converted, nil
+	rtx.PanicOnError(ioutil.WriteFile(filename, sd.GetData(), 0666), "Could not save output to file")
+	return &sd, nil
 }
