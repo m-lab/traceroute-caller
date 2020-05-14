@@ -32,6 +32,10 @@ func (td testData) Serialize() string {
 	return string(td.data)
 }
 
+func (td testData) GetData() []byte {
+	return td.data
+}
+
 func (td testData) AnnotateHops(client ipservice.Client) error {
 	return nil
 }

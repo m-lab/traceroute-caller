@@ -84,7 +84,7 @@ func (s *Scamper) TraceFromCachedTrace(conn connection.Connection, t time.Time, 
 
 	// remove the first line of cachedTest
 	var cachedTestJson schema.PTTestRaw
-	err = json.Unmarshal(cachedTest.(*ScamperData).GetData(), &cachedTestJson)
+	err = json.Unmarshal(cachedTest.GetData(), &cachedTestJson)
 
 	if err != nil {
 		log.Println("Invalid cached test")
