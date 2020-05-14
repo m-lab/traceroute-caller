@@ -14,6 +14,7 @@ import (
 	"github.com/go-test/deep"
 	"github.com/m-lab/tcp-info/inetdiag"
 	"github.com/m-lab/uuid"
+	"github.com/m-lab/uuid-annotator/ipservice"
 
 	"github.com/m-lab/traceroute-caller/connection"
 	"github.com/m-lab/traceroute-caller/connectionlistener"
@@ -23,22 +24,34 @@ import (
 	"github.com/m-lab/tcp-info/eventsocket"
 )
 
+type testData struct {
+	data []byte
+}
+
+func (td testData) Serialize() string {
+	return string(td.data)
+}
+
+func (td testData) AnnotateHops(client ipservice.Client) error {
+	return nil
+}
+
 type fakeTracer struct {
 	ips   []string
 	mutex sync.Mutex
 	wg    sync.WaitGroup
 }
 
-func (ft *fakeTracer) Trace(conn connection.Connection, t time.Time) ([]byte, error) {
+func (ft *fakeTracer) Trace(conn connection.Connection, t time.Time) (ipcache.TracerouteData, error) {
 	ft.mutex.Lock() // Must have a lock to avoid race conditions around the append.
 	defer ft.mutex.Unlock()
 	log.Println("Tracing", conn)
 	ft.ips = append(ft.ips, conn.RemoteIP)
 	ft.wg.Done()
-	return []byte("Fake test Result"), nil
+	return testData{data: []byte("Fake test Result")}, nil
 }
 
-func (ft *fakeTracer) TraceFromCachedTrace(conn connection.Connection, t time.Time, cachedTest []byte) error {
+func (ft *fakeTracer) TraceFromCachedTrace(conn connection.Connection, t time.Time, cachedTest ipcache.TracerouteData) error {
 	log.Println("Create cached test for: ", conn)
 	return nil
 }
