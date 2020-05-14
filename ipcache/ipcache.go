@@ -25,19 +25,6 @@ type TracerouteData interface {
 	AnnotateHops(ipservice.Client) error
 }
 
-/*
-type ScamperData struct {
-	data []byte
-}
-
-func (sd *ScamperData) Serialize() string {
-	return string(sd.data)
-}
-
-func (sd *ScamperData) AnnotateHops(client ipservice.Client) error {
-	return nil
-} */
-
 // Tracer is the generic interface for all things that can perform a traceroute.
 type Tracer interface {
 	Trace(conn connection.Connection, t time.Time) (TracerouteData, error)
