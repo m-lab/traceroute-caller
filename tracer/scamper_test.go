@@ -50,13 +50,9 @@ func TestScamper(t *testing.T) {
 	if err == nil || err.Error() != "Invalid test" {
 		t.Error("The faked test should fail the parsing for annotation")
 	}
-	uuid, err := conn.UUID()
-	rtx.Must(err, "Could not make uuid")
-	expected := `{"UUID":"` + uuid + `","TracerouteCallerVersion":"` + prometheusx.GitShortCommit + `","CachedResult":false,"CachedUUID":""}
--I tracelb -P icmp-echo -q 3 -O ptr 10.1.1.1 -o- -O json
-`
-	if strings.TrimSpace(out.Serialize()) != strings.TrimSpace(expected) {
-		t.Error("Bad output:", out)
+
+	if out != nil {
+		t.Error("Should return empty output")
 	}
 
 	s.Binary = "false"
@@ -254,13 +250,13 @@ func TestCreateCacheTest(t *testing.T) {
 	prometheusx.GitShortCommit = "Fake Version"
 	cachedTest := `{"uuid":"\"ndt-plh7v_1566050090_000000000004D64D\"","testtime":"0001-01-01T00:00:00Z","parseinfo":{"TaskFileName":"","ParseTime":"0001-01-01T00:00:00Z","ParserVersion":"","Filename":""},"start_time":1566691298,"stop_time":1566691298,"scamper_version":"\"0.1\"","source":{"IP":"::ffff:180.87.97.101","Port":0,"IATA":"","Geo":null,"Network":null},"destination":{"IP":"::ffff:1.47.236.62","Port":0,"Geo":null,"Network":null},"probe_size":60,"probec":0,"hop":null,"exp_version":"\"\"","cached_result":false}`
 
-	d.TraceFromCachedTrace(c, faketime, ScamperData{data: []byte(`Broken cached test`)})
+	d.TraceFromCachedTrace(c, faketime, &ScamperData{data: []byte(`Broken cached test`)})
 	_, errInvalidTest := ioutil.ReadFile(tempdir + "/2019/04/01/20190401T034551Z_" + prefix.UnsafeString() + "_0000000000000001.jsonl")
 	if errInvalidTest == nil {
 		t.Error("should fail to generate cached test")
 	}
 
-	d.TraceFromCachedTrace(c, faketime, []byte(cachedTest))
+	d.TraceFromCachedTrace(c, faketime, &ScamperData{data: []byte(cachedTest)})
 
 	// Unmarshal the first line of the output file.
 	b, err := ioutil.ReadFile(tempdir + "/2019/04/01/20190401T034551Z_" + prefix.UnsafeString() + "_0000000000000001.json")
@@ -286,7 +282,7 @@ func TestCreateCacheTest(t *testing.T) {
 
 	// Now test an error condition.
 	d.OutputPath = "/dev/null"
-	if d.TraceFromCachedTrace(c, faketime, []byte(cachedTest)) == nil {
+	if d.TraceFromCachedTrace(c, faketime, &ScamperData{data: []byte(cachedTest)}) == nil {
 		t.Error("Should have had a test failure tryin gto write to /dev/null")
 	}
 }
@@ -354,7 +350,7 @@ func assertScamperDaemonIsTracer(d *ScamperDaemon) {
 	func(t ipcache.Tracer) {}(d)
 }
 
-func TestConvertTrace(t *testing.T) {
+func TestAnnotateHops(t *testing.T) {
 	// Test IP service not exist
 	testStr := `{"UUID": "ndt-plh7v_1566050090_000000000004D60F"}
 	{"type":"cycle-start", "list_name":"/tmp/scamperctrl:51803", "id":1, "hostname":"ndt-plh7v", "start_time":1566691268}
@@ -362,11 +358,13 @@ func TestConvertTrace(t *testing.T) {
 	{"type":"cycle-stop", "list_name":"/tmp/scamperctrl:51803", "id":1, "hostname":"ndt-plh7v", "stop_time":1566691541}
 	`
 
+	scamperData := &ScamperData{data: []byte(testStr)}
 	client := ipservice.NewClient("")
-	_, err := ConvertTrace([]byte(testStr), client)
+	err := scamperData.AnnotateHops(client)
 	if err != nil {
 		t.Error("Should not fail with IP service not exist at all")
 	}
+
 	// Create fake service
 	dir, err := ioutil.TempDir("", "ExampleFakeServerForTesting")
 	rtx.Must(err, "could not create tempdir")
@@ -382,15 +380,15 @@ func TestConvertTrace(t *testing.T) {
 	go srv.Serve()
 
 	client2 := ipservice.NewClient(*ipservice.SocketFilename)
-	output, err := ConvertTrace([]byte(testStr), client2)
+	scamperData2 := &ScamperData{data: []byte(testStr)}
+	err = scamperData2.AnnotateHops(client2)
 
 	if err != nil {
 		t.Error("Should succeed here")
 	}
 	// Notice that "asn" is 5 for IP "1.2.3.4"
-	expectedOutput := `{"schema_version":"\"1\"","uuid":"\"ndt-plh7v_1566050090_000000000004D60F\"","testtime":"0001-01-01T00:00:00Z","start_time":1566691268,"stop_time":1566691541,"scamper_version":"\"0.1\"","serverIP":"\"2001:550:1b01:1:e41d:2d00:151:f6c0\"","clientIP":"\"2600:1009:b013:1a59:c369:b528:98fd:ab43\"","probe_size":60,"probec":85,"hop":[{"source":{"ip":"\"1.2.3.4\"","city":"\"\"","country_code":"\"\"","hostname":"\"\"","asn":5},"linkc":1,"link":[{"hop_dst_ip":"\"2001:550:3::1ca\"","ttl":2,"probes":[{"flowid":1,"rtt":[36.803]},{"flowid":2,"rtt":[0.332]},{"flowid":3,"rtt":[0.329]},{"flowid":4,"rtt":[0.567]},{"flowid":5,"rtt":[0.329]},{"flowid":6,"rtt":[1.237]}]}]},{"source":{"ip":"\"1.2.3.4\"","city":"\"\"","country_code":"\"\"","hostname":"\"\"","asn":0},"linkc":1,"link":[{"hop_dst_ip":"\"2001:550:3::1ca\"","ttl":2,"probes":[{"flowid":1,"rtt":[36.803]},{"flowid":2,"rtt":[0.332]},{"flowid":3,"rtt":[0.329]},{"flowid":4,"rtt":[0.567]},{"flowid":5,"rtt":[0.329]},{"flowid":6,"rtt":[1.237]}]}]},{"source":{"ip":"\"2001:550:3::1ca\"","city":"\"\"","country_code":"\"\"","hostname":"\"\"","asn":0},"linkc":1,"link":[{"hop_dst_ip":"\"2600:803::79\"","ttl":3,"probes":[{"flowid":1,"rtt":[17.333]},{"flowid":2,"rtt":[18.218]},{"flowid":3,"rtt":[21.073]},{"flowid":4,"rtt":[17.319]},{"flowid":5,"rtt":[17.358]},{"flowid":6,"rtt":[23.343]}]}]},{"source":{"ip":"\"2001:550:3::1ca\"","city":"\"\"","country_code":"\"\"","hostname":"\"\"","asn":0},"linkc":1,"link":[{"hop_dst_ip":"\"2600:803::79\"","ttl":3,"probes":[{"flowid":1,"rtt":[17.333]},{"flowid":2,"rtt":[18.218]},{"flowid":3,"rtt":[21.073]},{"flowid":4,"rtt":[17.319]},{"flowid":5,"rtt":[17.358]},{"flowid":6,"rtt":[23.343]}]}]},{"source":{"ip":"\"2600:803::79\"","city":"\"\"","country_code":"\"\"","hostname":"\"\"","asn":0},"linkc":1,"link":[{"hop_dst_ip":"\"2600:803:150f::4a\"","ttl":4,"probes":[{"flowid":1,"rtt":[22.481]},{"flowid":2,"rtt":[24.043]},{"flowid":3,"rtt":[22.379]},{"flowid":4,"rtt":[22.392]},{"flowid":5,"rtt":[22.417]},{"flowid":6,"rtt":[22.572]}]}]},{"source":{"ip":"\"2600:803::79\"","city":"\"\"","country_code":"\"\"","hostname":"\"\"","asn":0},"linkc":1,"link":[{"hop_dst_ip":"\"2600:803:150f::4a\"","ttl":4,"probes":[{"flowid":1,"rtt":[22.481]},{"flowid":2,"rtt":[24.043]},{"flowid":3,"rtt":[22.379]},{"flowid":4,"rtt":[22.392]},{"flowid":5,"rtt":[22.417]},{"flowid":6,"rtt":[22.572]}]}]},{"source":{"ip":"\"2600:803:150f::4a\"","city":"\"\"","country_code":"\"\"","hostname":"\"\"","asn":0},"linkc":1,"link":[{"hop_dst_ip":"\"2001:4888:36:1002:3a2:1:0:1\"","ttl":5,"probes":[{"flowid":1,"rtt":[25.645]},{"flowid":2,"rtt":[23.055]},{"flowid":3,"rtt":[29.006]},{"flowid":4,"rtt":[25.995]},{"flowid":5,"rtt":[23.122]},{"flowid":6,"rtt":[27.896]}]}]},{"source":{"ip":"\"2600:803:150f::4a\"","city":"\"\"","country_code":"\"\"","hostname":"\"\"","asn":0},"linkc":1,"link":[{"hop_dst_ip":"\"2001:4888:36:1002:3a2:1:0:1\"","ttl":5,"probes":[{"flowid":1,"rtt":[25.645]},{"flowid":2,"rtt":[23.055]},{"flowid":3,"rtt":[29.006]},{"flowid":4,"rtt":[25.995]},{"flowid":5,"rtt":[23.122]},{"flowid":6,"rtt":[27.896]}]}]},{"source":{"ip":"\"2001:4888:36:1002:3a2:1:0:1\"","city":"\"\"","country_code":"\"\"","hostname":"\"\"","asn":0},"linkc":1,"link":[{"hop_dst_ip":"\"2001:4888:3f:6092:3a2:26:0:1\"","ttl":6,"probes":[{"flowid":1,"rtt":[23.099]},{"flowid":2,"rtt":[23.069]},{"flowid":3,"rtt":[23.162]},{"flowid":4,"rtt":[23.051]},{"flowid":5,"rtt":[23.118]},{"flowid":6,"rtt":[23.009]}]}]},{"source":{"ip":"\"2001:4888:36:1002:3a2:1:0:1\"","city":"\"\"","country_code":"\"\"","hostname":"\"\"","asn":0},"linkc":1,"link":[{"hop_dst_ip":"\"2001:4888:3f:6092:3a2:26:0:1\"","ttl":6,"probes":[{"flowid":1,"rtt":[23.099]},{"flowid":2,"rtt":[23.069]},{"flowid":3,"rtt":[23.162]},{"flowid":4,"rtt":[23.051]},{"flowid":5,"rtt":[23.118]},{"flowid":6,"rtt":[23.009]}]}]},{"source":{"ip":"\"2001:4888:3f:6092:3a2:26:0:1\"","city":"\"\"","country_code":"\"\"","hostname":"\"\"","asn":0},"linkc":1,"link":null}],"cached_result":false,"cached_uuid":"\"\"","traceroutecaller_commit":"\"\""}`
-
-	if string(output) != string(expectedOutput) {
+	expectedOutput := `{"schema_version":"\"1\"","uuid":"\"ndt-plh7v_1566050090_000000000004D60F\"","testtime":"0001-01-01T00:00:00Z","start_time":1566691268,"stop_time":1566691541,"scamper_version":"\"0.1\"","serverIP":"\"2001:550:1b01:1:e41d:2d00:151:f6c0\"","clientIP":"\"2600:1009:b013:1a59:c369:b528:98fd:ab43\"","probe_size":60,"probec":85,"hop":[{"source":{"ip":"\"1.2.3.4\"","city":"\"\"","country_code":"\"\"","hostname":"\"\"","asn":5},"linkc":1,"link":[{"hop_dst_ip":"\"2001:550:3::1ca\"","ttl":2,"probes":[{"flowid":1,"rtt":[36.803]},{"flowid":2,"rtt":[0.332]},{"flowid":3,"rtt":[0.329]},{"flowid":4,"rtt":[0.567]},{"flowid":5,"rtt":[0.329]},{"flowid":6,"rtt":[1.237]}]}]},{"source":{"ip":"\"2001:550:3::1ca\"","city":"\"\"","country_code":"\"\"","hostname":"\"\"","asn":0},"linkc":1,"link":[{"hop_dst_ip":"\"2600:803::79\"","ttl":3,"probes":[{"flowid":1,"rtt":[17.333]},{"flowid":2,"rtt":[18.218]},{"flowid":3,"rtt":[21.073]},{"flowid":4,"rtt":[17.319]},{"flowid":5,"rtt":[17.358]},{"flowid":6,"rtt":[23.343]}]}]},{"source":{"ip":"\"2600:803::79\"","city":"\"\"","country_code":"\"\"","hostname":"\"\"","asn":0},"linkc":1,"link":[{"hop_dst_ip":"\"2600:803:150f::4a\"","ttl":4,"probes":[{"flowid":1,"rtt":[22.481]},{"flowid":2,"rtt":[24.043]},{"flowid":3,"rtt":[22.379]},{"flowid":4,"rtt":[22.392]},{"flowid":5,"rtt":[22.417]},{"flowid":6,"rtt":[22.572]}]}]},{"source":{"ip":"\"2600:803:150f::4a\"","city":"\"\"","country_code":"\"\"","hostname":"\"\"","asn":0},"linkc":1,"link":[{"hop_dst_ip":"\"2001:4888:36:1002:3a2:1:0:1\"","ttl":5,"probes":[{"flowid":1,"rtt":[25.645]},{"flowid":2,"rtt":[23.055]},{"flowid":3,"rtt":[29.006]},{"flowid":4,"rtt":[25.995]},{"flowid":5,"rtt":[23.122]},{"flowid":6,"rtt":[27.896]}]}]},{"source":{"ip":"\"2001:4888:36:1002:3a2:1:0:1\"","city":"\"\"","country_code":"\"\"","hostname":"\"\"","asn":0},"linkc":1,"link":[{"hop_dst_ip":"\"2001:4888:3f:6092:3a2:26:0:1\"","ttl":6,"probes":[{"flowid":1,"rtt":[23.099]},{"flowid":2,"rtt":[23.069]},{"flowid":3,"rtt":[23.162]},{"flowid":4,"rtt":[23.051]},{"flowid":5,"rtt":[23.118]},{"flowid":6,"rtt":[23.009]}]}]},{"source":{"ip":"\"2001:4888:3f:6092:3a2:26:0:1\"","city":"\"\"","country_code":"\"\"","hostname":"\"\"","asn":0},"linkc":1,"link":null}],"cached_result":false,"cached_uuid":"\"\"","traceroutecaller_commit":"\"\""}`
+	if scamperData2.Serialize() != string(expectedOutput) {
 		t.Error("Fail to add annotation.")
 	}
 }

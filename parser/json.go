@@ -220,13 +220,13 @@ func ParseAndInsertAnnotation(ann map[string]*annotator.ClientAnnotations,
 				Linkc: oneNode.Linkc,
 				Links: links,
 			})
+		} else {
+			hops = append(hops, schema.ScamperHop{
+				Source: schema.HopIP{IP: oneNode.Addr, Hostname: oneNode.Name},
+				Linkc:  oneNode.Linkc,
+				Links:  links,
+			})
 		}
-		hops = append(hops, schema.ScamperHop{
-			Source: schema.HopIP{IP: oneNode.Addr, Hostname: oneNode.Name},
-			Linkc:  oneNode.Linkc,
-			Links:  links,
-		})
-
 	}
 
 	err = json.Unmarshal([]byte(jsonStrings[3]), &cycleStop)

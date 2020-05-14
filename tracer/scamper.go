@@ -270,7 +270,7 @@ func (d *ScamperDaemon) trace(conn connection.Connection, t time.Time) (ipcache.
 	}
 
 	sd := ScamperData{data: buff.Bytes()}
-	sd.AnnotateHops(d.AnnotationClient)
+	err = sd.AnnotateHops(d.AnnotationClient)
 
 	if err != nil {
 		return nil, err
