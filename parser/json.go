@@ -174,11 +174,10 @@ func ParseAndInsertAnnotation(ann map[string]*annotator.ClientAnnotations,
 				hopAnn := ann[oneNode.Addr]
 				hops = append(hops, schema.ScamperHop{
 					Source: schema.HopIP{
-						IP:          oneNode.Addr,
-						City:        hopAnn.Geo.City,
-						CountryCode: hopAnn.Geo.CountryCode,
-						ASN:         hopAnn.Network.ASNumber,
-						Hostname:    oneNode.Name},
+						IP:       oneNode.Addr,
+						Geo:      hopAnn.Geo,
+						Network:  hopAnn.Network,
+						Hostname: oneNode.Name},
 					Linkc: oneNode.Linkc,
 				})
 			} else {
@@ -213,10 +212,9 @@ func ParseAndInsertAnnotation(ann map[string]*annotator.ClientAnnotations,
 			hopAnn := ann[oneNode.Addr]
 			hops = append(hops, schema.ScamperHop{
 				Source: schema.HopIP{IP: oneNode.Addr,
-					City:        hopAnn.Geo.City,
-					CountryCode: hopAnn.Geo.CountryCode,
-					ASN:         hopAnn.Network.ASNumber,
-					Hostname:    oneNode.Name},
+					Geo:      hopAnn.Geo,
+					Network:  hopAnn.Network,
+					Hostname: oneNode.Name},
 				Linkc: oneNode.Linkc,
 				Links: links,
 			})

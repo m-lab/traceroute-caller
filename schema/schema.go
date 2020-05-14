@@ -2,14 +2,15 @@ package schema
 
 import (
 	"time"
+
+	"github.com/m-lab/uuid-annotator/annotator"
 )
 
 type HopIP struct {
-	IP          string `json:"ip,string"`
-	City        string `json:"city,string"`
-	CountryCode string `json:"country_code,string"`
-	Hostname    string `json:"hostname,string"`
-	ASN         uint32 `json:"asn,uint32"`
+	IP       string                 `json:"ip,string"`
+	Hostname string                 `json:"hostname,string"`
+	Geo      *annotator.Geolocation `json:"geo"`
+	Network  *annotator.Network     `json:"network"`
 }
 
 type HopProbe struct {
