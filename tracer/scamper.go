@@ -121,7 +121,10 @@ func (s *Scamper) TraceFromCachedTrace(conn connection.Connection, t time.Time, 
 	filename := dir + s.generateFilename(conn.Cookie, t)
 	log.Println("Starting a cached trace to be put in", filename)
 
-	newUUID, _ := conn.UUID()
+	newUUID, err := conn.UUID()
+	if err != nil {
+		return err
+	}
 	newTest := cachedTest.CacheTraceroute(newUUID)
 
 	if err == nil {
