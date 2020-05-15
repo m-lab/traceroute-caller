@@ -8,53 +8,7 @@ import (
 
 	"github.com/m-lab/traceroute-caller/parser"
 	"github.com/m-lab/traceroute-caller/schema"
-	"github.com/m-lab/uuid-annotator/annotator"
 )
-
-func TestInsertAnnotation(t *testing.T) {
-	fakeAnn := make(map[string]*annotator.ClientAnnotations)
-
-	var pt schema.PTTestRaw
-	output := parser.InsertAnnotation(fakeAnn, pt)
-	if !reflect.DeepEqual(pt, output) {
-		t.Error("Empty annotation should not change anything")
-	}
-
-	var hops []schema.ScamperHop
-	hops = append(hops, schema.ScamperHop{
-		Source: schema.HopIP{IP: "180.87.97.101"},
-	})
-	hops = append(hops, schema.ScamperHop{
-		Source: schema.HopIP{IP: "1.47.236.62"},
-	})
-	pt2 := schema.PTTestRaw{
-		Hop: hops,
-	}
-
-	fakeAnn["180.87.97.101"] = &annotator.ClientAnnotations{
-		Geo: &annotator.Geolocation{
-			ContinentCode: "NA",
-		},
-		Network: &annotator.Network{
-			ASNumber: 1234,
-		},
-	}
-
-	fakeAnn["1.47.236.62"] = &annotator.ClientAnnotations{
-		Geo: &annotator.Geolocation{
-			ContinentCode: "SA",
-		},
-		Network: &annotator.Network{
-			ASNumber: 5678,
-		},
-	}
-
-	output2 := parser.InsertAnnotation(fakeAnn, pt2)
-
-	if output2.Hop[0].Source.Network.ASNumber != 1234 {
-		t.Error("Cannot insert hop annotation")
-	}
-}
 
 func TestParseJsonSimple(t *testing.T) {
 	testStr := `{"UUID": "ndt-plh7v_1566050090_000000000004D64D"}

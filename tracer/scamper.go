@@ -35,6 +35,19 @@ func ExtractIP(pttest schema.PTTestRaw) []string {
 	return IPList
 }
 
+// InsertAnnotation returns a PTTestRaw with hops source IPs annotated.
+func InsertAnnotation(ann map[string]*annotator.ClientAnnotations,
+	ptTest schema.PTTestRaw) schema.PTTestRaw {
+	for i, _ := range ptTest.Hop {
+		ip := ptTest.Hop[i].Source.IP
+		if ann[ip] != nil {
+			ptTest.Hop[i].Source.Geo = ann[ip].Geo
+			ptTest.Hop[i].Source.Network = ann[ip].Network
+		}
+	}
+	return ptTest
+}
+
 // scamperData implement ipcache.TracerouteData
 type scamperData struct {
 	data schema.PTTestRaw
@@ -70,7 +83,7 @@ func (sd *scamperData) AnnotateHops(client ipservice.Client) error {
 	}
 
 	// add annotation to the final output
-	sd.data = parser.InsertAnnotation(ann, sd.data)
+	sd.data = InsertAnnotation(ann, sd.data)
 	return nil
 }
 

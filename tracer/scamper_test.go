@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -17,8 +18,8 @@ import (
 	"github.com/m-lab/go/warnonerror"
 	"github.com/m-lab/traceroute-caller/connection"
 	"github.com/m-lab/traceroute-caller/ipcache"
-	"github.com/m-lab/traceroute-caller/parser"
 	"github.com/m-lab/traceroute-caller/schema"
+	"github.com/m-lab/uuid-annotator/annotator"
 	"github.com/m-lab/uuid-annotator/asnannotator"
 	"github.com/m-lab/uuid-annotator/geoannotator"
 	"github.com/m-lab/uuid-annotator/ipservice"
@@ -36,7 +37,7 @@ func TestExtractIP(t *testing.T) {
 	pt := schema.PTTestRaw{
 		Hop: hops,
 	}
-	output := parser.ExtractIP(pt)
+	output := ExtractIP(pt)
 	if len(output) != 2 {
 		t.Error("Should be 2 hop IPs")
 	}
@@ -420,5 +421,50 @@ func TestAnnotateHops(t *testing.T) {
 	expectedOutput := `{"schema_version":"\"\"","uuid":"\"\"","testtime":"0001-01-01T00:00:00Z","start_time":0,"stop_time":0,"scamper_version":"\"\"","serverIP":"\"\"","clientIP":"\"\"","probe_size":0,"probec":0,"hop":[{"source":{"ip":"\"1.2.3.4\"","hostname":"\"\"","geo":{"Missing":true},"network":{"CIDR":"1.2.3.4/32","ASNumber":5,"ASName":"Test Number Five","Systems":[{"ASNs":[5]}]}},"linkc":0,"link":null},{"source":{"ip":"\"1.47.236.62\"","hostname":"\"\"","geo":{"Missing":true},"network":{"Missing":true}},"linkc":0,"link":null}],"cached_result":false,"cached_uuid":"\"\"","traceroutecaller_commit":"\"\""}`
 	if sd2.Serialize() != string(expectedOutput) {
 		t.Error("Fail to add annotation.")
+	}
+}
+
+func TestInsertAnnotation(t *testing.T) {
+	fakeAnn := make(map[string]*annotator.ClientAnnotations)
+
+	var pt schema.PTTestRaw
+	output := InsertAnnotation(fakeAnn, pt)
+	if !reflect.DeepEqual(pt, output) {
+		t.Error("Empty annotation should not change anything")
+	}
+
+	var hops []schema.ScamperHop
+	hops = append(hops, schema.ScamperHop{
+		Source: schema.HopIP{IP: "180.87.97.101"},
+	})
+	hops = append(hops, schema.ScamperHop{
+		Source: schema.HopIP{IP: "1.47.236.62"},
+	})
+	pt2 := schema.PTTestRaw{
+		Hop: hops,
+	}
+
+	fakeAnn["180.87.97.101"] = &annotator.ClientAnnotations{
+		Geo: &annotator.Geolocation{
+			ContinentCode: "NA",
+		},
+		Network: &annotator.Network{
+			ASNumber: 1234,
+		},
+	}
+
+	fakeAnn["1.47.236.62"] = &annotator.ClientAnnotations{
+		Geo: &annotator.Geolocation{
+			ContinentCode: "SA",
+		},
+		Network: &annotator.Network{
+			ASNumber: 5678,
+		},
+	}
+
+	output2 := InsertAnnotation(fakeAnn, pt2)
+
+	if output2.Hop[0].Source.Network.ASNumber != 1234 {
+		t.Error("Cannot insert hop annotation")
 	}
 }

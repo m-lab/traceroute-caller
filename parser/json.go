@@ -9,7 +9,6 @@ import (
 
 	"github.com/google/go-jsonnet"
 	"github.com/m-lab/traceroute-caller/schema"
-	"github.com/m-lab/uuid-annotator/annotator"
 )
 
 // Parse Scamper JSON filename like
@@ -210,14 +209,6 @@ func ParseRaw(data []byte) (schema.PTTestRaw, error) {
 	return output, nil
 }
 
-func ExtractIP(pttest schema.PTTestRaw) []string {
-	var IPList []string
-	for i, _ := range pttest.Hop {
-		IPList = append(IPList, pttest.Hop[i].Source.IP)
-	}
-	return IPList
-}
-
 // ParseJSON the raw jsonl test file into schema.PTTest.
 func ParseJSON(testName string, rawContent []byte) (schema.PTTestRaw, error) {
 	// Get the logtime
@@ -233,16 +224,4 @@ func ParseJSON(testName string, rawContent []byte) (schema.PTTestRaw, error) {
 	}
 	PTTest.TestTime = logTime
 	return PTTest, nil
-}
-
-func InsertAnnotation(ann map[string]*annotator.ClientAnnotations,
-	ptTest schema.PTTestRaw) schema.PTTestRaw {
-	for i, _ := range ptTest.Hop {
-		ip := ptTest.Hop[i].Source.IP
-		if ann[ip] != nil {
-			ptTest.Hop[i].Source.Geo = ann[ip].Geo
-			ptTest.Hop[i].Source.Network = ann[ip].Network
-		}
-	}
-	return ptTest
 }
