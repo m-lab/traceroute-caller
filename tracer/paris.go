@@ -26,6 +26,7 @@ func (pd *ParisData) GetData() []byte {
 }
 
 func (pd *ParisData) AnnotateHops(client ipservice.Client) error {
+	// TODO: annotate hops using historical Maxmind datasets.
 	return nil
 }
 

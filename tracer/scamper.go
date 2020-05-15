@@ -39,6 +39,10 @@ func (sd *ScamperData) Serialize() string {
 	return ""
 }
 
+func (sd *ScamperData) GetStructureData() schema.PTTestRaw {
+	return sd.data
+}
+
 func (sd *ScamperData) GetData() []byte {
 	testStr, err := json.Marshal(sd.data)
 	if err == nil {
@@ -90,15 +94,7 @@ func (s *Scamper) TraceFromCachedTrace(conn connection.Connection, t time.Time, 
 	filename := dir + s.generateFilename(conn.Cookie, t)
 	log.Println("Starting a cached trace to be put in", filename)
 
-	// remove the first line of cachedTest
-	var cachedTestJson schema.PTTestRaw
-	err = json.Unmarshal(cachedTest.GetData(), &cachedTestJson)
-
-	if err != nil {
-		log.Println("Invalid cached test")
-		tracerCacheErrors.WithLabelValues("scamper", "badcache").Inc()
-		return errors.New("Invalid cached test")
-	}
+	cachedTestJson := cachedTest.(*ScamperData).GetStructureData()
 
 	cachedTestJson.CachedResult = true
 	cachedTestJson.CachedUUID = cachedTestJson.UUID
