@@ -17,15 +17,11 @@ type parisData struct {
 	data []byte
 }
 
-func (pd *parisData) Serialize() string {
-	return string(pd.data)
-}
-
 func (pd *parisData) GetData() []byte {
 	return pd.data
 }
 
-func (pd *parisData) CacheTraceroute(newUUID string) ipcache.TracerouteData {
+func (pd *parisData) CachedTraceroute(newUUID string) ipcache.TracerouteData {
 	return pd
 }
 

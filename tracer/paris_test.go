@@ -38,12 +38,12 @@ func TestParis(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	if strings.TrimSpace(out.Serialize()) != "--dst-port=123 --src-port=456 10.1.1.1" {
-		t.Error("Bad output:", out.Serialize())
+	if strings.TrimSpace(string(out.GetData())) != "--dst-port=123 --src-port=456 10.1.1.1" {
+		t.Error("Bad output:", string(out.GetData()))
 	}
 	contents, err := ioutil.ReadFile(dir + "/2003/11/09/20031109T15:55:59Z-UUID-" + prefix.UnsafeString() + "_00000000000012AB.paris")
 	rtx.Must(err, "Could not read file")
-	if string(contents) != out.Serialize() {
+	if string(contents) != string(out.GetData()) {
 		t.Error("The contents of the file should equal the returned values from scraper")
 	}
 
@@ -72,7 +72,7 @@ func TestParis(t *testing.T) {
 
 	contents, err = ioutil.ReadFile(dir + "/2003/11/09/20031109T15:58:01Z-UUID-" + prefix.UnsafeString() + "_000000000000CDEF.cached.paris")
 	rtx.Must(err, "Could not read file")
-	if string(contents) != out.Serialize() {
+	if string(contents) != string(out.GetData()) {
 		t.Error("The contents of the file should equal the returned values from the original trace")
 	}
 

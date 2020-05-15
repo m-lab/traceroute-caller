@@ -28,10 +28,6 @@ type testData struct {
 	data []byte
 }
 
-func (td testData) Serialize() string {
-	return string(td.data)
-}
-
 func (td testData) GetData() []byte {
 	return td.data
 }
@@ -40,7 +36,7 @@ func (td testData) AnnotateHops(client ipservice.Client) error {
 	return nil
 }
 
-func (td testData) CacheTraceroute(newUUID string) ipcache.TracerouteData {
+func (td testData) CachedTraceroute(newUUID string) ipcache.TracerouteData {
 	return td
 }
 
@@ -75,7 +71,7 @@ func TestTrace(t *testing.T) {
 	if err != nil {
 		t.Error("trace not working correctly.")
 	}
-	if tmp.Serialize() != "Fake trace test 1.1.1.2" {
+	if string(tmp.GetData()) != "Fake trace test 1.1.1.2" {
 		t.Error("cache not trace correctly ")
 	}
 
@@ -90,7 +86,7 @@ func TestTrace(t *testing.T) {
 	if err != nil {
 		t.Error("trace not working correctly.")
 	}
-	if t2.Serialize() != "Fake trace test 1.1.1.5" {
+	if string(t2.GetData()) != "Fake trace test 1.1.1.5" {
 		t.Error("cache did not trace")
 	}
 	if tt.cctest != 0 {
@@ -227,8 +223,8 @@ func TestCacheWithBlockedTests(t *testing.T) {
 				if err != nil {
 					t.Errorf("Trace %d not done correctly.", j)
 				}
-				if s.Serialize() != expected {
-					t.Errorf("Bad trace output: %q, should be %s", s.Serialize(), expected)
+				if string(s.GetData()) != expected {
+					t.Errorf("Bad trace output: %q, should be %s", string(s.GetData()), expected)
 				}
 			}
 			if j == block || j == blockThenError {

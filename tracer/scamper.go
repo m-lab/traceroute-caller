@@ -26,8 +26,8 @@ import (
 	pipe "gopkg.in/m-lab/pipe.v3"
 )
 
-// ExtractIP returns list of hop IP sources from a traceroute.
-func ExtractIP(pttest schema.PTTestRaw) []string {
+// extractIP returns list of hop IP sources from a traceroute.
+func extractIP(pttest schema.PTTestRaw) []string {
 	var IPList []string
 	for i, _ := range pttest.Hop {
 		IPList = append(IPList, pttest.Hop[i].Source.IP)
@@ -35,8 +35,8 @@ func ExtractIP(pttest schema.PTTestRaw) []string {
 	return IPList
 }
 
-// InsertAnnotation returns a PTTestRaw with hops source IPs annotated.
-func InsertAnnotation(ann map[string]*annotator.ClientAnnotations,
+// insertAnnotation returns a PTTestRaw with hops source IPs annotated.
+func insertAnnotation(ann map[string]*annotator.ClientAnnotations,
 	ptTest schema.PTTestRaw) schema.PTTestRaw {
 	for i, _ := range ptTest.Hop {
 		ip := ptTest.Hop[i].Source.IP
@@ -53,14 +53,6 @@ type scamperData struct {
 	data schema.PTTestRaw
 }
 
-func (sd *scamperData) Serialize() string {
-	testStr, err := json.Marshal(sd.data)
-	if err == nil {
-		return string(testStr)
-	}
-	return ""
-}
-
 func (sd *scamperData) GetData() []byte {
 	testStr, err := json.Marshal(sd.data)
 	if err == nil {
@@ -70,7 +62,7 @@ func (sd *scamperData) GetData() []byte {
 }
 
 func (sd *scamperData) AnnotateHops(client ipservice.Client) error {
-	iplist := ExtractIP(sd.data)
+	iplist := extractIP(sd.data)
 	// Fetch annoatation for the IPs
 	ann := make(map[string]*annotator.ClientAnnotations)
 	var err error
@@ -83,11 +75,11 @@ func (sd *scamperData) AnnotateHops(client ipservice.Client) error {
 	}
 
 	// add annotation to the final output
-	sd.data = InsertAnnotation(ann, sd.data)
+	sd.data = insertAnnotation(ann, sd.data)
 	return nil
 }
 
-func (sd *scamperData) CacheTraceroute(newUUID string) ipcache.TracerouteData {
+func (sd *scamperData) CachedTraceroute(newUUID string) ipcache.TracerouteData {
 	var newSD scamperData
 	newSD.data = sd.data
 	newSD.data.CachedResult = true
@@ -125,7 +117,7 @@ func (s *Scamper) TraceFromCachedTrace(conn connection.Connection, t time.Time, 
 	if err != nil {
 		return err
 	}
-	newTest := cachedTest.CacheTraceroute(newUUID)
+	newTest := cachedTest.CachedTraceroute(newUUID)
 
 	if err == nil {
 		return ioutil.WriteFile(filename, newTest.GetData(), 0666)

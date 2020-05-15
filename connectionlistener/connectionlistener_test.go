@@ -28,15 +28,11 @@ type testData struct {
 	data []byte
 }
 
-func (td testData) Serialize() string {
-	return string(td.data)
-}
-
 func (td testData) GetData() []byte {
 	return td.data
 }
 
-func (td testData) CacheTraceroute(newUUID string) ipcache.TracerouteData {
+func (td testData) CachedTraceroute(newUUID string) ipcache.TracerouteData {
 	return td
 }
 

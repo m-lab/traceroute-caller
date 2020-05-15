@@ -37,7 +37,7 @@ func TestExtractIP(t *testing.T) {
 	pt := schema.PTTestRaw{
 		Hop: hops,
 	}
-	output := ExtractIP(pt)
+	output := extractIP(pt)
 	if len(output) != 2 {
 		t.Error("Should be 2 hop IPs")
 	}
@@ -239,7 +239,7 @@ func TestTraceTimeout(t *testing.T) {
 	if err.Error() != "timeout" {
 		t.Error("Should return TimeOut err, not ", err)
 	}
-	if len(data.Serialize()) != 0 {
+	if data.GetData() != nil {
 		t.Error("Should return empty string when TimeOut")
 	}
 }
@@ -419,7 +419,7 @@ func TestAnnotateHops(t *testing.T) {
 	}
 	// Notice that "asn" is 5 for IP "1.2.3.4"
 	expectedOutput := `{"schema_version":"\"\"","uuid":"\"\"","testtime":"0001-01-01T00:00:00Z","start_time":0,"stop_time":0,"scamper_version":"\"\"","serverIP":"\"\"","clientIP":"\"\"","probe_size":0,"probec":0,"hop":[{"source":{"ip":"\"1.2.3.4\"","hostname":"\"\"","geo":{"Missing":true},"network":{"CIDR":"1.2.3.4/32","ASNumber":5,"ASName":"Test Number Five","Systems":[{"ASNs":[5]}]}},"linkc":0,"link":null},{"source":{"ip":"\"1.47.236.62\"","hostname":"\"\"","geo":{"Missing":true},"network":{"Missing":true}},"linkc":0,"link":null}],"cached_result":false,"cached_uuid":"\"\"","traceroutecaller_commit":"\"\""}`
-	if sd2.Serialize() != string(expectedOutput) {
+	if string(sd2.GetData()) != string(expectedOutput) {
 		t.Error("Fail to add annotation.")
 	}
 }
@@ -428,7 +428,7 @@ func TestInsertAnnotation(t *testing.T) {
 	fakeAnn := make(map[string]*annotator.ClientAnnotations)
 
 	var pt schema.PTTestRaw
-	output := InsertAnnotation(fakeAnn, pt)
+	output := insertAnnotation(fakeAnn, pt)
 	if !reflect.DeepEqual(pt, output) {
 		t.Error("Empty annotation should not change anything")
 	}
@@ -462,7 +462,7 @@ func TestInsertAnnotation(t *testing.T) {
 		},
 	}
 
-	output2 := InsertAnnotation(fakeAnn, pt2)
+	output2 := insertAnnotation(fakeAnn, pt2)
 
 	if output2.Hop[0].Source.Network.ASNumber != 1234 {
 		t.Error("Cannot insert hop annotation")
