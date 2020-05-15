@@ -28,15 +28,23 @@ import (
 
 // ScamperData implement ipcache.TracerouteData
 type ScamperData struct {
-	data []byte
+	data schema.PTTestRaw
 }
 
 func (sd *ScamperData) Serialize() string {
-	return string(sd.data)
+	testStr, err := json.Marshal(sd.data)
+	if err == nil {
+		return string(testStr)
+	}
+	return ""
 }
 
 func (sd *ScamperData) GetData() []byte {
-	return sd.data
+	testStr, err := json.Marshal(sd.data)
+	if err == nil {
+		return []byte(testStr)
+	}
+	return nil
 }
 
 func (sd *ScamperData) AnnotateHops(client ipservice.Client) error {
@@ -53,8 +61,8 @@ func (sd *ScamperData) AnnotateHops(client ipservice.Client) error {
 	}
 
 	// add annotation to the final output
-	sd.data, err = parser.InsertAnnotation(ann, sd.data)
-	return err
+	sd.data = parser.InsertAnnotation(ann, sd.data)
+	return nil
 }
 
 // Scamper uses scamper in non-daemon mode to perform traceroutes. This is much
@@ -151,7 +159,12 @@ func (s *Scamper) trace(conn connection.Connection, t time.Time) (ipcache.Tracer
 
 	*ipservice.SocketFilename = "/var/local/uuidannotatorsocket/annotator.sock"
 	client := ipservice.NewClient(*ipservice.SocketFilename)
-	sd := ScamperData{data: buff.Bytes()}
+	pt, err := parser.ParseRaw(buff.Bytes())
+	if err != nil {
+		return nil, err
+	}
+
+	sd := ScamperData{data: pt}
 	err = sd.AnnotateHops(client)
 	if err != nil {
 		return nil, err
@@ -269,7 +282,11 @@ func (d *ScamperDaemon) trace(conn connection.Connection, t time.Time) (ipcache.
 		return nil, err
 	}
 
-	sd := ScamperData{data: buff.Bytes()}
+	pt, err := parser.ParseRaw(buff.Bytes())
+	if err != nil {
+		return nil, err
+	}
+	sd := ScamperData{data: pt}
 	err = sd.AnnotateHops(d.AnnotationClient)
 
 	if err != nil {

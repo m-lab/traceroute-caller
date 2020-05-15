@@ -140,10 +140,8 @@ func TestPTParser(t *testing.T) {
 	// TODO(dev): reformat these individual values to be more readable.
 	expected_hop := schema.ScamperHop{
 		Source: schema.HopIP{
-			IP:          "64.233.174.109",
-			City:        "",
-			CountryCode: "",
-			Hostname:    "sr05-te1-8.nuq04.net.google.com",
+			IP:       "64.233.174.109",
+			Hostname: "sr05-te1-8.nuq04.net.google.com",
 		},
 		Linkc: 0,
 		Links: []schema.HopLink{
