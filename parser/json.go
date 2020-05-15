@@ -8,9 +8,7 @@ import (
 	"strings"
 
 	"github.com/google/go-jsonnet"
-	"github.com/m-lab/go/rtx"
 	"github.com/m-lab/traceroute-caller/schema"
-	"github.com/m-lab/uuid-annotator/annotator"
 )
 
 // Parse Scamper JSON filename like
@@ -105,20 +103,7 @@ type CyclestopLine struct {
 	Stop_time float64 `json:"stop_time"`
 }
 
-func InsertAnnotation(ann map[string]*annotator.ClientAnnotations,
-	data []byte) ([]byte, error) {
-	PTTest, err := ParseAndInsertAnnotation(ann, data)
-	if err != nil {
-		return []byte{}, err
-	}
-
-	outputString, err := json.Marshal(PTTest)
-	rtx.Must(err, "cannot marshal the output")
-	return []byte(outputString), nil
-}
-
-func ParseAndInsertAnnotation(ann map[string]*annotator.ClientAnnotations,
-	data []byte) (schema.PTTestRaw, error) {
+func ParseRaw(data []byte) (schema.PTTestRaw, error) {
 	var uuid, version string
 	var resultFromCache bool
 	var hops []schema.ScamperHop
@@ -135,7 +120,7 @@ func ParseAndInsertAnnotation(ann map[string]*annotator.ClientAnnotations,
 
 	// Parse the first line for meta info.
 	err := json.Unmarshal([]byte(jsonStrings[0]), &meta)
-	log.Println(meta)
+
 	if err != nil {
 		log.Println(err)
 		return schema.PTTestRaw{}, errors.New("Invalid meta")
@@ -171,8 +156,10 @@ func ParseAndInsertAnnotation(ann map[string]*annotator.ClientAnnotations,
 		var links []schema.HopLink
 		if len(oneNode.Links) == 0 {
 			hops = append(hops, schema.ScamperHop{
-				Source: schema.HopIP{IP: oneNode.Addr, Hostname: oneNode.Name},
-				Linkc:  oneNode.Linkc,
+				Source: schema.HopIP{
+					IP:       oneNode.Addr,
+					Hostname: oneNode.Name},
+				Linkc: oneNode.Linkc,
 			})
 			continue
 		}
@@ -193,25 +180,11 @@ func ParseAndInsertAnnotation(ann map[string]*annotator.ClientAnnotations,
 			}
 			links = append(links, schema.HopLink{HopDstIP: oneLink.Addr, TTL: ttl, Probes: probes})
 		}
-		// Extract Hop Geolocation for hop IP
-		if ann[oneNode.Addr] != nil {
-			hopAnn := ann[oneNode.Addr]
-			hops = append(hops, schema.ScamperHop{
-				Source: schema.HopIP{IP: oneNode.Addr,
-					City:        hopAnn.Geo.City,
-					CountryCode: hopAnn.Geo.CountryCode,
-					ASN:         hopAnn.Network.ASNumber,
-					Hostname:    oneNode.Name},
-				Linkc: oneNode.Linkc,
-				Links: links,
-			})
-		}
 		hops = append(hops, schema.ScamperHop{
 			Source: schema.HopIP{IP: oneNode.Addr, Hostname: oneNode.Name},
 			Linkc:  oneNode.Linkc,
 			Links:  links,
 		})
-
 	}
 
 	err = json.Unmarshal([]byte(jsonStrings[3]), &cycleStop)
@@ -236,27 +209,6 @@ func ParseAndInsertAnnotation(ann map[string]*annotator.ClientAnnotations,
 	return output, nil
 }
 
-func ExtractIP(rawContent []byte) []string {
-	var IPList []string
-	var tracelb TracelbLine
-
-	jsonStrings := strings.Split(string(rawContent[:]), "\n")
-	if len(jsonStrings) < 3 {
-		return []string{}
-	}
-	// Parse the line in struct
-	err := json.Unmarshal([]byte(jsonStrings[2]), &tracelb)
-	if err != nil {
-		return []string{}
-	}
-
-	for i, _ := range tracelb.Nodes {
-		oneNode := &tracelb.Nodes[i]
-		IPList = append(IPList, oneNode.Addr)
-	}
-	return IPList
-}
-
 // ParseJSON the raw jsonl test file into schema.PTTest.
 func ParseJSON(testName string, rawContent []byte) (schema.PTTestRaw, error) {
 	// Get the logtime
@@ -265,8 +217,7 @@ func ParseJSON(testName string, rawContent []byte) (schema.PTTestRaw, error) {
 		return schema.PTTestRaw{}, err
 	}
 
-	emptyAnn := make(map[string]*annotator.ClientAnnotations)
-	PTTest, err := ParseAndInsertAnnotation(emptyAnn, rawContent)
+	PTTest, err := ParseRaw(rawContent)
 
 	if err != nil {
 		return schema.PTTestRaw{}, err

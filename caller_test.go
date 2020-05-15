@@ -8,12 +8,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/m-lab/tcp-info/eventsocket"
-
 	"github.com/m-lab/go/prometheusx"
-	"github.com/m-lab/go/rtx"
-
 	"github.com/m-lab/go/prometheusx/promtest"
+	"github.com/m-lab/go/rtx"
+	"github.com/m-lab/tcp-info/eventsocket"
 )
 
 func TestMetrics(t *testing.T) {

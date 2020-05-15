@@ -14,6 +14,7 @@ import (
 	"github.com/m-lab/go/rtx"
 	"github.com/m-lab/traceroute-caller/connection"
 	"github.com/m-lab/traceroute-caller/ipcache"
+	"github.com/m-lab/uuid-annotator/ipservice"
 	pipe "gopkg.in/m-lab/pipe.v3"
 )
 
@@ -23,12 +24,28 @@ type testTracer struct {
 	answers []map[connection.Connection]struct{}
 }
 
-func (tf *testTracer) Trace(conn connection.Connection, t time.Time) (string, error) {
-	tf.calls++
-	return "Fake trace test " + conn.RemoteIP, nil
+type testData struct {
+	data []byte
 }
 
-func (tf *testTracer) TraceFromCachedTrace(conn connection.Connection, t time.Time, cachedTest string) error {
+func (td testData) GetData() []byte {
+	return td.data
+}
+
+func (td testData) AnnotateHops(client ipservice.Client) error {
+	return nil
+}
+
+func (td testData) CachedTraceroute(newUUID string) ipcache.TracerouteData {
+	return td
+}
+
+func (tf *testTracer) Trace(conn connection.Connection, t time.Time) (ipcache.TracerouteData, error) {
+	tf.calls++
+	return testData{data: []byte("Fake trace test " + conn.RemoteIP)}, nil
+}
+
+func (tf *testTracer) TraceFromCachedTrace(conn connection.Connection, t time.Time, cachedTest ipcache.TracerouteData) error {
 	tf.cctest++
 	return nil
 }
@@ -54,7 +71,7 @@ func TestTrace(t *testing.T) {
 	if err != nil {
 		t.Error("trace not working correctly.")
 	}
-	if tmp != "Fake trace test 1.1.1.2" {
+	if string(tmp.GetData()) != "Fake trace test 1.1.1.2" {
 		t.Error("cache not trace correctly ")
 	}
 
@@ -69,7 +86,7 @@ func TestTrace(t *testing.T) {
 	if err != nil {
 		t.Error("trace not working correctly.")
 	}
-	if t2 != "Fake trace test 1.1.1.5" {
+	if string(t2.GetData()) != "Fake trace test 1.1.1.5" {
 		t.Error("cache did not trace")
 	}
 	if tt.cctest != 0 {
@@ -150,19 +167,19 @@ type pausingTracer struct {
 	successes            int64
 }
 
-func (pt *pausingTracer) Trace(conn connection.Connection, t time.Time) (string, error) {
+func (pt *pausingTracer) Trace(conn connection.Connection, t time.Time) (ipcache.TracerouteData, error) {
 	randomDelay()
 	if conn.RemoteIP == pt.traceToBlock || conn.RemoteIP == pt.traceToBlockAndError {
 		<-pt.ctx.Done()
 	}
 	atomic.AddInt64(&pt.successes, 1)
 	if conn.RemoteIP == pt.traceToError || conn.RemoteIP == pt.traceToBlockAndError {
-		return "", errors.New(pipe.ErrTimeout.Error())
+		return nil, errors.New(pipe.ErrTimeout.Error())
 	}
-	return "Trace to " + conn.RemoteIP, nil
+	return testData{data: []byte("Trace to " + conn.RemoteIP)}, nil
 }
 
-func (pt *pausingTracer) TraceFromCachedTrace(conn connection.Connection, t time.Time, cachedTest string) error {
+func (pt *pausingTracer) TraceFromCachedTrace(conn connection.Connection, t time.Time, cachedTest ipcache.TracerouteData) error {
 	randomDelay()
 	atomic.AddInt64(&pt.successes, 1)
 	return nil
@@ -206,8 +223,8 @@ func TestCacheWithBlockedTests(t *testing.T) {
 				if err != nil {
 					t.Errorf("Trace %d not done correctly.", j)
 				}
-				if s != expected {
-					t.Errorf("Bad trace output: %q, should be %s", s, expected)
+				if string(s.GetData()) != expected {
+					t.Errorf("Bad trace output: %q, should be %s", string(s.GetData()), expected)
 				}
 			}
 			if j == block || j == blockThenError {
