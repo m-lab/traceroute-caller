@@ -56,28 +56,6 @@ func TestInsertAnnotation(t *testing.T) {
 	}
 }
 
-func TestExtractIP(t *testing.T) {
-	var hops []schema.ScamperHop
-	hops = append(hops, schema.ScamperHop{
-		Source: schema.HopIP{IP: "180.87.97.101"},
-	})
-	hops = append(hops, schema.ScamperHop{
-		Source: schema.HopIP{IP: "1.47.236.62"},
-	})
-	pt := schema.PTTestRaw{
-		Hop: hops,
-	}
-
-	output := parser.ExtractIP(pt)
-	if len(output) != 2 {
-		t.Error("Should be 2 hop IPs")
-	}
-
-	if output[0] != "180.87.97.101" {
-		t.Error("Faile to extract hop IPs")
-	}
-}
-
 func TestParseJsonSimple(t *testing.T) {
 	testStr := `{"UUID": "ndt-plh7v_1566050090_000000000004D64D"}
 {"type":"cycle-start", "list_name":"/tmp/scamperctrl:51811", "id":1, "hostname":"ndt-plh7v", "start_time":1566691298}

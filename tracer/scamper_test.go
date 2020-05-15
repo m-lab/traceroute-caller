@@ -17,12 +17,34 @@ import (
 	"github.com/m-lab/go/warnonerror"
 	"github.com/m-lab/traceroute-caller/connection"
 	"github.com/m-lab/traceroute-caller/ipcache"
+	"github.com/m-lab/traceroute-caller/parser"
 	"github.com/m-lab/traceroute-caller/schema"
 	"github.com/m-lab/uuid-annotator/asnannotator"
 	"github.com/m-lab/uuid-annotator/geoannotator"
 	"github.com/m-lab/uuid-annotator/ipservice"
 	"github.com/m-lab/uuid/prefix"
 )
+
+func TestExtractIP(t *testing.T) {
+	var hops []schema.ScamperHop
+	hops = append(hops, schema.ScamperHop{
+		Source: schema.HopIP{IP: "180.87.97.101"},
+	})
+	hops = append(hops, schema.ScamperHop{
+		Source: schema.HopIP{IP: "1.47.236.62"},
+	})
+	pt := schema.PTTestRaw{
+		Hop: hops,
+	}
+	output := parser.ExtractIP(pt)
+	if len(output) != 2 {
+		t.Error("Should be 2 hop IPs")
+	}
+
+	if output[0] != "180.87.97.101" {
+		t.Error("Faile to extract hop IPs")
+	}
+}
 
 func TestScamper(t *testing.T) {
 	dir, err := ioutil.TempDir("", "TestScamper")

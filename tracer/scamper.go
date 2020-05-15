@@ -26,6 +26,15 @@ import (
 	pipe "gopkg.in/m-lab/pipe.v3"
 )
 
+// ExtractIP returns list of hop IP sources from a traceroute.
+func ExtractIP(pttest schema.PTTestRaw) []string {
+	var IPList []string
+	for i, _ := range pttest.Hop {
+		IPList = append(IPList, pttest.Hop[i].Source.IP)
+	}
+	return IPList
+}
+
 // ScamperData implement ipcache.TracerouteData
 type ScamperData struct {
 	data schema.PTTestRaw
@@ -39,10 +48,6 @@ func (sd *ScamperData) Serialize() string {
 	return ""
 }
 
-func (sd *ScamperData) GetStructureData() schema.PTTestRaw {
-	return sd.data
-}
-
 func (sd *ScamperData) GetData() []byte {
 	testStr, err := json.Marshal(sd.data)
 	if err == nil {
@@ -52,7 +57,7 @@ func (sd *ScamperData) GetData() []byte {
 }
 
 func (sd *ScamperData) AnnotateHops(client ipservice.Client) error {
-	iplist := parser.ExtractIP(sd.data)
+	iplist := ExtractIP(sd.data)
 	// Fetch annoatation for the IPs
 	ann := make(map[string]*annotator.ClientAnnotations)
 	var err error
