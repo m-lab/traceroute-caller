@@ -276,13 +276,13 @@ func TestCreateCacheTest(t *testing.T) {
 	}
 
 	var pt schema.PTTestRaw
-	d.TraceFromCachedTrace(c, faketime, &ScamperData{data: pt})
+	d.TraceFromCachedTrace(c, faketime, &scamperData{data: pt})
 	_, errInvalidTest := ioutil.ReadFile(tempdir + "/2019/04/01/20190401T034551Z_" + prefix.UnsafeString() + "_0000000000000001.jsonl")
 	if errInvalidTest == nil {
 		t.Error("should fail to generate cached test")
 	}
 
-	d.TraceFromCachedTrace(c, faketime, &ScamperData{data: cachedTest})
+	d.TraceFromCachedTrace(c, faketime, &scamperData{data: cachedTest})
 
 	// Unmarshal the first line of the output file.
 	b, err := ioutil.ReadFile(tempdir + "/2019/04/01/20190401T034551Z_" + prefix.UnsafeString() + "_0000000000000001.json")
@@ -308,7 +308,7 @@ func TestCreateCacheTest(t *testing.T) {
 
 	// Now test an error condition.
 	d.OutputPath = "/dev/null"
-	if d.TraceFromCachedTrace(c, faketime, &ScamperData{data: cachedTest}) == nil {
+	if d.TraceFromCachedTrace(c, faketime, &scamperData{data: cachedTest}) == nil {
 		t.Error("Should have had a test failure trying to write to /dev/null")
 	}
 }
@@ -388,9 +388,9 @@ func TestAnnotateHops(t *testing.T) {
 	pt := schema.PTTestRaw{
 		Hop: hops,
 	}
-	scamperData := &ScamperData{data: pt}
+	sd := &scamperData{data: pt}
 	client := ipservice.NewClient("")
-	err := scamperData.AnnotateHops(client)
+	err := sd.AnnotateHops(client)
 	if err != nil {
 		t.Error("Should not fail with IP service not exist at all")
 	}
@@ -410,15 +410,15 @@ func TestAnnotateHops(t *testing.T) {
 	go srv.Serve()
 
 	client2 := ipservice.NewClient(*ipservice.SocketFilename)
-	scamperData2 := &ScamperData{data: pt}
-	err = scamperData2.AnnotateHops(client2)
+	sd2 := &scamperData{data: pt}
+	err = sd2.AnnotateHops(client2)
 
 	if err != nil {
 		t.Error("Should succeed here")
 	}
 	// Notice that "asn" is 5 for IP "1.2.3.4"
 	expectedOutput := `{"schema_version":"\"\"","uuid":"\"\"","testtime":"0001-01-01T00:00:00Z","start_time":0,"stop_time":0,"scamper_version":"\"\"","serverIP":"\"\"","clientIP":"\"\"","probe_size":0,"probec":0,"hop":[{"source":{"ip":"\"1.2.3.4\"","hostname":"\"\"","geo":{"Missing":true},"network":{"CIDR":"1.2.3.4/32","ASNumber":5,"ASName":"Test Number Five","Systems":[{"ASNs":[5]}]}},"linkc":0,"link":null},{"source":{"ip":"\"1.47.236.62\"","hostname":"\"\"","geo":{"Missing":true},"network":{"Missing":true}},"linkc":0,"link":null}],"cached_result":false,"cached_uuid":"\"\"","traceroutecaller_commit":"\"\""}`
-	if scamperData2.Serialize() != string(expectedOutput) {
+	if sd2.Serialize() != string(expectedOutput) {
 		t.Error("Fail to add annotation.")
 	}
 }

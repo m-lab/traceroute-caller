@@ -35,12 +35,12 @@ func ExtractIP(pttest schema.PTTestRaw) []string {
 	return IPList
 }
 
-// ScamperData implement ipcache.TracerouteData
-type ScamperData struct {
+// scamperData implement ipcache.TracerouteData
+type scamperData struct {
 	data schema.PTTestRaw
 }
 
-func (sd *ScamperData) Serialize() string {
+func (sd *scamperData) Serialize() string {
 	testStr, err := json.Marshal(sd.data)
 	if err == nil {
 		return string(testStr)
@@ -48,7 +48,7 @@ func (sd *ScamperData) Serialize() string {
 	return ""
 }
 
-func (sd *ScamperData) GetData() []byte {
+func (sd *scamperData) GetData() []byte {
 	testStr, err := json.Marshal(sd.data)
 	if err == nil {
 		return []byte(testStr)
@@ -56,7 +56,7 @@ func (sd *ScamperData) GetData() []byte {
 	return nil
 }
 
-func (sd *ScamperData) AnnotateHops(client ipservice.Client) error {
+func (sd *scamperData) AnnotateHops(client ipservice.Client) error {
 	iplist := ExtractIP(sd.data)
 	// Fetch annoatation for the IPs
 	ann := make(map[string]*annotator.ClientAnnotations)
@@ -74,8 +74,8 @@ func (sd *ScamperData) AnnotateHops(client ipservice.Client) error {
 	return nil
 }
 
-func (sd *ScamperData) CacheTraceroute(newUUID string) ipcache.TracerouteData {
-	var newSD ScamperData
+func (sd *scamperData) CacheTraceroute(newUUID string) ipcache.TracerouteData {
+	var newSD scamperData
 	newSD.data = sd.data
 	newSD.data.CachedResult = true
 	newSD.data.CachedUUID = sd.data.UUID
@@ -171,7 +171,7 @@ func (s *Scamper) trace(conn connection.Connection, t time.Time) (ipcache.Tracer
 		return nil, err
 	}
 
-	sd := ScamperData{data: pt}
+	sd := scamperData{data: pt}
 	err = sd.AnnotateHops(client)
 	if err != nil {
 		return nil, err
@@ -293,7 +293,7 @@ func (d *ScamperDaemon) trace(conn connection.Connection, t time.Time) (ipcache.
 	if err != nil {
 		return nil, err
 	}
-	sd := ScamperData{data: pt}
+	sd := scamperData{data: pt}
 	err = sd.AnnotateHops(d.AnnotationClient)
 
 	if err != nil {

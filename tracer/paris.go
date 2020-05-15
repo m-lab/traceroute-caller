@@ -13,23 +13,23 @@ import (
 	pipe "gopkg.in/m-lab/pipe.v3"
 )
 
-type ParisData struct {
+type parisData struct {
 	data []byte
 }
 
-func (pd *ParisData) Serialize() string {
+func (pd *parisData) Serialize() string {
 	return string(pd.data)
 }
 
-func (pd *ParisData) GetData() []byte {
+func (pd *parisData) GetData() []byte {
 	return pd.data
 }
 
-func (pd *ParisData) CacheTraceroute(newUUID string) ipcache.TracerouteData {
+func (pd *parisData) CacheTraceroute(newUUID string) ipcache.TracerouteData {
 	return pd
 }
 
-func (pd *ParisData) AnnotateHops(client ipservice.Client) error {
+func (pd *parisData) AnnotateHops(client ipservice.Client) error {
 	// TODO: annotate hops using historical Maxmind datasets.
 	return nil
 }
@@ -84,7 +84,7 @@ func (p *Paris) Trace(conn connection.Connection, t time.Time) (ipcache.Tracerou
 	data := buff.Bytes()
 	err = ioutil.WriteFile(dir+fn, data, 0446)
 	log.Println("Wrote file", dir+fn)
-	return &ParisData{data: data}, err
+	return &parisData{data: data}, err
 }
 
 // TraceFromCachedTrace creates a file from a previously-existing traceroute
