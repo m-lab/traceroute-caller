@@ -36,6 +36,10 @@ func (td testData) GetData() []byte {
 	return td.data
 }
 
+func (td testData) CacheTraceroute(newUUID string) ipcache.TracerouteData {
+	return td
+}
+
 func (td testData) AnnotateHops(client ipservice.Client) error {
 	return nil
 }

@@ -40,6 +40,10 @@ func (td testData) AnnotateHops(client ipservice.Client) error {
 	return nil
 }
 
+func (td testData) CacheTraceroute(newUUID string) ipcache.TracerouteData {
+	return td
+}
+
 func (tf *testTracer) Trace(conn connection.Connection, t time.Time) (ipcache.TracerouteData, error) {
 	tf.calls++
 	return testData{data: []byte("Fake trace test " + conn.RemoteIP)}, nil

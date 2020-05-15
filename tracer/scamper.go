@@ -69,6 +69,15 @@ func (sd *ScamperData) AnnotateHops(client ipservice.Client) error {
 	return nil
 }
 
+func (sd *ScamperData) CacheTraceroute(newUUID string) ipcache.TracerouteData {
+	var newSD ScamperData
+	newSD.data = sd.data
+	newSD.data.CachedResult = true
+	newSD.data.CachedUUID = sd.data.UUID
+	newSD.data.UUID = newUUID
+	return &newSD
+}
+
 // Scamper uses scamper in non-daemon mode to perform traceroutes. This is much
 // less efficient, but when scamper crashes, it has a much lower "blast radius".
 type Scamper struct {
@@ -94,14 +103,11 @@ func (s *Scamper) TraceFromCachedTrace(conn connection.Connection, t time.Time, 
 	filename := dir + s.generateFilename(conn.Cookie, t)
 	log.Println("Starting a cached trace to be put in", filename)
 
-	cachedTestJson := cachedTest.(*ScamperData).GetStructureData()
+	newUUID, _ := conn.UUID()
+	newTest := cachedTest.CacheTraceroute(newUUID)
 
-	cachedTestJson.CachedResult = true
-	cachedTestJson.CachedUUID = cachedTestJson.UUID
-	cachedTestJson.UUID, err = conn.UUID()
-	newTest, err := json.Marshal(cachedTestJson)
 	if err == nil {
-		return ioutil.WriteFile(filename, []byte(newTest), 0666)
+		return ioutil.WriteFile(filename, newTest.GetData(), 0666)
 	}
 	return err
 }

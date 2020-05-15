@@ -25,6 +25,10 @@ func (pd *ParisData) GetData() []byte {
 	return pd.data
 }
 
+func (pd *ParisData) CacheTraceroute(newUUID string) ipcache.TracerouteData {
+	return pd
+}
+
 func (pd *ParisData) AnnotateHops(client ipservice.Client) error {
 	// TODO: annotate hops using historical Maxmind datasets.
 	return nil

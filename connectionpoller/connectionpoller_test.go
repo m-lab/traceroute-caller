@@ -138,6 +138,10 @@ func (td testData) AnnotateHops(client ipservice.Client) error {
 	return nil
 }
 
+func (td testData) CacheTraceroute(newUUID string) ipcache.TracerouteData {
+	return td
+}
+
 type testTracer struct {
 	calls   int
 	answers []map[connection.Connection]struct{}

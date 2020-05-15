@@ -24,6 +24,7 @@ type TracerouteData interface {
 	Serialize() string
 	GetData() []byte
 	AnnotateHops(ipservice.Client) error
+	CacheTraceroute(newUUID string) TracerouteData
 }
 
 // Tracer is the generic interface for all things that can perform a traceroute.
