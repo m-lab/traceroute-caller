@@ -97,7 +97,7 @@ func (p *Paris) TraceFromCachedTrace(conn connection.Connection, t time.Time, ca
 		return err
 	}
 	fn := p.filename(uuid, t, true)
-	return ioutil.WriteFile(dir+fn, cachedTest.(*ParisData).GetData(), 0446)
+	return ioutil.WriteFile(dir+fn, cachedTest.GetData(), 0446)
 }
 
 // DontTrace skips tracing entirely. It is used strictly to inform a particular
