@@ -418,7 +418,7 @@ func TestAnnotateHops(t *testing.T) {
 		t.Error("Should succeed here")
 	}
 	// Notice that "asn" is 5 for IP "1.2.3.4"
-	expectedOutput := `{"schema_version":"\"\"","uuid":"\"\"","testtime":"0001-01-01T00:00:00Z","start_time":0,"stop_time":0,"scamper_version":"\"\"","serverIP":"\"\"","clientIP":"\"\"","probe_size":0,"probec":0,"hop":[{"source":{"ip":"\"1.2.3.4\"","hostname":"\"\"","geo":{"Missing":true},"network":{"CIDR":"1.2.3.4/32","ASNumber":5,"ASName":"Test Number Five","Systems":[{"ASNs":[5]}]}},"linkc":0,"link":null},{"source":{"ip":"\"1.47.236.62\"","hostname":"\"\"","geo":{"Missing":true},"network":{"Missing":true}},"linkc":0,"link":null}],"cached_result":false,"cached_uuid":"\"\"","traceroutecaller_commit":"\"\""}`
+	expectedOutput := `{"schema_version":"","uuid":"","testtime":"0001-01-01T00:00:00Z","start_time":0,"stop_time":0,"scamper_version":"","serverIP":"","clientIP":"","probe_size":0,"probec":0,"hop":[{"source":{"ip":"1.2.3.4","hostname":"","geo":{"Missing":true},"network":{"CIDR":"1.2.3.4/32","ASNumber":5,"ASName":"Test Number Five","Systems":[{"ASNs":[5]}]}},"linkc":0,"link":null},{"source":{"ip":"1.47.236.62","hostname":"","geo":{"Missing":true},"network":{"Missing":true}},"linkc":0,"link":null}],"cached_result":false,"cached_uuid":"","traceroutecaller_commit":""}`
 	if string(sd2.GetData()) != string(expectedOutput) {
 		t.Error("Fail to add annotation.")
 	}
