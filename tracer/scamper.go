@@ -118,7 +118,7 @@ func (s *Scamper) TraceFromCachedTrace(conn connection.Connection, t time.Time, 
 		return err
 	}
 	newTest := cachedTest.CachedTraceroute(newUUID)
-
+        cachedTracePerformed.WithLabelValues("scamper").Inc()
 	if err == nil {
 		return ioutil.WriteFile(filename, newTest.GetData(), 0666)
 	}
