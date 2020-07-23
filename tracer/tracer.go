@@ -21,6 +21,13 @@ var (
 		},
 		[]string{"type"},
 	)
+	cachedTracePerformed = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "cached_traces_performed_total",
+			Help: "The number of calls to the external trace routine from cache",
+		},
+		[]string{"type"},
+	)
 	tracesInProgress = promauto.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "traces_in_progress",
