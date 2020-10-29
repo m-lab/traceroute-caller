@@ -56,6 +56,13 @@ var (
 		},
 		[]string{"type", "error"},
 	)
+	tracerParseErrors = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "traces_error_parse_total",
+			Help: "The number of traces that were supposed to be parsed and annotated but could not be",
+		},
+		[]string{"type", "error"},
+	)
 	scamperDaemonRunning = promauto.NewGauge(
 		prometheus.GaugeOpts{
 			Name: "traces_scamper_daemon_running",
