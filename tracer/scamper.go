@@ -176,12 +176,14 @@ func (s *Scamper) trace(conn connection.Connection, t time.Time) (ipcache.Tracer
 	client := ipservice.NewClient(*ipservice.SocketFilename)
 	pt, err := parser.ParseRaw(buff.Bytes())
 	if err != nil {
+		tracerParseErrors.WithLabelValues("scamper").Inc()
 		return nil, err
 	}
 
 	sd := scamperData{data: pt}
 	err = sd.AnnotateHops(client)
 	if err != nil {
+		tracerParseErrors.WithLabelValues("scamper").Inc()
 		return nil, err
 	}
 	rtx.PanicOnError(ioutil.WriteFile(filename, sd.GetData(), 0666), "Could not save output to file")
