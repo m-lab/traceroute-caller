@@ -40,7 +40,7 @@ func TestMain(t *testing.T) {
 	main()
 }
 
-func TestScamper(t *testing.T) {
+func XTestScamper(t *testing.T) {
 	dir, err := ioutil.TempDir("", "TestMain")
 	rtx.Must(err, "Could not create temp dir")
 	defer os.RemoveAll(dir)
