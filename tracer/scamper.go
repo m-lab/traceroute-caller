@@ -172,9 +172,8 @@ func (s *Scamper) trace(conn connection.Connection, t time.Time) (ipcache.Tracer
 
 	rtx.PanicOnError(err, "Command %v failed", cmd)
 
-	*ipservice.SocketFilename = "/var/local/uuidannotatorsocket/annotator.sock"
 	client := ipservice.NewClient(*ipservice.SocketFilename)
-	pt, err := parser.ParseRaw(buff.Bytes())
+	pt, err := parser.ParseRaw(buff.Bytes(), t)
 	if err != nil {
 		return nil, err
 	}
@@ -222,7 +221,6 @@ func (d *ScamperDaemon) MustStart(ctx context.Context) {
 	// Start is non-blocking.
 	rtx.Must(command.Start(), "Could not start daemon")
 
-	*ipservice.SocketFilename = "/var/local/uuidannotatorsocket/annotator.sock"
 	d.AnnotationClient = ipservice.NewClient(*ipservice.SocketFilename)
 
 	// Liveness guarantee: either the process will die and then the derived context
@@ -297,7 +295,7 @@ func (d *ScamperDaemon) trace(conn connection.Connection, t time.Time) (ipcache.
 		return nil, err
 	}
 
-	pt, err := parser.ParseRaw(buff.Bytes())
+	pt, err := parser.ParseRaw(buff.Bytes(), t)
 	if err != nil {
 		return nil, err
 	}
