@@ -13,7 +13,7 @@ RUN chmod -R a+rx /go/bin/traceroute-caller
 
 
 # Build the binaries that are called by traceroute-caller
-FROM ubuntu:latest as build_tracers
+FROM ubuntu:20.04 as build_tracers
 # Install all the packages we need and then remove the apt-get lists.
 # iproute2 gives us ss
 # all the other packages are for the build processes.
@@ -45,7 +45,7 @@ RUN make install
 
 # Create an image for the binaries that are called by traceroute-caller without
 # any of the build tools.
-FROM ubuntu:latest
+FROM ubuntu:20.04
 # Install all the packages we need and then remove the apt-get lists.
 # iproute2 gives us ss
 RUN apt-get update && \
