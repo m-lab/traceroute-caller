@@ -1,0 +1,67 @@
+version: '3.7'
+services:
+  tcpinfo:
+    image: measurementlab/tcp-info:latest
+    volumes:
+      - ./local:/local
+    # NOTE: All service containers will use the same network and IP. All ports
+    # must be configured on the first.
+    ports:
+      - target: 9990
+        published: 9990
+        protocol: tcp
+        mode: bridge
+      - target: 9991
+        published: 9991
+        protocol: tcp
+        mode: bridge
+      - target: 9992
+        published: 9992
+        protocol: tcp
+        mode: bridge
+    command:
+      - -prometheusx.listen-address=:9990
+      - -output=/local/tcpinfo
+      - -tcpinfo.eventsocket=/local/tcpevents.sock
+      - -anonymize.ip=none
+
+  uuid-annotator:
+    image: measurementlab/uuid-annotator:latest
+    volumes:
+      - ./local:/local
+      - ./testdata:/testdata
+    network_mode: "service:tcpinfo"
+    # NOTE: all database URLs are required. Minimal, incomplete versions of
+    # each are included in the testdata directory.
+    command:
+      - -prometheusx.listen-address=:9991
+      - -datadir=/local/annotation
+      - -tcpinfo.eventsocket=/local/tcpevents.sock
+      - -ipservice.sock=/local/uuid-annotator.sock
+      - -maxmind.url=file:///testdata/GeoLite2-City-incomplete.tar.gz
+      - -routeview-v4.url=file:///testdata/RouteViewIPv4.incomplete.gz
+      - -routeview-v6.url=file:///testdata/RouteViewIPv6.incomplete.gz
+      - -siteinfo.url=file:///testdata/annotations-incomplete.json
+      - -hostname=mlab1-lga0t.mlab-sandbox.measurement-lab.org
+
+  traceroute-caller:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ./local:/local
+    network_mode: "service:tcpinfo"
+    deploy:
+      # NOTE: traceroute-caller may fail on startup if it tries to read a
+      # socket that the above services are not yet listening on.
+      # So, allow restart.
+      restart_policy:
+        condition: any
+        delay: 5s
+    command:
+      - -prometheusx.listen-address=:9992
+      - -outputPath=/local/traceroute
+      - -poll=false
+      - -ipservice.sock=/local/uuid-annotator.sock
+      - -tcpinfo.eventsocket=/local/tcpevents.sock
+      - -tracetool=scamper-daemon
