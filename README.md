@@ -29,8 +29,17 @@ After the docker images have started, trigger a network connection from
 within one of those containers. For example:
 
 ```sh
-docker exec -it $( docker ps | grep local-traceroute | awk '{print $1}' ) apt-get update
+docker exec \
+  -it $( docker ps | grep local-traceroute | awk '{print $1}' ) \
+  apt-get update
 ```
 
 The logs from traceroute-caller should indicate that files are being saved
 under `./local/*`.
+
+Before restarting your docker-compose environment, remove the old images,
+which may no longer be in a consistent state.
+
+```sh
+docker-compose rm
+```
