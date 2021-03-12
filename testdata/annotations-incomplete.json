@@ -1,0 +1,31 @@
+[
+   {
+      "Annotation": {
+         "Geo": {
+            "City": "New York",
+            "ContinentCode": "NA",
+            "CountryCode": "US",
+            "Latitude": 40.7667,
+            "Longitude": -73.8667,
+            "State": "NY"
+         },
+         "Network": {
+            "ASName": "Level 3 Parent, LLC",
+            "ASNumber": 3356,
+            "Systems": [
+               {
+                  "ASNs": [
+                     3356
+                  ]
+               }
+            ]
+         },
+         "Site": "lga0t"
+      },
+      "Name": "lga0t",
+      "Network": {
+         "IPv4": "4.14.159.64/26",
+         "IPv6": "2001:1900:2100:2d::/64"
+      }
+   }
+]
