@@ -6,6 +6,7 @@ import (
 	"log"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/google/go-jsonnet"
 	"github.com/m-lab/traceroute-caller/schema"
@@ -103,7 +104,7 @@ type CyclestopLine struct {
 	Stop_time float64 `json:"stop_time"`
 }
 
-func ParseRaw(data []byte) (schema.PTTestRaw, error) {
+func ParseRaw(data []byte, connTime time.Time) (schema.PTTestRaw, error) {
 	var uuid, version string
 	var resultFromCache bool
 	var hops []schema.ScamperHop
@@ -195,6 +196,7 @@ func ParseRaw(data []byte) (schema.PTTestRaw, error) {
 	output := schema.PTTestRaw{
 		SchemaVersion:          "1",
 		UUID:                   uuid,
+		TestTime:               connTime,
 		StartTime:              int64(cycleStart.Start_time),
 		StopTime:               int64(cycleStop.Stop_time),
 		ScamperVersion:         tracelb.Version,
@@ -203,8 +205,8 @@ func ParseRaw(data []byte) (schema.PTTestRaw, error) {
 		ProbeSize:              int64(tracelb.Probe_size),
 		ProbeC:                 int64(tracelb.Probec),
 		Hop:                    hops,
-		TracerouteCallerCommit: version,
 		CachedResult:           resultFromCache,
+		TracerouteCallerCommit: version,
 	}
 	return output, nil
 }
@@ -217,7 +219,7 @@ func ParseJSON(testName string, rawContent []byte) (schema.PTTestRaw, error) {
 		return schema.PTTestRaw{}, err
 	}
 
-	PTTest, err := ParseRaw(rawContent)
+	PTTest, err := ParseRaw(rawContent, logTime)
 
 	if err != nil {
 		return schema.PTTestRaw{}, err
