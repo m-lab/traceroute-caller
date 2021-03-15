@@ -55,7 +55,7 @@ func main() {
 
 	flag.Parse()
 	rtx.Must(flagx.ArgsFromEnv(flag.CommandLine), "Could not get args from environment")
-	rtx.Must(os.MkdirAll(*outputPath, 0557), "Could not create data directory")
+	rtx.Must(os.MkdirAll(*outputPath, 0777), "Could not create data directory")
 
 	defer cancel()
 	wg := sync.WaitGroup{}
