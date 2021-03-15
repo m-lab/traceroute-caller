@@ -19,27 +19,33 @@ CPython version: 3.7.7
 OpenSSL version: OpenSSL 1.1.1g  21 Apr 2020
 ```
 
-Start a local build using sample files in `./testdata`.
+In the root directory of traceroute-caller, start a local build using
+sample files in `./testdata`.
 
 ```sh
-docker-compose up
+$ docker-compose up
 ```
 
-After the docker images have started, trigger a network connection from
-within one of those containers. For example:
+This will create and run three containers.  Container names are prefixed by the
+current working directory name (i.e., traceroute-caller).  After the containers
+are running, trigger a network connection from within one of those containers.
+For example:
 
 ```sh
-docker exec \
-  -it $( docker ps | grep local-traceroute | awk '{print $1}' ) \
-  apt-get update
+$ docker exec -it traceroute-caller_traceroute-caller_1 apt-get update
 ```
 
 The logs from traceroute-caller should indicate that files are being saved
 under `./local/*`.
 
-Before restarting your docker-compose environment, remove the old images,
-which may no longer be in a consistent state.
+```sh
+$ ls -lR ./local
+```
+
+Use `docker-compose down` to stop the containers and remove resources before
+restarting your docker-compose environment.
 
 ```sh
-docker-compose rm
+$ docker-compose down
+$ docker-compose up
 ```
