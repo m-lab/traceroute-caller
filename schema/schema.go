@@ -19,7 +19,7 @@ type HopProbe struct {
 }
 
 type HopLink struct {
-	HopDstIP string     `json:"hop_dst_ip,string"`
+	HopDstIP string     `json:"hop_dst_ip"`
 	TTL      int64      `json:"ttl,int64"`
 	Probes   []HopProbe `json:"probes"`
 }
