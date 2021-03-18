@@ -23,7 +23,7 @@ In the root directory of traceroute-caller, start a local build using
 sample files in `./testdata`.
 
 ```sh
-$ docker-compose up
+docker-compose up
 ```
 
 This will create and run three containers.  Container names are prefixed by the
@@ -32,20 +32,20 @@ are running, trigger a network connection from within one of those containers.
 For example:
 
 ```sh
-$ docker exec -it traceroute-caller_traceroute-caller_1 apt-get update
+docker exec -it traceroute-caller_traceroute-caller_1 apt-get update
 ```
 
 The logs from traceroute-caller should indicate that files are being saved
 under `./local/*`.
 
 ```sh
-$ ls -lR ./local
+ls -lR ./local
 ```
 
 Use `docker-compose down` to stop the containers and remove resources before
 restarting your docker-compose environment.
 
 ```sh
-$ docker-compose down
-$ docker-compose up
+docker-compose down
+docker-compose up
 ```
