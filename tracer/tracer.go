@@ -14,6 +14,20 @@ import (
 )
 
 var (
+	// QueryCostHistogram tracks the costs of dedup and other queries.
+	traceTimeHistogram = promauto.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name: "trace_time_seconds",
+			Help: "scamper trace time in seconds",
+			Buckets: []float64{
+				0.1, 0.215, 0.464, 1.0, 2.15, 4.64, 10, 21.5, 46.4,
+				100, 215, 464, 1000, 2150, 4640,
+			},
+		},
+		// Outcome, e.g. success, failure
+		[]string{"outcome"},
+	)
+
 	tracesPerformed = promauto.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "traces_performed_total",

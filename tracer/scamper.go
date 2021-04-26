@@ -91,21 +91,31 @@ func (s *Scamper) trace(conn connection.Connection, t time.Time) (string, error)
 	log.Println("Starting a trace to be put in", filename)
 	buff := bytes.Buffer{}
 
-	_, err = buff.WriteString(GetMetaline(conn, false, ""))
-	// XXX Should not use panic recovery.  Convert these to errors.
+	// WriteString never errors, but may panic on OOM
+	_, _ = buff.WriteString(GetMetaline(conn, false, ""))
+	// TODO Should not use panic recovery.  Convert these to errors.
 	rtx.PanicOnError(err, "Could not write to buffer")
 
 	cmd := pipe.Line(
 		pipe.Exec(s.Binary, "-I", "tracelb -P icmp-echo -q 3 -O ptr "+conn.RemoteIP, "-o-", "-O", "json"),
 		pipe.Write(&buff),
 	)
+	start := time.Now()
 	err = pipe.RunTimeout(cmd, s.ScamperTimeout)
+	latency := time.Since(start).Seconds()
+	if err != nil {
+		traceTimeHistogram.WithLabelValues("error").Observe(latency)
+	} else {
+		traceTimeHistogram.WithLabelValues("success").Observe(latency)
+	}
+
 	tracesPerformed.WithLabelValues("scamper").Inc()
 	if err != nil && err.Error() == pipe.ErrTimeout.Error() {
 		log.Println("Trace timed out: ", cmd)
 		return "", err
 	}
 
+	// TODO - should we really panic here?
 	rtx.PanicOnError(err, "Command %v failed", cmd)
 	rtx.PanicOnError(ioutil.WriteFile(filename, buff.Bytes(), 0666), "Could not save output to file")
 	return buff.String(), nil
