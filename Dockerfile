@@ -25,7 +25,7 @@ RUN apt-get update && \
 # Build and install scamper
 RUN ls -l
 RUN mkdir /scamper-src
-ADD ./vendor/scamper/ /scamper-src
+ADD ./third_party/scamper/ /scamper-src
 RUN tar xvzf  /scamper-src/scamper-cvs-20191102a.tar.gz -C /scamper-src/
 RUN chmod +x /scamper-src/scamper-cvs-20191102a/configure
 WORKDIR /scamper-src/scamper-cvs-20191102a/
@@ -35,7 +35,7 @@ RUN make install
 
 # Build and install paris-traceroute
 RUN mkdir /pt-src
-ADD ./vendor/libparistraceroute/ /pt-src
+ADD ./third_party/libparistraceroute/ /pt-src
 WORKDIR /pt-src
 RUN mkdir -p m4
 RUN ./autogen.sh
