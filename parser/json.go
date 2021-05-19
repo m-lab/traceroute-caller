@@ -152,7 +152,7 @@ func ParseRaw(data []byte, connTime time.Time) (schema.PTTestRaw, error) {
 			return schema.PTTestRaw{}, errors.New("Invalid tracelb")
 		}
 	}
-	for i, _ := range tracelb.Nodes {
+	for i := range tracelb.Nodes {
 		oneNode := &tracelb.Nodes[i]
 		var links []schema.HopLink
 		if len(oneNode.Links) == 0 {
