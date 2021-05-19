@@ -15,9 +15,7 @@ script:
 - go test ./... -race
 - go test ./... -v -coverprofile=_coverage.cov
 
-# Build a Docker image to make sure that we can.
-- docker build .
-
+after_success:
 # Coveralls
 # Upload coverage information for unit tests.
 - $HOME/gopath/bin/goveralls -coverprofile=_coverage.cov -service=travis-ci
