@@ -254,7 +254,7 @@ func TestParseAndWrite(t *testing.T) {
 
 	err = pt.ParseAndWrite("testdata/20171208T22:03:54Z-104.198.139.160-60574-163.22.28.37-7999.paris",
 		"testdata/20171208T22:03:54Z-104.198.139.160-60574-163.22.28.37-7999.paris", rawData)
-	if err.Error() != "Invalid data format in the first line." {
+	if err.Error() != "invalid data format in the first line" {
 		t.Fatal("fail to detect corrupted file")
 	}
 }
@@ -288,7 +288,7 @@ func TestPTParserEmptyHop(t *testing.T) {
 	1  P(6, 6) 172.17.95.252
 	`)
 	_, parseErr := parser.Parse("", "testdata/20180201T07:57:37Z-125.212.217.215-56622-208.177.76.115-9100.paris", "", rawData)
-	if parseErr.Error() != "Empty test" {
+	if parseErr.Error() != "empty test" {
 		t.Fatal("fail to detect corrupted first line")
 	}
 }
@@ -298,7 +298,7 @@ func TestPTParserRttParsingFailure(t *testing.T) {
 	1  P(6, 6) 172.17.95.252 (172.17.95.252)  xxxy ms
 	`)
 	_, parseErr := parser.Parse("", "testdata/20180201T07:57:37Z-125.212.217.215-56622-208.177.76.115-9100.paris", "", rawData)
-	if parseErr.Error() != "Failed to parse rtts for icmp test. 4 numbers expected" {
+	if parseErr.Error() != "failed to parse rtts for icmp test - 4 numbers expected" {
 		t.Fatal("fail to detect corrupted rtt value")
 	}
 
@@ -314,7 +314,7 @@ func TestPTParserRttParsingFailure(t *testing.T) {
 	1  P(6, 6) 172.17.95.252 (172.17.95.252)  0.523 xxs
 	`)
 	_, parseErr = parser.Parse("", "testdata/20180201T07:57:37Z-125.212.217.215-56622-208.177.76.115-9100.paris", "", rawData)
-	if parseErr.Error() != "Malformed line. Expected 'ms'" {
+	if parseErr.Error() != "malformed line - Expected 'ms'" {
 		t.Fatal("fail to detect corrupted rtt value")
 	}
 
@@ -348,7 +348,7 @@ func TestPTParserFlowFailure(t *testing.T) {
  5  P(16, 16) pr01-xe-7-1-0.pao03.net.google.com (72.14.218.190):0,2,3,4,6,8,10:xxy  0.530 ms  pr02-xe-3-0-1.pao03.net.google.com (72.14.196.8):1,5,7,9  0.556 ms
  `)
 	_, parseErr = parser.Parse("", "testdata/20180201T07:57:37Z-125.212.217.215-56622-208.177.76.115-9100.paris", "", rawData)
-	if parseErr.Error() != "Wrong format for flow IP address" {
+	if parseErr.Error() != "wrong format for flow IP address" {
 		t.Fatal("fail to detect corrupted flow value")
 	}
 }

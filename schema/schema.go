@@ -14,19 +14,19 @@ type HopIP struct {
 }
 
 type HopProbe struct {
-	Flowid int64     `json:"flowid,int64"`
+	Flowid int64     `json:"flowid"`
 	Rtt    []float64 `json:"rtt"`
 }
 
 type HopLink struct {
 	HopDstIP string     `json:"hop_dst_ip"`
-	TTL      int64      `json:"ttl,int64"`
+	TTL      int64      `json:"ttl"`
 	Probes   []HopProbe `json:"probes"`
 }
 
 type ScamperHop struct {
 	Source HopIP     `json:"source"`
-	Linkc  int64     `json:"linkc,int64"`
+	Linkc  int64     `json:"linkc"`
 	Links  []HopLink `json:"link"`
 }
 
@@ -34,15 +34,15 @@ type PTTestRaw struct {
 	SchemaVersion          string       `json:"schema_version" bigquery:"schema_version"`
 	UUID                   string       `json:"uuid" bigquery:"uuid"`
 	TestTime               time.Time    `json:"testtime"`
-	StartTime              int64        `json:"start_time,int64" bigquery:"start_time"`
-	StopTime               int64        `json:"stop_time,int64" bigquery:"stop_time"`
+	StartTime              int64        `json:"start_time" bigquery:"start_time"`
+	StopTime               int64        `json:"stop_time" bigquery:"stop_time"`
 	ScamperVersion         string       `json:"scamper_version" bigquery:"scamper_version"`
 	ServerIP               string       `json:"serverIP" bigquery:"serverip"`
 	ClientIP               string       `json:"clientIP" bigquery:"clientip"`
-	ProbeSize              int64        `json:"probe_size,int64"`
-	ProbeC                 int64        `json:"probec,int64"`
+	ProbeSize              int64        `json:"probe_size"`
+	ProbeC                 int64        `json:"probec"`
 	Hop                    []ScamperHop `json:"hop"`
-	CachedResult           bool         `json:"cached_result,bool" bigquery:"cached_result"`
+	CachedResult           bool         `json:"cached_result" bigquery:"cached_result"`
 	CachedUUID             string       `json:"cached_uuid" bigquery:"cached_uuid"`
 	TracerouteCallerCommit string       `json:"traceroutecaller_commit" bigquery:"traceroutecaller_caller"`
 }
