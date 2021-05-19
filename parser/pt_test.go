@@ -73,37 +73,37 @@ func TestParseFirstLine(t *testing.T) {
 		return
 	}
 
-	protocol, dest_ip, server_ip, err = parser.ParseFirstLine("Exception : [ERROR](Probe.cc, 109)Can't send the probe : Invalid argument")
+	_, _, _, err = parser.ParseFirstLine("Exception : [ERROR](Probe.cc, 109)Can't send the probe : Invalid argument")
 	if err == nil {
 		t.Errorf("Should return error for err message on the first line!\n")
 		return
 	}
 
-	protocol, dest_ip, server_ip, err = parser.ParseFirstLine("traceroute to 35.243.216.203 (35.243.216.203), 30 hops max, 30 bytes packets")
+	_, _, _, err = parser.ParseFirstLine("traceroute to 35.243.216.203 (35.243.216.203), 30 hops max, 30 bytes packets")
 	if err == nil {
 		t.Errorf("Should return error for unknown first line format!\n")
 		return
 	}
 
-	protocol, dest_ip, server_ip, err = parser.ParseFirstLine("traceroute [(123:33461) -> (:53849)], protocol icmp, algo")
+	_, _, _, err = parser.ParseFirstLine("traceroute [(123:33461) -> (:53849)], protocol icmp, algo")
 	if err == nil {
 		t.Errorf("Should return error for unknown first line format!\n")
 		return
 	}
 
-	protocol, dest_ip, server_ip, err = parser.ParseFirstLine("traceroute [(123:33461) -> (98.162.212.214:53849)], protocol icmp, algo")
+	_, _, _, err = parser.ParseFirstLine("traceroute [(123:33461) -> (98.162.212.214:53849)], protocol icmp, algo")
 	if err == nil {
 		t.Errorf("Should return error for unknown first line format!\n")
 		return
 	}
 
-	protocol, dest_ip, server_ip, err = parser.ParseFirstLine("traceroute [(64.86.132.76:33461) -> (98.162.212.214:53849)], protocol yyy, algo xxx, duration 19 s")
+	_, _, _, err = parser.ParseFirstLine("traceroute [(64.86.132.76:33461) -> (98.162.212.214:53849)], protocol yyy, algo xxx, duration 19 s")
 	if err == nil {
 		t.Errorf("Should return error for unknown first line format!\n")
 		return
 	}
 
-	protocol, dest_ip, server_ip, err = parser.ParseFirstLine("traceroute [(64.86.132.76:33461) -> (98.162.212.214:53849)], protocol icmp, algo xxx, duration 19 s")
+	_, _, _, err = parser.ParseFirstLine("traceroute [(64.86.132.76:33461) -> (98.162.212.214:53849)], protocol icmp, algo xxx, duration 19 s")
 	if err != nil {
 		t.Errorf("algo could be something unknown and won't be an error!\n")
 		return
@@ -121,20 +121,23 @@ func TestCreateTestId(t *testing.T) {
 
 func TestPTParser(t *testing.T) {
 	rawData, err := ioutil.ReadFile("testdata/20170320T23:53:10Z-172.17.94.34-33456-74.125.224.100-33457.paris")
+	if err != nil {
+		t.Fatal(err.Error())
+	}
 	cachedTest, err := parser.Parse("", "testdata/20170320T23:53:10Z-172.17.94.34-33456-74.125.224.100-33457.paris", "", rawData)
 	if err != nil {
-		t.Fatalf(err.Error())
+		t.Fatal(err.Error())
 	}
 	if cachedTest.LogTime.Unix() != 1490053990 {
-		t.Fatalf("Do not process log time correctly.")
+		t.Error("Do not process log time correctly.")
 	}
 
 	if cachedTest.ServerIP != "172.17.94.34" {
-		t.Fatalf("Wrong results for Server IP.")
+		t.Error("Wrong results for Server IP.")
 	}
 
 	if cachedTest.ClientIP != "74.125.224.100" {
-		t.Fatalf("Wrong results for Client IP.")
+		t.Error("Wrong results for Client IP.")
 	}
 
 	// TODO(dev): reformat these individual values to be more readable.

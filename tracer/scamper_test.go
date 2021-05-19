@@ -371,8 +371,8 @@ func TestGetMetaline(t *testing.T) {
 	}
 }
 
-// If this successfully compiles, then ScamperDaemon implements the Tracer interface,
-// which is what we want it to do.
+//lint:ignore U1000 This performs a compile time check.
+// If this successfully compiles, then ScamperDaemon implements the Tracer interface.
 func assertScamperDaemonIsTracer(d *ScamperDaemon) {
 	func(t ipcache.Tracer) {}(d)
 }
