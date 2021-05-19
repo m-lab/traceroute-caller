@@ -70,7 +70,7 @@ func TestScamper(t *testing.T) {
 
 	// Test Trace
 	out, err := s.Trace(conn, now)
-	if err == nil || err.Error() != "Invalid test" {
+	if err == nil || err.Error() != "invalid test" {
 		t.Error("The faked test should fail the parsing for annotation")
 	}
 
@@ -202,7 +202,7 @@ func TestTraceWritesMeta(t *testing.T) {
 	prometheusx.GitShortCommit = "Fake Version"
 	_, err = d.Trace(c, faketime)
 
-	if err == nil || err.Error() != "Invalid test" {
+	if err == nil || err.Error() != "invalid test" {
 		t.Error("Trace should fail with meta line only.")
 	}
 }
