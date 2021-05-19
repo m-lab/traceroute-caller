@@ -145,11 +145,11 @@ func TestPTParser(t *testing.T) {
 		},
 		Linkc: 0,
 		Links: []schema.HopLink{
-			schema.HopLink{
+			{
 				HopDstIP: "74.125.224.100",
 				TTL:      0,
 				Probes: []schema.HopProbe{
-					schema.HopProbe{
+					{
 						Flowid: 0,
 						Rtt:    []float64{0.895},
 					},

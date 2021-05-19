@@ -117,16 +117,16 @@ func TestParseJsonComplex(t *testing.T) {
 		Source: schema.HopIP{IP: "2001:550:1b01:1::1"},
 		Linkc:  1,
 		Links: []schema.HopLink{
-			schema.HopLink{
+			{
 				HopDstIP: "2001:550:3::1ca",
 				TTL:      2,
 				Probes: []schema.HopProbe{
-					schema.HopProbe{Flowid: 1, Rtt: []float64{36.803}},
-					schema.HopProbe{Flowid: 2, Rtt: []float64{0.332}},
-					schema.HopProbe{Flowid: 3, Rtt: []float64{0.329}},
-					schema.HopProbe{Flowid: 4, Rtt: []float64{0.567}},
-					schema.HopProbe{Flowid: 5, Rtt: []float64{0.329}},
-					schema.HopProbe{Flowid: 6, Rtt: []float64{1.237}},
+					{Flowid: 1, Rtt: []float64{36.803}},
+					{Flowid: 2, Rtt: []float64{0.332}},
+					{Flowid: 3, Rtt: []float64{0.329}},
+					{Flowid: 4, Rtt: []float64{0.567}},
+					{Flowid: 5, Rtt: []float64{0.329}},
+					{Flowid: 6, Rtt: []float64{1.237}},
 				},
 			},
 		},

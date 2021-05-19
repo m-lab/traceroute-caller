@@ -29,7 +29,7 @@ import (
 // extractIP returns list of hop IP sources from a traceroute.
 func extractIP(pttest schema.PTTestRaw) []string {
 	var IPList []string
-	for i, _ := range pttest.Hop {
+	for i := range pttest.Hop {
 		IPList = append(IPList, pttest.Hop[i].Source.IP)
 	}
 	return IPList
@@ -38,7 +38,7 @@ func extractIP(pttest schema.PTTestRaw) []string {
 // insertAnnotation returns a PTTestRaw with hops source IPs annotated.
 func insertAnnotation(ann map[string]*annotator.ClientAnnotations,
 	ptTest schema.PTTestRaw) schema.PTTestRaw {
-	for i, _ := range ptTest.Hop {
+	for i := range ptTest.Hop {
 		ip := ptTest.Hop[i].Source.IP
 		if ann[ip] != nil {
 			ptTest.Hop[i].Source.Geo = ann[ip].Geo
