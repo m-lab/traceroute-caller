@@ -138,10 +138,7 @@ func (td testData) CachedTraceroute(newUUID string) ipcache.TracerouteData {
 	return td
 }
 
-type testTracer struct {
-	calls   int
-	answers []map[connection.Connection]struct{}
-}
+type testTracer struct{}
 
 func (tt *testTracer) Trace(conn connection.Connection, t time.Time) (ipcache.TracerouteData, error) {
 	return testData{data: []byte("Fake Trace test")}, nil

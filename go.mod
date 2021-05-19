@@ -11,4 +11,5 @@ require (
 	github.com/m-lab/uuid-annotator v0.4.4
 	github.com/prometheus/client_golang v1.10.0
 	gopkg.in/m-lab/pipe.v3 v3.0.0-20180108231244-604e84f43ee0
+	mvdan.cc/gofumpt v0.1.1 // indirect
 )

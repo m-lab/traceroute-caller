@@ -19,9 +19,8 @@ import (
 )
 
 type testTracer struct {
-	calls   int
-	cctest  int
-	answers []map[connection.Connection]struct{}
+	calls  int
+	cctest int
 }
 
 type testData struct {
@@ -163,7 +162,6 @@ type pausingTracer struct {
 	traceToBlock         string
 	traceToBlockAndError string
 	traceToError         string
-	mut                  sync.Mutex
 	successes            int64
 }
 

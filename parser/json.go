@@ -116,7 +116,7 @@ func ParseRaw(data []byte, connTime time.Time) (schema.PTTestRaw, error) {
 	jsonStrings := strings.Split(string(data[:]), "\n")
 	if len(jsonStrings) != 5 {
 		log.Println("Invalid test")
-		return schema.PTTestRaw{}, errors.New("Invalid test")
+		return schema.PTTestRaw{}, errors.New("invalid test")
 	}
 
 	// Parse the first line for meta info.
@@ -124,7 +124,7 @@ func ParseRaw(data []byte, connTime time.Time) (schema.PTTestRaw, error) {
 
 	if err != nil {
 		log.Println(err)
-		return schema.PTTestRaw{}, errors.New("Invalid meta")
+		return schema.PTTestRaw{}, errors.New("invalid meta")
 	}
 	if meta.UUID == "" {
 		return schema.PTTestRaw{}, errors.New("empty UUID")
@@ -135,7 +135,7 @@ func ParseRaw(data []byte, connTime time.Time) (schema.PTTestRaw, error) {
 
 	err = json.Unmarshal([]byte(jsonStrings[1]), &cycleStart)
 	if err != nil {
-		return schema.PTTestRaw{}, errors.New("Invalid cycle-start")
+		return schema.PTTestRaw{}, errors.New("invalid cycle-start")
 	}
 
 	// Parse the line in struct
@@ -145,11 +145,13 @@ func ParseRaw(data []byte, connTime time.Time) (schema.PTTestRaw, error) {
 		// extra reprocessing using jsonnett
 		// TODO: this is a hack. We should see if this can be simplified.
 		vm := jsonnet.MakeVM()
-		output, err := vm.EvaluateSnippet("file", jsonStrings[2])
+		output, err := vm.EvaluateAnonymousSnippet("file", jsonStrings[2])
+		if err != nil {
+			return schema.PTTestRaw{}, errors.New("invalid tracelb")
+		}
 		err = json.Unmarshal([]byte(output), &tracelb)
 		if err != nil {
-			// fail and return here.
-			return schema.PTTestRaw{}, errors.New("Invalid tracelb")
+			return schema.PTTestRaw{}, errors.New("invalid tracelb")
 		}
 	}
 	for i := range tracelb.Nodes {
@@ -190,7 +192,7 @@ func ParseRaw(data []byte, connTime time.Time) (schema.PTTestRaw, error) {
 
 	err = json.Unmarshal([]byte(jsonStrings[3]), &cycleStop)
 	if err != nil {
-		return schema.PTTestRaw{}, errors.New("Invalid cycle-stop")
+		return schema.PTTestRaw{}, errors.New("invalid cycle-stop")
 	}
 
 	output := schema.PTTestRaw{
