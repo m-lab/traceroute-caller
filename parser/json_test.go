@@ -79,7 +79,7 @@ func TestParseJsonFailure(t *testing.T) {
 {"type":"cycle-stop", "list_name":"/tmp/scamperctrl:51811", "id":1, "hostname":"ndt-plh7v", "stop_time":1566691298}
 `
 	_, err = parser.ParseJSON("20190825T000138Z_ndt-plh7v_1566050090_000000000004D64D.jsonl", []byte(testStr))
-	if err.Error() != "invalid tracelb" {
+	if err.Error() != "jsonnet also unable to parse json" {
 		t.Fatalf("fail to detect corrupted tracelb")
 	}
 	testStr = `{"UUID":"ndt-v595x_1572645241_0000000000000626"}
