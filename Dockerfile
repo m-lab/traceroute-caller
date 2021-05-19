@@ -1,5 +1,5 @@
 # Build the traceroute-caller binary
-FROM golang:1.13 as build_caller
+FROM golang:1.16 as build_caller
 ADD . /go/src/github.com/m-lab/traceroute-caller
 RUN rm /go/src/github.com/m-lab/traceroute-caller/Dockerfile
 ENV GOARCH amd64
