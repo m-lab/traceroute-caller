@@ -52,7 +52,7 @@ func TestParseJsonFailure(t *testing.T) {
 			   {"type":"cycle-extra"}
 			   `
 	_, err = parser.ParseJSON("20190825T000138Z_ndt-plh7v_1566050090_000000000004D64D.jsonl", []byte(testStr))
-	if err.Error() != "Invalid test" {
+	if err.Error() != "invalid test" {
 		t.Fatalf("fail to detect corrupted test")
 	}
 	testStr = `{"Unknown:"bc092be"}
@@ -61,7 +61,7 @@ func TestParseJsonFailure(t *testing.T) {
 {"type":"cycle-stop", "list_name":"/tmp/scamperctrl:51811", "id":1, "hostname":"ndt-plh7v", "stop_time":1566691298}
 `
 	_, err = parser.ParseJSON("20190825T000138Z_ndt-plh7v_1566050090_000000000004D64D.jsonl", []byte(testStr))
-	if err.Error() != "Invalid meta" {
+	if err.Error() != "invalid meta" {
 		t.Fatalf("fail to detect corrupted meta")
 	}
 	testStr = `{"UUID":"ndt-v595x_1572645241_0000000000000626"}
@@ -70,7 +70,7 @@ func TestParseJsonFailure(t *testing.T) {
 {"type":"cycle-stop", "list_name":"/tmp/scamperctrl:51811", "id":1, "hostname":"ndt-plh7v", "stop_time":1566691298}
 `
 	_, err = parser.ParseJSON("20190825T000138Z_ndt-plh7v_1566050090_000000000004D64D.jsonl", []byte(testStr))
-	if err.Error() != "Invalid cycle-start" {
+	if err.Error() != "invalid cycle-start" {
 		t.Fatalf("fail to detect corrupted cycle-start")
 	}
 	testStr = `{"UUID":"ndt-v595x_1572645241_0000000000000626"}
@@ -79,7 +79,7 @@ func TestParseJsonFailure(t *testing.T) {
 {"type":"cycle-stop", "list_name":"/tmp/scamperctrl:51811", "id":1, "hostname":"ndt-plh7v", "stop_time":1566691298}
 `
 	_, err = parser.ParseJSON("20190825T000138Z_ndt-plh7v_1566050090_000000000004D64D.jsonl", []byte(testStr))
-	if err.Error() != "Invalid tracelb" {
+	if err.Error() != "jsonnet also unable to parse json" {
 		t.Fatalf("fail to detect corrupted tracelb")
 	}
 	testStr = `{"UUID":"ndt-v595x_1572645241_0000000000000626"}
@@ -88,7 +88,7 @@ func TestParseJsonFailure(t *testing.T) {
 {"type":"cycle-stop, "list_name":"/tmp/scamperctrl:51811", "id":1, "hostname":"ndt-plh7v", "stop_time":1566691298}
 `
 	_, err = parser.ParseJSON("20190825T000138Z_ndt-plh7v_1566050090_000000000004D64D.jsonl", []byte(testStr))
-	if err.Error() != "Invalid cycle-stop" {
+	if err.Error() != "invalid cycle-stop" {
 		t.Fatalf("fail to detect corrupted cycle-stop")
 	}
 }

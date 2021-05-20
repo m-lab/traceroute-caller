@@ -45,7 +45,7 @@ func (c *creator) FromSockID(sockid inetdiag.SockID) (Connection, error) {
 	srcIP := net.ParseIP(sockid.SrcIP)
 	dstIP := net.ParseIP(sockid.DstIP)
 	if srcIP == nil || dstIP == nil {
-		return Connection{}, fmt.Errorf("Could not convert %q and %q to IPs", sockid.SrcIP, sockid.DstIP)
+		return Connection{}, fmt.Errorf("could not convert %q and %q to IPs", sockid.SrcIP, sockid.DstIP)
 	}
 	srcLocal := false
 	dstLocal := false
@@ -70,7 +70,7 @@ func (c *creator) FromSockID(sockid inetdiag.SockID) (Connection, error) {
 			Cookie:     strconv.FormatUint(sockid.CookieUint64(), 16),
 		}, nil
 	}
-	return Connection{}, fmt.Errorf("Could not find a local<->remote IP pair in %+v", sockid)
+	return Connection{}, fmt.Errorf("could not find a local<->remote IP pair in %+v", sockid)
 }
 
 // Creator allows you to create a connection object from a SockID. It properly
@@ -98,7 +98,7 @@ func NewCreator() (Creator, error) {
 		case *net.IPAddr:
 			ip = a.IP
 		default:
-			return c, fmt.Errorf("Unknown type of address %q", addr.String())
+			return c, fmt.Errorf("unknown type of address %q", addr.String())
 		}
 		if ip != nil {
 			c.localIPs = append(c.localIPs, &ip)

@@ -156,20 +156,20 @@ func ParseFirstLine(oneLine string) (protocol string, destIP string, serverIP st
 		if index == 0 {
 			segments := strings.Split(part, " ")
 			if len(segments) != 4 {
-				return "", "", "", errors.New("corrupted first line.")
+				return "", "", "", errors.New("corrupted first line")
 			}
 			if len(segments[1]) <= 2 || !strings.HasPrefix(segments[1], "[(") || len(segments[3]) <= 2 || !strings.HasPrefix(segments[3], "(") {
-				return "", "", "", errors.New("Invalid data format in the first line.")
+				return "", "", "", errors.New("invalid data format in the first line")
 			}
 			serverIPIndex := strings.LastIndex(segments[1], ":")
 			destIPIndex := strings.LastIndex(segments[3], ":")
 			if serverIPIndex < 3 || destIPIndex < 2 {
-				return "", "", "", errors.New("Invalid data format in the first line.")
+				return "", "", "", errors.New("invalid data format in the first line")
 			}
 			serverIP = segments[1][2:serverIPIndex]
 			destIP = segments[3][1:destIPIndex]
 			if net.ParseIP(serverIP) == nil || net.ParseIP(destIP) == nil {
-				return "", "", "", errors.New("Invalid IP address in the first line.")
+				return "", "", "", errors.New("invalid IP address in the first line")
 			}
 			continue
 		}
@@ -183,7 +183,7 @@ func ParseFirstLine(oneLine string) (protocol string, destIP string, serverIP st
 			if mm[0] == "protocol" {
 				if mm[1] != "icmp" && mm[1] != "udp" && mm[1] != "tcp" {
 					log.Printf("Unknown protocol")
-					return "", "", "", errors.New("Unknown protocol")
+					return "", "", "", errors.New("unknown protocol")
 				} else {
 					protocol = mm[1]
 				}
@@ -212,7 +212,7 @@ func CreateTestId(fn string, bn string) string {
 // parts[3] should always be "ms"
 func ProcessOneTuple(parts []string, protocol string, currentLeaves []Node, allNodes, newLeaves *[]Node) error {
 	if parts[3] != "ms" {
-		return errors.New("Malformed line. Expected 'ms'")
+		return errors.New("malformed line - Expected 'ms'")
 	}
 	var rtt []float64
 	//TODO: to use regexp here.
@@ -231,14 +231,14 @@ func ProcessOneTuple(parts []string, protocol string, currentLeaves []Node, allN
 	case protocol == "icmp":
 		nums := strings.Split(parts[2], "/")
 		if len(nums) != 4 {
-			return errors.New("Failed to parse rtts for icmp test. 4 numbers expected")
+			return errors.New("failed to parse rtts for icmp test - 4 numbers expected")
 		}
 		for _, num := range nums {
 			oneRtt, err := strconv.ParseFloat(num, 64)
 			if err == nil {
 				rtt = append(rtt, oneRtt)
 			} else {
-				log.Printf("Failed to conver rtt to number with error %v", err)
+				log.Printf("failed to convert rtt to number with error %v", err)
 				return err
 			}
 		}
@@ -308,7 +308,7 @@ func ProcessOneTuple(parts []string, protocol string, currentLeaves []Node, allN
 			}
 		}
 	default:
-		return errors.New("Wrong format for flow IP address")
+		return errors.New("wrong format for flow IP address")
 	}
 	return nil
 }
@@ -396,7 +396,7 @@ func Parse(fileName string, testName string, testId string, rawContent []byte) (
 
 	if len(allNodes) == 0 {
 		// Empty test, stop here.
-		return cachedPTData{}, errors.New("Empty test")
+		return cachedPTData{}, errors.New("empty test")
 	}
 	// Check whether the last hop is the destIP
 
@@ -435,13 +435,11 @@ type PTParser struct {
 
 // ParseAndInsert parses a paris-traceroute log file and write the output in a json file.
 func (pt *PTParser) ParseAndWrite(fileName string, testName string, rawContent []byte) error {
-	testId := filepath.Base(testName)
-	if fileName != "" {
-		testId = CreateTestId(fileName, filepath.Base(testName))
-		pt.taskFileName = fileName
-	} else {
+	if fileName == "" {
 		return errors.New("empty filename")
 	}
+	testId := CreateTestId(fileName, filepath.Base(testName))
+	pt.taskFileName = fileName
 
 	// Process the legacy Paris Traceroute txt output
 	cachedTest, err := Parse(fileName, testName, testId, rawContent)
