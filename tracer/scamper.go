@@ -102,7 +102,7 @@ func (*Scamper) generateFilename(cookie string, t time.Time) string {
 	return t.Format("20060102T150405Z") + "_" + uuid.FromCookie(uint64(c)) + ".json"
 }
 
-// New version that create test from cached trace
+// TraceFromCachedTrace creates test from cached trace.
 func (s *Scamper) TraceFromCachedTrace(conn connection.Connection, t time.Time, cachedTest ipcache.TracerouteData) error {
 	dir, err := createTimePath(s.OutputPath, t)
 	if err != nil {
