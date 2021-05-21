@@ -38,20 +38,21 @@ func InitParserVersion() string {
 	return gParserVersion
 }
 
+// PTFileName is the file name of paris-traceroute output.
 type PTFileName struct {
 	Name string
 }
 
+// GetDate coverts a date like "20170320T23:53:10Z" into the format "20170320T235310Z".
 func (f *PTFileName) GetDate() (string, bool) {
 	i := strings.Index(f.Name, "Z")
 	if i >= 15 {
-		// covert date like "20170320T23:53:10Z" or "20170320T235310Z" into one format
 		return strings.Replace(f.Name[0:i+1], ":", "", -1), true
 	}
 	return "", false
 }
 
-// Return timestamp parsed from file name.
+// GetLogtime returns timestamp parsed from file name.
 func GetLogtime(filename PTFileName) (time.Time, error) {
 	date, success := filename.GetDate()
 	if !success {
@@ -61,7 +62,7 @@ func GetLogtime(filename PTFileName) (time.Time, error) {
 	return time.Parse("20060102T150405Z", date)
 }
 
-// The data structure is used to store the parsed results temporarily before it is verified
+// cachedPTData is used to store the parsed results temporarily before it is verified
 // not polluted and can be inserted into BQ tables
 type cachedPTData struct {
 	TestID           string
@@ -73,12 +74,13 @@ type cachedPTData struct {
 	UUID             string
 }
 
+// Node represents a hop.
 type Node struct {
-	hostname        string
-	ip              string
-	rtts            []float64
-	parent_ip       string
-	parent_hostname string
+	hostname       string
+	ip             string
+	rtts           []float64
+	parentIP       string
+	parentHostname string
 
 	// For a given hop in a paris traceroute, there may be multiple IP
 	// addresses. Each one belongs to a flow, which is an independent path from
@@ -88,12 +90,19 @@ type Node struct {
 	flow int
 }
 
-const IPv4_AF int32 = 2
-const IPv6_AF int32 = 10
+// TODO: determine if IPv[46]AF constants are needed.
+
+// IPv4AF is IPv4 address family.
+const IPv4AF int32 = 2
+
+// IPv6AF is IPv6 address family.
+const IPv6AF int32 = 10
+
+// PTBufferSize is the buffer size of paris-traceroute.
 const PTBufferSize int = 2
 
-// ProcessAllNodes take the array of the Nodes, and generate one ScamperHop entry from each node.
-func ProcessAllNodes(allNodes []Node, server_IP, protocol string) []schema.ScamperHop {
+// ProcessAllNodes takes an array of Nodes and generates one ScamperHop entry from each Node.
+func ProcessAllNodes(allNodes []Node, serverIP, protocol string) []schema.ScamperHop {
 	var results []schema.ScamperHop
 
 	// Iterate from the end of the list of nodes to minimize cost of removing nodes.
@@ -109,10 +118,10 @@ func ProcessAllNodes(allNodes []Node, server_IP, protocol string) []schema.Scamp
 		}
 		links := make([]schema.HopLink, 0, 1)
 		links = append(links, hopLink)
-		if allNodes[i].parent_ip == "" {
-			// create a hop that from server_IP to allNodes[i].ip
+		if allNodes[i].parentIP == "" {
+			// create a hop that from serverIP to allNodes[i].ip
 			source := schema.HopIP{
-				IP: server_IP,
+				IP: serverIP,
 			}
 			oneHop := schema.ScamperHop{
 				Source: source,
@@ -122,8 +131,8 @@ func ProcessAllNodes(allNodes []Node, server_IP, protocol string) []schema.Scamp
 			break
 		} else {
 			source := schema.HopIP{
-				IP:       allNodes[i].parent_ip,
-				Hostname: allNodes[i].parent_hostname,
+				IP:       allNodes[i].parentIP,
+				Hostname: allNodes[i].parentHostname,
 			}
 			oneHop := schema.ScamperHop{
 				Source: source,
@@ -135,8 +144,9 @@ func ProcessAllNodes(allNodes []Node, server_IP, protocol string) []schema.Scamp
 	return results
 }
 
-// This function was designed for hops with multiple flows. When the source IP are duplicate flows, but the destination IP is
-// single flow IP, those hops will result in just one node in the list.
+// Unique was designed for hops with multiple flows. When the source
+// IP are duplicate flows, but the destination IP is single flow IP, those
+// hops will result in just one node in the list.
 func Unique(oneNode Node, list []Node) bool {
 	for _, existingNode := range list {
 		if existingNode.hostname == oneNode.hostname && existingNode.ip == oneNode.ip && existingNode.flow == oneNode.flow {
@@ -146,7 +156,7 @@ func Unique(oneNode Node, list []Node) bool {
 	return true
 }
 
-// Handle the first line, like
+// ParseFirstLine handles the first line, like
 // "traceroute [(64.86.132.76:33461) -> (98.162.212.214:53849)], protocol icmp, algo exhaustive, duration 19 s"
 func ParseFirstLine(oneLine string) (protocol string, destIP string, serverIP string, err error) {
 	parts := strings.Split(oneLine, ",")
@@ -184,28 +194,28 @@ func ParseFirstLine(oneLine string) (protocol string, destIP string, serverIP st
 				if mm[1] != "icmp" && mm[1] != "udp" && mm[1] != "tcp" {
 					log.Printf("Unknown protocol")
 					return "", "", "", errors.New("unknown protocol")
-				} else {
-					protocol = mm[1]
 				}
+				protocol = mm[1]
 			}
 		}
 	}
 	return protocol, destIP, serverIP, nil
 }
 
-func CreateTestId(fn string, bn string) string {
+// CreateTestID creates a test ID based on the given file name and test name.
+// fn is in format like 20170501T000000Z-mlab1-acc02-paris-traceroute-0000.tgz
+// bn is in format like 20170320T23:53:10Z-98.162.212.214-53849-64.86.132.75-42677.paris
+// test_id is in format like 2017/05/01/mlab1.lga06/20170501T23:58:07Z-72.228.158.51-40835-128.177.119.209-8080.paris.gz
+func CreateTestID(fn string, bn string) string {
 	rawFn := filepath.Base(fn)
-	// fn is in format like 20170501T000000Z-mlab1-acc02-paris-traceroute-0000.tgz
-	// bn is in format like 20170320T23:53:10Z-98.162.212.214-53849-64.86.132.75-42677.paris
-	// test_id is in format like 2017/05/01/mlab1.lga06/20170501T23:58:07Z-72.228.158.51-40835-128.177.119.209-8080.paris.gz
-	testId := bn
+	testID := bn
 	if len(rawFn) > 30 {
-		testId = rawFn[0:4] + "/" + rawFn[4:6] + "/" + rawFn[6:8] + "/" + rawFn[17:22] + "." + rawFn[23:28] + "/" + bn + ".gz"
+		testID = rawFn[0:4] + "/" + rawFn[4:6] + "/" + rawFn[6:8] + "/" + rawFn[17:22] + "." + rawFn[23:28] + "/" + bn + ".gz"
 	}
-	return testId
+	return testID
 }
 
-// For each 4 tuples, it is like:
+// ProcessOneTuple processes a tuple. For each 4 tuples, it is like:
 // parts[0] is the hostname, like "if-ae-10-3.tcore2.DT8-Dallas.as6453.net".
 // parts[1] is IP address like "(66.110.57.41)" or "(72.14.218.190):0,2,3,4,6,8,10"
 // parts[2] are rtt in numbers like "0.298/0.318/0.340/0.016"
@@ -215,7 +225,7 @@ func ProcessOneTuple(parts []string, protocol string, currentLeaves []Node, allN
 		return errors.New("malformed line - Expected 'ms'")
 	}
 	var rtt []float64
-	//TODO: to use regexp here.
+	// TODO: to use regexp here.
 	switch {
 	// Handle tcp or udp, parts[2] is a single number.
 	case protocol == "tcp" || protocol == "udp":
@@ -238,7 +248,7 @@ func ProcessOneTuple(parts []string, protocol string, currentLeaves []Node, allN
 			if err == nil {
 				rtt = append(rtt, oneRtt)
 			} else {
-				log.Printf("failed to convert rtt to number with error %v", err)
+				log.Printf("Failed to conver rtt to number with error %v", err)
 				return err
 			}
 		}
@@ -251,11 +261,11 @@ func ProcessOneTuple(parts []string, protocol string, currentLeaves []Node, allN
 	// Check whether it is root node.
 	if len(*allNodes) == 0 {
 		oneNode := &Node{
-			hostname:  parts[0],
-			ip:        ips[0][1 : len(ips[0])-1],
-			rtts:      rtt,
-			parent_ip: "",
-			flow:      -1,
+			hostname: parts[0],
+			ip:       ips[0][1 : len(ips[0])-1],
+			rtts:     rtt,
+			parentIP: "",
+			flow:     -1,
 		}
 
 		*allNodes = append(*allNodes, *oneNode)
@@ -269,12 +279,12 @@ func ProcessOneTuple(parts []string, protocol string, currentLeaves []Node, allN
 		// For single flow, the new node will be son of all current leaves
 		for _, leaf := range currentLeaves {
 			oneNode := &Node{
-				hostname:        parts[0],
-				ip:              ips[0][1 : len(ips[0])-1],
-				rtts:            rtt,
-				parent_ip:       leaf.ip,
-				parent_hostname: leaf.hostname,
-				flow:            -1,
+				hostname:       parts[0],
+				ip:             ips[0][1 : len(ips[0])-1],
+				rtts:           rtt,
+				parentIP:       leaf.ip,
+				parentHostname: leaf.hostname,
+				flow:           -1,
 			}
 			*allNodes = append(*allNodes, *oneNode)
 			if Unique(*oneNode, *newLeaves) {
@@ -285,20 +295,20 @@ func ProcessOneTuple(parts []string, protocol string, currentLeaves []Node, allN
 		// Create a leave for each flow.
 		flows := strings.Split(ips[1], ",")
 		for _, flow := range flows {
-			flow_int, err := strconv.Atoi(flow)
+			flowInt, err := strconv.Atoi(flow)
 			if err != nil {
 				return err
 			}
 
 			for _, leaf := range currentLeaves {
-				if leaf.flow == -1 || leaf.flow == flow_int {
+				if leaf.flow == -1 || leaf.flow == flowInt {
 					oneNode := &Node{
-						hostname:        parts[0],
-						ip:              ips[0][1 : len(ips[0])-1],
-						rtts:            rtt,
-						parent_ip:       leaf.ip,
-						parent_hostname: leaf.hostname,
-						flow:            flow_int,
+						hostname:       parts[0],
+						ip:             ips[0][1 : len(ips[0])-1],
+						rtts:           rtt,
+						parentIP:       leaf.ip,
+						parentHostname: leaf.hostname,
+						flow:           flowInt,
 					}
 					*allNodes = append(*allNodes, *oneNode)
 					if Unique(*oneNode, *newLeaves) {
@@ -314,7 +324,7 @@ func ProcessOneTuple(parts []string, protocol string, currentLeaves []Node, allN
 }
 
 // Parse the raw test file into hops ParisTracerouteHop.
-func Parse(fileName string, testName string, testId string, rawContent []byte) (cachedPTData, error) {
+func Parse(fileName string, testName string, testID string, rawContent []byte) (cachedPTData, error) {
 	//log.Printf("%s", testName)
 
 	// Get the logtime
@@ -381,7 +391,7 @@ func Parse(fileName string, testName string, testId string, rawContent []byte) (
 					return cachedPTData{}, err
 				}
 				// Skip over any error codes for now. These are after the "ms" and start with '!'.
-				for ; i+4 < len(parts) && parts[i+4] != "" && parts[i+4][0] == '!'; i += 1 {
+				for ; i+4 < len(parts) && parts[i+4] != "" && parts[i+4][0] == '!'; i++ {
 				}
 			} // Done with a 4-tuple parsing
 			if strings.Contains(oneLine, destIP) {
@@ -416,7 +426,7 @@ func Parse(fileName string, testName string, testId string, rawContent []byte) (
 	// TODO: Add annotation to the IP of source, destination and hops.
 
 	return cachedPTData{
-		TestID:           testId,
+		TestID:           testID,
 		Hops:             PTHops,
 		LogTime:          logTime,
 		ServerIP:         serverIP,
@@ -425,6 +435,7 @@ func Parse(fileName string, testName string, testId string, rawContent []byte) (
 	}, nil
 }
 
+// PTParser encapsulates data for a paris-traceroute measurement.
 type PTParser struct {
 	// Care should be taken to ensure this does not accumulate many rows and
 	// lead to OOM problems.
@@ -433,16 +444,16 @@ type PTParser struct {
 	NumFiles      int    // Number of files already written
 }
 
-// ParseAndInsert parses a paris-traceroute log file and write the output in a json file.
+// ParseAndWrite parses a paris-traceroute log file and write the output in a json file.
 func (pt *PTParser) ParseAndWrite(fileName string, testName string, rawContent []byte) error {
 	if fileName == "" {
 		return errors.New("empty filename")
 	}
-	testId := CreateTestId(fileName, filepath.Base(testName))
+	testID := CreateTestID(fileName, filepath.Base(testName))
 	pt.taskFileName = fileName
 
 	// Process the legacy Paris Traceroute txt output
-	cachedTest, err := Parse(fileName, testName, testId, rawContent)
+	cachedTest, err := Parse(fileName, testName, testID, rawContent)
 	if err != nil {
 		log.Printf("%v %s", err, testName)
 		return err
@@ -490,6 +501,7 @@ func (pt *PTParser) ParseAndWrite(fileName string, testName string, rawContent [
 	return nil
 }
 
+// WriteOneTest annotates the IPs and writes the file to disk.
 func (pt *PTParser) WriteOneTest(oneTest cachedPTData) {
 	// TODO: Annotate the IPs and write the file to Disk
 	/*
@@ -515,10 +527,15 @@ func (pt *PTParser) WriteOneTest(oneTest cachedPTData) {
 	pt.NumFiles++
 }
 
+// TODO: These exported methods are only used for unit tests but if
+//       tests do whitebox testing there is no need for these.
+
+// NumBufferedTests returns the number of previous tests.
 func (pt *PTParser) NumBufferedTests() int {
 	return len(pt.previousTests)
 }
 
+// NumFilesForTests returns the number of test files already written.
 func (pt *PTParser) NumFilesForTests() int {
 	return pt.NumFiles
 }

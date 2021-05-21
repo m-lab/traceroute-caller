@@ -1,4 +1,22 @@
-// Package main provides the traceroute-caller.
+// traceroute-caller is a wrapper around the `paris-traceroute` and
+// `scamper` commands and can be invoked in two different poll and
+// listen modes:
+//
+//   - Poll mode uses the `connectionpoller` package to get a complete list
+//     of all connections by executing `/bin/ss -e -n` every 5 seconds
+//     and running a traceroute on all closed connections.  This mode is
+//     mostly for local test and debugging purposes as it doesn't require
+//     any services such as `tcp-info` or `uuid-annotator`.
+//
+//   - Listen mode uses the `tcp-info/eventsocket` package to listen for
+//     open and close connection events, and runs a traceroute measurement
+//     on closed connections.
+//
+// traceroute-caller on M-Lab servers always runs in the listen mode.
+// To see all available flags:
+//
+//   $ go build
+//   $ ./traceroute-caller --help
 package main
 
 import (
@@ -47,9 +65,6 @@ func init() {
 	flag.Var(&tracerType, "tracetool", "Choose whether paris-traceroute or scamper should be used.")
 }
 
-// Sample cmd:
-// go build
-// ./traceroute-caller --outputPath scamper_output
 func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 

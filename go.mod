@@ -10,6 +10,7 @@ require (
 	github.com/m-lab/uuid v0.0.0-20191115203855-549727171666
 	github.com/m-lab/uuid-annotator v0.4.4
 	github.com/prometheus/client_golang v1.10.0
+	golang.org/x/mod v0.4.0 // indirect
+	golang.org/x/tools v0.0.0-20210101214203-2dba1e4ea05c // indirect
 	gopkg.in/m-lab/pipe.v3 v3.0.0-20180108231244-604e84f43ee0
-	mvdan.cc/gofumpt v0.1.1 // indirect
 )

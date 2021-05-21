@@ -29,20 +29,20 @@ type TS struct {
 
 // Reply describes a single reply message.
 type Reply struct {
-	Rx         TS      `json:"rx"`
-	TTL        int     `json:"ttl"`
-	RTT        float64 `json:"rtt"`
-	Icmp_type  int     `json:"icmp_type"`
-	Icmp_code  int     `json:"icmp_code"`
-	Icmp_q_tos int     `json:"icmp_q_tos"`
-	Icmp_q_ttl int     `json:"icmp_q_ttl"`
+	Rx       TS      `json:"rx"`
+	TTL      int     `json:"ttl"`
+	RTT      float64 `json:"rtt"`
+	IcmpType int     `json:"icmp_type"`
+	IcmpCode int     `json:"icmp_code"`
+	IcmpQTos int     `json:"icmp_q_tos"`
+	IcmpQTTL int     `json:"icmp_q_ttl"`
 }
 
 // Probe describes a single probe message, and all the associated replies.
 type Probe struct {
 	Tx      TS      `json:"tx"`
 	Replyc  int     `json:"replyc"`
-	Ttl     int64   `json:"ttl"`
+	TTL     int64   `json:"ttl"`
 	Attempt int     `json:"attempt"`
 	Flowid  int64   `json:"flowid"`
 	Replies []Reply `json:"replies"` // There is usually just a single reply
@@ -59,7 +59,7 @@ type ScamperLink struct {
 type ScamperNode struct {
 	Addr  string          `json:"addr"`
 	Name  string          `json:"name"`
-	Q_ttl int             `json:"q_ttl"`
+	QTTL  int             `json:"q_ttl"`
 	Linkc int64           `json:"linkc"`
 	Links [][]ScamperLink `json:"links"`
 }
@@ -80,11 +80,11 @@ type Metadata struct {
 
 // CyclestartLine contains the information about the scamper "cyclestart"
 type CyclestartLine struct {
-	Type       string  `json:"type"`      // "cycle-start"
-	List_name  string  `json:"list_name"` // e.g. "/tmp/scamperctrl:58"
-	ID         float64 `json:"id"`        // e.g. 1 - seems to be an integer?
-	Hostname   string  `json:"hostname"`
-	Start_time float64 `json:"start_time"` // This is a unix epoch time.
+	Type      string  `json:"type"`      // "cycle-start"
+	ListName  string  `json:"list_name"` // e.g. "/tmp/scamperctrl:58"
+	ID        float64 `json:"id"`        // e.g. 1 - seems to be an integer?
+	Hostname  string  `json:"hostname"`
+	StartTime float64 `json:"start_time"` // This is a unix epoch time.
 }
 
 // TracelbLine contains the actual scamper trace details.
@@ -98,29 +98,29 @@ type TracelbLine struct {
 	Dst     string  `json:"dst"`
 	Start   TS      `json:"start"`
 	// NOTE: None of these seem to be actual floats - all ints.
-	Probe_size   float64       `json:"probe_size"`
-	Firsthop     float64       `json:"firsthop"`
-	Attempts     float64       `json:"attempts"`
-	Confidence   float64       `json:"confidence"`
-	Tos          float64       `json:"tos"`
-	Gaplint      float64       `json:"gaplint"`
-	Wait_timeout float64       `json:"wait_timeout"`
-	Wait_probe   float64       `json:"wait_probe"`
-	Probec       float64       `json:"probec"`
-	Probec_max   float64       `json:"probec_max"`
-	Nodec        float64       `json:"nodec"`
-	Linkc        float64       `json:"linkc"`
-	Nodes        []ScamperNode `json:"nodes"`
+	ProbeSize   float64       `json:"probe_size"`
+	Firsthop    float64       `json:"firsthop"`
+	Attempts    float64       `json:"attempts"`
+	Confidence  float64       `json:"confidence"`
+	Tos         float64       `json:"tos"`
+	Gaplint     float64       `json:"gaplint"`
+	WaitTimeout float64       `json:"wait_timeout"`
+	WaitProbe   float64       `json:"wait_probe"`
+	Probec      float64       `json:"probec"`
+	ProbecMax   float64       `json:"probec_max"`
+	Nodec       float64       `json:"nodec"`
+	Linkc       float64       `json:"linkc"`
+	Nodes       []ScamperNode `json:"nodes"`
 }
 
 // CyclestopLine contains the ending details from the scamper tool.  ID,
-// List_name, hostname seem to match CyclestartLine
+// ListName, hostname seem to match CyclestartLine
 type CyclestopLine struct {
-	Type      string  `json:"type"` // "cycle-stop"
-	List_name string  `json:"list_name"`
-	ID        float64 `json:"id"`
-	Hostname  string  `json:"hostname"`
-	Stop_time float64 `json:"stop_time"` // This is a unix epoch time.
+	Type     string  `json:"type"` // "cycle-stop"
+	ListName string  `json:"list_name"`
+	ID       float64 `json:"id"`
+	Hostname string  `json:"hostname"`
+	StopTime float64 `json:"stop_time"` // This is a unix epoch time.
 }
 
 // ParseRaw parses JSONL files containing the four JSON lines described above,
@@ -202,7 +202,7 @@ func ParseRaw(data []byte, connTime time.Time) (schema.PTTestRaw, error) {
 					rtt = append(rtt, oneReply.RTT)
 				}
 				probes = append(probes, schema.HopProbe{Flowid: int64(oneProbe.Flowid), Rtt: rtt})
-				ttl = int64(oneProbe.Ttl)
+				ttl = int64(oneProbe.TTL)
 			}
 			links = append(links, schema.HopLink{HopDstIP: oneLink.Addr, TTL: ttl, Probes: probes})
 		}
@@ -222,12 +222,12 @@ func ParseRaw(data []byte, connTime time.Time) (schema.PTTestRaw, error) {
 		SchemaVersion:          "1",
 		UUID:                   uuid,
 		TestTime:               connTime,
-		StartTime:              int64(cycleStart.Start_time),
-		StopTime:               int64(cycleStop.Stop_time),
+		StartTime:              int64(cycleStart.StartTime),
+		StopTime:               int64(cycleStop.StopTime),
 		ScamperVersion:         tracelb.Version,
 		ServerIP:               tracelb.Src,
 		ClientIP:               tracelb.Dst,
-		ProbeSize:              int64(tracelb.Probe_size),
+		ProbeSize:              int64(tracelb.ProbeSize),
 		ProbeC:                 int64(tracelb.Probec),
 		Hop:                    hops,
 		CachedResult:           resultFromCache,

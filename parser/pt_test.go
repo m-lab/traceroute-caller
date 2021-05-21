@@ -110,8 +110,8 @@ func TestParseFirstLine(t *testing.T) {
 	}
 }
 
-func TestCreateTestId(t *testing.T) {
-	test_id := parser.CreateTestId("20170501T000000Z-mlab1-acc02-paris-traceroute-0000.tgz", "20170501T23:53:10Z-98.162.212.214-53849-64.86.132.75-42677.paris")
+func TestCreateTestID(t *testing.T) {
+	test_id := parser.CreateTestID("20170501T000000Z-mlab1-acc02-paris-traceroute-0000.tgz", "20170501T23:53:10Z-98.162.212.214-53849-64.86.132.75-42677.paris")
 	if test_id != "2017/05/01/mlab1.acc02/20170501T23:53:10Z-98.162.212.214-53849-64.86.132.75-42677.paris.gz" {
 		log.Println(test_id)
 		t.Errorf("Error in creating test id!\n")

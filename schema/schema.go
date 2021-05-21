@@ -1,3 +1,4 @@
+// Package schema will be deprecated soon. Do not use.
 package schema
 
 import (
@@ -6,6 +7,7 @@ import (
 	"github.com/m-lab/uuid-annotator/annotator"
 )
 
+// HopIP will be deprecated soon. Do not use.
 type HopIP struct {
 	IP       string                 `json:"ip"`
 	Hostname string                 `json:"hostname"`
@@ -13,23 +15,27 @@ type HopIP struct {
 	Network  *annotator.Network     `json:"network"`
 }
 
+// HopProbe will be deprecated soon. Do not use.
 type HopProbe struct {
 	Flowid int64     `json:"flowid"`
 	Rtt    []float64 `json:"rtt"`
 }
 
+// HopLink will be deprecated soon. Do not use.
 type HopLink struct {
 	HopDstIP string     `json:"hop_dst_ip"`
 	TTL      int64      `json:"ttl"`
 	Probes   []HopProbe `json:"probes"`
 }
 
+// ScamperHop will be deprecated soon. Do not use.
 type ScamperHop struct {
 	Source HopIP     `json:"source"`
 	Linkc  int64     `json:"linkc"`
 	Links  []HopLink `json:"link"`
 }
 
+// PTTestRaw will be deprecated soon. Do not use.
 type PTTestRaw struct {
 	SchemaVersion          string       `json:"schema_version" bigquery:"schema_version"`
 	UUID                   string       `json:"uuid" bigquery:"uuid"`
