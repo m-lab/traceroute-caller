@@ -213,6 +213,9 @@ func ParseRaw(data []byte, connTime time.Time) (schema.PTTestRaw, error) {
 		})
 	}
 
+	// XXX ^^^^^^ Everything above here is almost identical to the structs and
+	// ParseJSONL code in etl/parser/pt.go
+
 	err = json.Unmarshal([]byte(jsonStrings[3]), &cycleStop)
 	if err != nil {
 		return schema.PTTestRaw{}, errors.New("invalid cycle-stop")
