@@ -1,5 +1,11 @@
 package parser
 
+// Much of this file is copied from code in etl/parser/pt.go.  This comment
+// (just below) doesn't really belong here.  Node, ProcessAllNodes, Unique,
+// ParseFirstLine, ParseOneTuple, and Parse are duplicated almost exactly
+// from etl.  However, much of that code is for handling different "legacy"
+// Paris traceroute data, and does not belong here.
+
 // Parse PT filename like 20170320T23:53:10Z-98.162.212.214-53849-64.86.132.75-42677.paris
 // The format of legacy test file can be found at https://paris-traceroute.net/.
 
@@ -74,7 +80,10 @@ type cachedPTData struct {
 	UUID             string
 }
 
+// XXX vvvvvvv Largely copy paste from etl/parser/pt.go
+
 // Node represents a hop.
+// Copied/adapted from etl/parser/pt.go.
 type Node struct {
 	hostname       string
 	ip             string
@@ -102,6 +111,7 @@ const IPv6AF int32 = 10
 const PTBufferSize int = 2
 
 // ProcessAllNodes takes an array of Nodes and generates one ScamperHop entry from each Node.
+// Copied/adapted from etl/parser/pt.go.
 func ProcessAllNodes(allNodes []Node, serverIP, protocol string) []schema.ScamperHop {
 	var results []schema.ScamperHop
 
@@ -147,6 +157,7 @@ func ProcessAllNodes(allNodes []Node, serverIP, protocol string) []schema.Scampe
 // Unique was designed for hops with multiple flows. When the source
 // IP are duplicate flows, but the destination IP is single flow IP, those
 // hops will result in just one node in the list.
+// Copied/adapted from etl/parser/pt.go.
 func Unique(oneNode Node, list []Node) bool {
 	for _, existingNode := range list {
 		if existingNode.hostname == oneNode.hostname && existingNode.ip == oneNode.ip && existingNode.flow == oneNode.flow {
@@ -158,6 +169,7 @@ func Unique(oneNode Node, list []Node) bool {
 
 // ParseFirstLine handles the first line, like
 // "traceroute [(64.86.132.76:33461) -> (98.162.212.214:53849)], protocol icmp, algo exhaustive, duration 19 s"
+// Copied/adapted from etl/parser/pt.go.
 func ParseFirstLine(oneLine string) (protocol string, destIP string, serverIP string, err error) {
 	parts := strings.Split(oneLine, ",")
 	// check protocol
@@ -206,6 +218,7 @@ func ParseFirstLine(oneLine string) (protocol string, destIP string, serverIP st
 // fn is in format like 20170501T000000Z-mlab1-acc02-paris-traceroute-0000.tgz
 // bn is in format like 20170320T23:53:10Z-98.162.212.214-53849-64.86.132.75-42677.paris
 // test_id is in format like 2017/05/01/mlab1.lga06/20170501T23:58:07Z-72.228.158.51-40835-128.177.119.209-8080.paris.gz
+// Copied/adapted from etl/parser/pt.go.
 func CreateTestID(fn string, bn string) string {
 	rawFn := filepath.Base(fn)
 	testID := bn
@@ -220,6 +233,7 @@ func CreateTestID(fn string, bn string) string {
 // parts[1] is IP address like "(66.110.57.41)" or "(72.14.218.190):0,2,3,4,6,8,10"
 // parts[2] are rtt in numbers like "0.298/0.318/0.340/0.016"
 // parts[3] should always be "ms"
+// Copied/adapted from etl/parser/pt.go.
 func ProcessOneTuple(parts []string, protocol string, currentLeaves []Node, allNodes, newLeaves *[]Node) error {
 	if parts[3] != "ms" {
 		return errors.New("malformed line - Expected 'ms'")
@@ -324,6 +338,7 @@ func ProcessOneTuple(parts []string, protocol string, currentLeaves []Node, allN
 }
 
 // Parse the raw test file into hops ParisTracerouteHop.
+// Copied/adapted from etl/parser/pt.go.
 func Parse(fileName string, testName string, testID string, rawContent []byte) (cachedPTData, error) {
 	//log.Printf("%s", testName)
 
@@ -435,6 +450,8 @@ func Parse(fileName string, testName string, testID string, rawContent []byte) (
 	}, nil
 }
 
+// XXX ^^^^^^^ Largely copy paste from etl/parser/pt.go
+
 // PTParser encapsulates data for a paris-traceroute measurement.
 type PTParser struct {
 	// Care should be taken to ensure this does not accumulate many rows and
@@ -453,6 +470,7 @@ func (pt *PTParser) ParseAndWrite(fileName string, testName string, rawContent [
 	pt.taskFileName = fileName
 
 	// Process the legacy Paris Traceroute txt output
+	// XXX Why is this considered legacy?
 	cachedTest, err := Parse(fileName, testName, testID, rawContent)
 	if err != nil {
 		log.Printf("%v %s", err, testName)
