@@ -58,7 +58,6 @@ var (
 
 	// hostname of the current machine. Only call os.Hostname once, because the
 	// result should never change.
-	//lint:ignore U1000 hostname is used for testing.
 	hostname string
 
 	// log.Fatal turned into a variable to aid in testing of error conditions.
@@ -84,7 +83,6 @@ type Metadata struct {
 // extractUUID retrieves the UUID from a cached line.
 //
 // TODO: Eliminate the need to unmarshal data we marshaled in the first place.
-//lint:ignore U1000 extractUUID is used for testing.
 func extractUUID(metaline string) string {
 	var metaResult Metadata
 	err := json.Unmarshal([]byte(metaline), &metaResult)
