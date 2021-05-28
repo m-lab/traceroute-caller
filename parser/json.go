@@ -4,13 +4,35 @@ import (
 	"encoding/json"
 	"errors"
 	"log"
-	"path/filepath"
+	"os"
 	"strings"
 	"time"
 
 	"github.com/google/go-jsonnet"
 	"github.com/m-lab/traceroute-caller/schema"
 )
+
+func init() {
+	InitParserVersion()
+}
+
+var gParserVersion string
+
+// InitParserVersion initializes the gParserVersion variable for use by all parsers.
+func InitParserVersion() string {
+	release, ok := os.LookupEnv("RELEASE_TAG")
+	if ok && release != "empty_tag" {
+		gParserVersion = "https://github.com/m-lab/traceroute-caller/tree/" + release
+	} else {
+		hash := os.Getenv("COMMIT_HASH")
+		if len(hash) >= 8 {
+			gParserVersion = "https://github.com/m-lab/traceroute-caller/tree/" + hash[0:8]
+		} else {
+			gParserVersion = "local development"
+		}
+	}
+	return gParserVersion
+}
 
 // Parse Scamper JSON filename like
 // The format of JSON can be found at
@@ -237,22 +259,4 @@ func ParseRaw(data []byte, connTime time.Time) (schema.PTTestRaw, error) {
 		TracerouteCallerCommit: version,
 	}
 	return output, nil
-}
-
-// ParseJSON the raw jsonl test file into schema.PTTest.
-// NB: This is NOT the scamper tool format.
-func ParseJSON(testName string, rawContent []byte) (schema.PTTestRaw, error) {
-	// Get the logtime
-	logTime, err := GetLogtime(PTFileName{Name: filepath.Base(testName)})
-	if err != nil {
-		return schema.PTTestRaw{}, err
-	}
-
-	PTTest, err := ParseRaw(rawContent, logTime)
-
-	if err != nil {
-		return schema.PTTestRaw{}, err
-	}
-	PTTest.TestTime = logTime
-	return PTTest, nil
 }
