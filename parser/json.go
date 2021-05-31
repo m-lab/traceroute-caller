@@ -1,11 +1,11 @@
 package parser
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"net"
 	"os"
-	"strings"
 )
 
 func init() {
@@ -177,25 +177,27 @@ func ExtractHops(tracelb *TracelbLine) ([]string, error) {
 func ExtractTraceLB(data []byte) (*TracelbLine, error) {
 	var cycleStart CyclestartLine
 	var cycleStop CyclestopLine
+	sep := []byte{'\n'}
 
-	jsonStrings := strings.Split(string(data), "\n")
-	if len(jsonStrings) != 3 && (len(jsonStrings) != 4 || strings.TrimSpace(jsonStrings[3]) != "") {
+	jsonLines := bytes.Split(data, sep)
+	//jsonStrings := strings.Split(string(data), "\n")
+	if len(jsonLines) != 3 && (len(jsonLines) != 4 || len(jsonLines[3]) != 0) {
 		return nil, errors.New("test has wrong number of lines")
 	}
 
 	// Are these necessary, or should we ignore errors in cycleStart/Stop?
-	err := json.Unmarshal([]byte(jsonStrings[0]), &cycleStart)
+	err := json.Unmarshal(jsonLines[0], &cycleStart)
 	if err != nil {
 		return nil, errors.New("invalid cycle-start")
 	}
 
-	err = json.Unmarshal([]byte(jsonStrings[2]), &cycleStop)
+	err = json.Unmarshal(jsonLines[2], &cycleStop)
 	if err != nil {
 		return nil, errors.New("invalid cycle-stop")
 	}
 
 	var tracelb TracelbLine
-	err = json.Unmarshal([]byte(jsonStrings[1]), &tracelb)
+	err = json.Unmarshal(jsonLines[1], &tracelb)
 	if err != nil {
 		return nil, errors.New("invalid tracelb")
 	}
