@@ -16,6 +16,17 @@ func init() {
 
 var gParserVersion string
 
+var (
+	ErrNotTraceLB         = errors.New("not a tracelb record")
+	ErrNoTypeField        = errors.New("no type field")
+	ErrTypeNotAString     = errors.New("type is not a string")
+	ErrWrongNumberRecords = errors.New("wrong number of JSONL lines")
+	ErrNoNodes            = errors.New("record has no node fields")
+	ErrNoAddr             = errors.New("node has no addr fields")
+	ErrBadLinkC           = errors.New("linkc field does not match")
+	ErrInvalidIP          = errors.New("not an IP address")
+)
+
 // InitParserVersion initializes the gParserVersion variable for use by all parsers.
 func InitParserVersion() string {
 	release, ok := os.LookupEnv("RELEASE_TAG")
@@ -175,24 +186,113 @@ func ExtractHops1(tracelb *TracelbLine) ([]string, error) {
 	return hopStrings, nil
 }
 
+func getIP(data []byte) (net.IP, error) {
+	// XXX convert to GetString
+	addr, inner := jsonparser.GetString(data, "addr")
+	switch inner {
+	case nil:
+		// Parse the IP string, to avoid formatting variations.
+		ip := net.ParseIP(string(addr))
+		// There seems to be a problem letting through <nil> values
+		if ip.String() != "" && ip.String() != "<nil>" {
+			return ip, nil
+		}
+		return ip, ErrInvalidIP
+	case jsonparser.KeyPathNotFoundError:
+		// This will only happen if there are NO address fields in the whole node.
+		// Should we instead look for link fields?
+		log.Println("addr field not found")
+		return nil, ErrNoAddr
+	default:
+		log.Println(inner)
+		return nil, inner
+	}
+}
+
 func ExtractHops(data []byte) ([]string, error) {
 	hops := make(map[string]struct{}, 100)
 
-	jsonparser.ArrayEach(data, func(value []byte, dataType jsonparser.ValueType, offset int, err error) {
-		addr, datatype, _, _ := jsonparser.Get(value, "addr")
-		if datatype == jsonparser.String {
-			// Parse the IP string, to avoid formatting variations.
-			ip := net.ParseIP(string(addr))
-			// There seems to be a problem letting through <nil> values
-			if ip.String() != "" && ip.String() != "<nil>" {
-				hops[ip.String()] = struct{}{}
-			}
+	// XXX Should use single call to get all needed non-array fields, type, linkc, nodec
+	recordType, err := jsonparser.GetString(data, "type")
+	switch err {
+	case nil:
+	case jsonparser.KeyPathNotFoundError:
+		return nil, ErrNoTypeField
+	default:
+		return nil, err
+	}
+	if string(recordType) != "tracelb" {
+		return nil, ErrNotTraceLB
+	}
+
+	linkc, err := jsonparser.GetInt(data, "linkc")
+	if err != nil {
+		return nil, err
+	}
+
+	var addrErr error
+	_, err = jsonparser.ArrayEach(data, func(nodeValue []byte, dataType jsonparser.ValueType, offset int, err error) {
+		log.Println("node")
+		ip, e1 := getIP(nodeValue)
+		switch e1 {
+		case nil:
+			log.Println(" -  addr", ip.String())
+			hops[ip.String()] = struct{}{}
+		default:
+		}
+		// links is an array containing more arrays...
+		_, linkErr1 := jsonparser.ArrayEach(nodeValue,
+			func(linksValue []byte, datatype jsonparser.ValueType, offset int, err error) {
+				_, linkErr2 := jsonparser.ArrayEach(nodeValue,
+					func(linksValue []byte, datatype jsonparser.ValueType, offset int, err error) {
+						log.Println("  link")
+						addr, inner := jsonparser.GetString(linksValue, "addr")
+						switch inner {
+						case nil:
+							ip := net.ParseIP(string(addr))
+							log.Println(" +  addr", ip.String())
+							// There seems to be a problem letting through <nil> values
+							if ip.String() != "" && ip.String() != "<nil>" {
+								hops[ip.String()] = struct{}{}
+							}
+						case jsonparser.KeyPathNotFoundError:
+							// This will only happen if there are NO address fields in the whole node.
+							// Should we instead look for link fields?
+							log.Println("addr field not found", string(linksValue))
+							addrErr = ErrNoAddr
+						default:
+							log.Println(inner)
+							addrErr = inner
+						}
+
+					}, "")
+				if linkErr2 != nil {
+					panic(linkErr2)
+				}
+			}, "links")
+		if linkErr1 != nil {
+			panic(linkErr1)
 		}
 	}, "nodes")
+
+	switch err {
+	case nil: // do nothing
+	case jsonparser.KeyPathNotFoundError:
+		return nil, ErrNoNodes
+	default:
+		return nil, err
+	}
+	if addrErr != nil {
+		log.Println("addr error", addrErr)
+		return nil, addrErr
+	}
 
 	hopStrings := make([]string, 0, len(hops))
 	for h := range hops {
 		hopStrings = append(hopStrings, h)
+	}
+	if int(linkc) != len(hops) {
+		return hopStrings, ErrBadLinkC
 	}
 	return hopStrings, nil
 }
@@ -206,7 +306,7 @@ func ExtractTraceLB(data []byte) (*TracelbLine, error) {
 	jsonLines := bytes.Split(data, sep)
 	//jsonStrings := strings.Split(string(data), "\n")
 	if len(jsonLines) != 3 && (len(jsonLines) != 4 || len(jsonLines[3]) != 0) {
-		return nil, errors.New("test has wrong number of lines")
+		return nil, ErrWrongNumberRecords
 	}
 
 	// Are these necessary, or should we ignore errors in cycleStart/Stop?
