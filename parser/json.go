@@ -6,6 +6,8 @@ import (
 	"errors"
 	"net"
 	"os"
+
+	"github.com/buger/jsonparser"
 )
 
 func init() {
@@ -146,7 +148,7 @@ type CyclestopLine struct {
 // ParseJSONL code in etl/parser/pt.go
 
 // ExtractHops parses tracelb and extract all hop addresses.
-func ExtractHops(tracelb *TracelbLine) ([]string, error) {
+func ExtractHops1(tracelb *TracelbLine) ([]string, error) {
 	// Unfortunately, net.IP cannot be used as map key.
 	hops := make(map[string]struct{}, 100)
 
@@ -166,6 +168,28 @@ func ExtractHops(tracelb *TracelbLine) ([]string, error) {
 			}
 		}
 	}
+	hopStrings := make([]string, 0, len(hops))
+	for h := range hops {
+		hopStrings = append(hopStrings, h)
+	}
+	return hopStrings, nil
+}
+
+func ExtractHops(data []byte) ([]string, error) {
+	hops := make(map[string]struct{}, 100)
+
+	jsonparser.ArrayEach(data, func(value []byte, dataType jsonparser.ValueType, offset int, err error) {
+		addr, datatype, _, _ := jsonparser.Get(value, "addr")
+		if datatype == jsonparser.String {
+			// Parse the IP string, to avoid formatting variations.
+			ip := net.ParseIP(string(addr))
+			// There seems to be a problem letting through <nil> values
+			if ip.String() != "" && ip.String() != "<nil>" {
+				hops[ip.String()] = struct{}{}
+			}
+		}
+	}, "nodes")
+
 	hopStrings := make([]string, 0, len(hops))
 	for h := range hops {
 		hopStrings = append(hopStrings, h)
@@ -202,4 +226,16 @@ func ExtractTraceLB(data []byte) (*TracelbLine, error) {
 		return nil, errors.New("invalid tracelb")
 	}
 	return &tracelb, nil
+}
+
+func ExtractTraceLine(data []byte) ([]byte, error) {
+	sep := []byte{'\n'}
+
+	jsonLines := bytes.Split(data, sep)
+	//jsonStrings := strings.Split(string(data), "\n")
+	if len(jsonLines) != 3 && (len(jsonLines) != 4 || len(jsonLines[3]) != 0) {
+		return nil, errors.New("test has wrong number of lines")
+	}
+
+	return jsonLines[1], nil
 }
