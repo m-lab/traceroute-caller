@@ -19,14 +19,14 @@ import (
 )
 
 var (
-	ErrNotTraceLB         = errors.New("not a tracelb record")
-	ErrNoTypeField        = errors.New("no type field")
-	ErrTypeNotAString     = errors.New("type is not a string")
-	ErrWrongNumberRecords = errors.New("wrong number of JSONL lines")
-	ErrNoNodes            = errors.New("record has no node fields")
-	ErrNoAddr             = errors.New("node has no addr fields")
-	ErrBadLinkC           = errors.New("linkc field does not match")
-	ErrInvalidIP          = errors.New("not an IP address")
+	ErrNotTraceLB            = errors.New("not a tracelb record")
+	ErrNoTypeField           = errors.New("no type field")
+	ErrTypeNotAString        = errors.New("type is not a string")
+	ErrWrongNumberRecords    = errors.New("wrong number of JSONL lines")
+	ErrNoNodes               = errors.New("record has no node fields")
+	ErrNoAddr                = errors.New("node has no addr fields")
+	ErrInternalInconsistency = errors.New("link or node count doesn't match field")
+	ErrInvalidIP             = errors.New("not an IP address")
 )
 
 // TS contains a unix epoch timestamp.
@@ -157,24 +157,31 @@ func ExtractHops1(tracelb *TracelbLine) ([]string, error) {
 
 func getIP(data []byte) (net.IP, error) {
 	// XXX convert to GetString
-	addr, inner := jsonparser.GetString(data, "addr")
-	switch inner {
-	case nil:
-		// Parse the IP string, to avoid formatting variations.
-		ip := net.ParseIP(string(addr))
-		// There seems to be a problem letting through <nil> values
-		if ip.String() != "" && ip.String() != "<nil>" {
-			return ip, nil
-		}
-		return ip, ErrInvalidIP
-	case jsonparser.KeyPathNotFoundError:
-		// This will only happen if there are NO address fields in the whole node.
-		// Should we instead look for link fields?
-		log.Println("addr field not found")
-		return nil, ErrNoAddr
+	addr, err := jsonparser.GetString(data, "addr")
+	switch addr {
+	case "*":
+		// These are expected, and parse to <nil>
+		return nil, nil
 	default:
-		log.Println(inner)
-		return nil, inner
+		switch err {
+		case nil:
+			// Parse the IP string, to avoid formatting variations.
+			ip := net.ParseIP(string(addr))
+			if ip.String() == "<nil>" {
+				// This happens if the IP address is not parseable.
+				// It likely means an error in scamper, or a change in scamper behavior
+				return ip, ErrInvalidIP
+			}
+			return ip, nil
+		case jsonparser.KeyPathNotFoundError:
+			// This will only happen if there are NO address fields in the input.
+			// It should not happen in normal scamper output.
+			return nil, ErrNoAddr
+		default:
+			// This is unexpected - we only expect KeyPathNotFoundError
+			log.Println(err)
+			return nil, err
+		}
 	}
 }
 
@@ -184,7 +191,7 @@ func ExtractHops(data []byte) ([]string, error) {
 	// XXX Should use single call to get all needed non-array fields, type, linkc, nodec
 	recordType, err := jsonparser.GetString(data, "type")
 	switch err {
-	case nil:
+	case nil: // Normal behavior
 	case jsonparser.KeyPathNotFoundError:
 		return nil, ErrNoTypeField
 	default:
@@ -194,53 +201,61 @@ func ExtractHops(data []byte) ([]string, error) {
 		return nil, ErrNotTraceLB
 	}
 
-	linkc, err := jsonparser.GetInt(data, "linkc")
+	nodec, err := jsonparser.GetInt(data, "nodec")
 	if err != nil {
 		return nil, err
 	}
+	if nodec == 0 {
+		return nil, ErrNoNodes
+	}
+
+	//	linkc, err := jsonparser.GetInt(data, "linkc")
+	//	if err != nil {
+	//		return nil, err
+	//	}
+
+	//	nodeCount := 0
+	//	linkCount := 0
 
 	var addrErr error
 	_, err = jsonparser.ArrayEach(data, func(nodeValue []byte, dataType jsonparser.ValueType, offset int, err error) {
-		log.Println("node")
+		//		nodeCount++
 		ip, e1 := getIP(nodeValue)
 		switch e1 {
 		case nil:
-			log.Println(" -  addr", ip.String())
-			hops[ip.String()] = struct{}{}
+			if ip != nil {
+				hops[ip.String()] = struct{}{}
+			}
 		default:
 		}
-		// links is an array containing more arrays...
+
+		// XXX - this may not be necessary, as it seems that there is a node for every IP address
+		// and final links have destinations of "*"
+
+		// links is an array containing another unnamed array...
 		_, linkErr1 := jsonparser.ArrayEach(nodeValue,
 			func(linksValue []byte, datatype jsonparser.ValueType, offset int, err error) {
-				_, linkErr2 := jsonparser.ArrayEach(nodeValue,
-					func(linksValue []byte, datatype jsonparser.ValueType, offset int, err error) {
-						log.Println("  link")
-						addr, inner := jsonparser.GetString(linksValue, "addr")
-						switch inner {
-						case nil:
-							ip := net.ParseIP(string(addr))
-							log.Println(" +  addr", ip.String())
-							// There seems to be a problem letting through <nil> values
-							if ip.String() != "" && ip.String() != "<nil>" {
-								hops[ip.String()] = struct{}{}
-							}
-						case jsonparser.KeyPathNotFoundError:
-							// This will only happen if there are NO address fields in the whole node.
-							// Should we instead look for link fields?
-							log.Println("addr field not found", string(linksValue))
-							addrErr = ErrNoAddr
-						default:
-							log.Println(inner)
-							addrErr = inner
+				//				linkCount++
+				// Parser the inner array
+				_, linkErr2 := jsonparser.ArrayEach(linksValue,
+					func(linksValue2 []byte, datatype jsonparser.ValueType, offset int, err error) {
+						ip, err := getIP(linksValue2)
+						if err != nil {
+							addrErr = err
+							return
 						}
-
-					}, "")
+						if ip != nil {
+							hops[ip.String()] = struct{}{}
+						}
+					}) // No key, because the array in unnamed
 				if linkErr2 != nil {
-					panic(linkErr2)
+					// XXX Add a metric
+					log.Println(linkErr2, string(linksValue))
 				}
 			}, "links")
 		if linkErr1 != nil {
-			panic(linkErr1)
+			// XXX Add a metric
+			log.Println(linkErr1, string(nodeValue))
 		}
 	}, "nodes")
 
@@ -260,9 +275,14 @@ func ExtractHops(data []byte) ([]string, error) {
 	for h := range hops {
 		hopStrings = append(hopStrings, h)
 	}
-	if int(linkc) != len(hops) {
-		return hopStrings, ErrBadLinkC
-	}
+
+	// It seems we don't actually understand the relationship between nodec/linkc
+	// and the number of parsed elements.
+	//
+	//	if int(linkc) != linkCount || int(nodec) != nodeCount {
+	//		log.Printf("%d/%d, %d/%d\n", nodeCount, nodec, linkCount, linkc)
+	//		return hopStrings, ErrInternalInconsistency
+	//	}
 	return hopStrings, nil
 }
 
