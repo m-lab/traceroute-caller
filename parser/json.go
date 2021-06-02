@@ -167,6 +167,9 @@ func getIP(data []byte) (net.IP, error) {
 		case nil:
 			// Parse the IP string, to avoid formatting variations.
 			ip := net.ParseIP(string(addr))
+			// XXX Not clear whether we should check this - perhaps leave it
+			// for the caller to deal with.  In particular, we don't want
+			// a bad IP address to interfere with annotating good IPs
 			if ip.String() == "<nil>" {
 				// This happens if the IP address is not parseable.
 				// It likely means an error in scamper, or a change in scamper behavior
@@ -218,46 +221,47 @@ func ExtractHops(data []byte) ([]string, error) {
 	//	linkCount := 0
 
 	var addrErr error
-	_, err = jsonparser.ArrayEach(data, func(nodeValue []byte, dataType jsonparser.ValueType, offset int, err error) {
-		//		nodeCount++
-		ip, e1 := getIP(nodeValue)
-		switch e1 {
-		case nil:
-			if ip != nil {
-				hops[ip.String()] = struct{}{}
-			}
-		default:
-		}
-
-		// XXX - this may not be necessary, as it seems that there is a node for every IP address
-		// and final links have destinations of "*"
-
-		// links is an array containing another unnamed array...
-		_, linkErr1 := jsonparser.ArrayEach(nodeValue,
-			func(linksValue []byte, datatype jsonparser.ValueType, offset int, err error) {
-				//				linkCount++
-				// Parser the inner array
-				_, linkErr2 := jsonparser.ArrayEach(linksValue,
-					func(linksValue2 []byte, datatype jsonparser.ValueType, offset int, err error) {
-						ip, err := getIP(linksValue2)
-						if err != nil {
-							addrErr = err
-							return
-						}
-						if ip != nil {
-							hops[ip.String()] = struct{}{}
-						}
-					}) // No key, because the array in unnamed
-				if linkErr2 != nil {
-					// XXX Add a metric
-					log.Println(linkErr2, string(linksValue))
+	_, err = jsonparser.ArrayEach(data,
+		func(nodeValue []byte, dataType jsonparser.ValueType, offset int, err error) {
+			//		nodeCount++
+			ip, e1 := getIP(nodeValue)
+			switch e1 {
+			case nil:
+				if ip != nil {
+					hops[ip.String()] = struct{}{}
 				}
-			}, "links")
-		if linkErr1 != nil {
-			// XXX Add a metric
-			log.Println(linkErr1, string(nodeValue))
-		}
-	}, "nodes")
+			default:
+			}
+
+			// XXX - this may not be necessary, as it seems that there is a node for every IP address
+			// and final links have destinations of "*"
+
+			// links is an array containing another unnamed array...
+			_, linkErr1 := jsonparser.ArrayEach(nodeValue,
+				func(linksValue []byte, datatype jsonparser.ValueType, offset int, err error) {
+					//				linkCount++
+					// Parser the inner array
+					_, linkErr2 := jsonparser.ArrayEach(linksValue,
+						func(linksValue2 []byte, datatype jsonparser.ValueType, offset int, err error) {
+							ip, err := getIP(linksValue2)
+							if err != nil {
+								addrErr = err
+								return
+							}
+							if ip != nil {
+								hops[ip.String()] = struct{}{}
+							}
+						}) // No key, because the array in unnamed
+					if linkErr2 != nil {
+						// XXX Add a metric
+						log.Println(linkErr2, string(linksValue))
+					}
+				}, "links")
+			if linkErr1 != nil {
+				// XXX Add a metric
+				log.Println(linkErr1, string(nodeValue))
+			}
+		}, "nodes")
 
 	switch err {
 	case nil: // do nothing
