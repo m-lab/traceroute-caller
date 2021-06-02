@@ -231,7 +231,8 @@ func ExtractHops(data []byte) ([]string, error) {
 	//	nodeCount := 0
 	//	linkCount := 0
 
-	var addrErr error
+	var addrErr error // Not really happy with this.  Better way?
+
 	_, err = jsonparser.ArrayEach(data,
 		func(nodeValue []byte, dataType jsonparser.ValueType, offset int, err error) {
 			//		nodeCount++
@@ -254,9 +255,9 @@ func ExtractHops(data []byte) ([]string, error) {
 					// Parser the inner array
 					_, linkErr2 := jsonparser.ArrayEach(linksValue,
 						func(linksValue2 []byte, datatype jsonparser.ValueType, offset int, err error) {
-							ip, err := getIP(linksValue2)
-							if err != nil {
-								addrErr = err
+							ip, ipErr := getIP(linksValue2)
+							if ipErr != nil {
+								addrErr = ipErr
 								return
 							}
 							if ip != nil {
