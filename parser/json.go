@@ -6,8 +6,6 @@ import (
 	"net"
 	"os"
 	"strings"
-
-	"github.com/kr/pretty"
 )
 
 func init() {
@@ -103,9 +101,9 @@ type Metadata struct {
 type CyclestartLine struct {
 	Type      string  `json:"type"`      // "cycle-start"
 	ListName  string  `json:"list_name"` // e.g. "/tmp/scamperctrl:58"
-	ID        float64 `json:"id"`        // e.g. 1 - seems to be an integer?
+	ID        float64 `json:"id"`        // XXX Integer?
 	Hostname  string  `json:"hostname"`
-	StartTime float64 `json:"start_time"` // This is a unix epoch time.
+	StartTime float64 `json:"start_time"` // XXX Integer? This is a unix epoch time.
 }
 
 // TracelbLine contains the actual scamper trace details.
@@ -113,12 +111,12 @@ type CyclestartLine struct {
 type TracelbLine struct {
 	Type    string  `json:"type"`
 	Version string  `json:"version"`
-	Userid  float64 `json:"userid"`
+	Userid  float64 `json:"userid"` // XXX Integer?
 	Method  string  `json:"method"`
 	Src     string  `json:"src"`
 	Dst     string  `json:"dst"`
 	Start   TS      `json:"start"`
-	// NOTE: None of these seem to be actual floats - all ints.
+	// XXX - None of these seem to be actual floats - change to int?
 	ProbeSize   float64       `json:"probe_size"`
 	Firsthop    float64       `json:"firsthop"`
 	Attempts    float64       `json:"attempts"`
@@ -148,8 +146,8 @@ type CyclestopLine struct {
 // ParseJSONL code in etl/parser/pt.go
 
 // ExtractHops parses tracelb and extract all hop addresses.
-// XXX Should this just return the map?
 func ExtractHops(tracelb *TracelbLine) ([]string, error) {
+	// Unfortunately, net.IP cannot be used as map key.
 	hops := make(map[string]struct{}, 100)
 
 	// Parse the json into struct
@@ -181,7 +179,6 @@ func ExtractTraceLB(data []byte) (*TracelbLine, error) {
 	var cycleStop CyclestopLine
 
 	jsonStrings := strings.Split(string(data), "\n")
-	pretty.Print(jsonStrings)
 	if len(jsonStrings) != 3 && (len(jsonStrings) != 4 || strings.TrimSpace(jsonStrings[3]) != "") {
 		return nil, errors.New("test has wrong number of lines")
 	}
