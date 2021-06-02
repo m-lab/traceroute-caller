@@ -18,8 +18,8 @@ import (
 )
 
 var (
-	ErrNotTraceLB            = errors.New("not a tracelb record")
 	ErrNoTypeField           = errors.New("no type field")
+	ErrNotTraceLB            = errors.New("not a tracelb record")
 	ErrTypeNotAString        = errors.New("type is not a string")
 	ErrWrongNumberRecords    = errors.New("wrong number of JSONL lines")
 	ErrNoNodes               = errors.New("record has no node fields")
@@ -187,6 +187,8 @@ func getIP(data []byte) (net.IP, error) {
 	}
 }
 
+// ExtractTraceLine extracts the second of three lines in a scamper JSONL record,
+// and verifies that it is a tracelb record.
 func ExtractTraceLine(data []byte) ([]byte, error) {
 	sep := []byte{'\n'}
 
@@ -196,14 +198,8 @@ func ExtractTraceLine(data []byte) ([]byte, error) {
 		return nil, errors.New("test has wrong number of lines")
 	}
 
-	return jsonLines[1], nil
-}
-
-func ExtractHops(data []byte) ([]string, error) {
-	hops := make(map[string]struct{}, 100)
-
 	// XXX Should use single call to get all needed non-array fields, type, linkc, nodec
-	recordType, err := jsonparser.GetString(data, "type")
+	recordType, err := jsonparser.GetString(jsonLines[1], "type")
 	switch err {
 	case nil: // Normal behavior
 	case jsonparser.KeyPathNotFoundError:
@@ -214,6 +210,13 @@ func ExtractHops(data []byte) ([]string, error) {
 	if string(recordType) != "tracelb" {
 		return nil, ErrNotTraceLB
 	}
+
+	return jsonLines[1], nil
+}
+
+// ExtractHops extracts the hop IP address from nodes in a tracelb json record.
+func ExtractHops(data []byte) ([]string, error) {
+	hops := make(map[string]struct{}, 100)
 
 	nodec, err := jsonparser.GetInt(data, "nodec")
 	if err != nil {
