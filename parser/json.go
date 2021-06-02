@@ -10,7 +10,6 @@ package parser
 
 import (
 	"bytes"
-	"encoding/json"
 	"errors"
 	"log"
 	"net"
@@ -188,6 +187,18 @@ func getIP(data []byte) (net.IP, error) {
 	}
 }
 
+func ExtractTraceLine(data []byte) ([]byte, error) {
+	sep := []byte{'\n'}
+
+	jsonLines := bytes.Split(data, sep)
+	//jsonStrings := strings.Split(string(data), "\n")
+	if len(jsonLines) != 3 && (len(jsonLines) != 4 || len(jsonLines[3]) != 0) {
+		return nil, errors.New("test has wrong number of lines")
+	}
+
+	return jsonLines[1], nil
+}
+
 func ExtractHops(data []byte) ([]string, error) {
 	hops := make(map[string]struct{}, 100)
 
@@ -288,49 +299,4 @@ func ExtractHops(data []byte) ([]string, error) {
 	//		return hopStrings, ErrInternalInconsistency
 	//	}
 	return hopStrings, nil
-}
-
-// ExtractTraceLB extracts the traceLB line from scamper JSONL.
-// Not currently used, but expected to be used soon for hop annotations.
-func ExtractTraceLB(data []byte) (*TracelbLine, error) {
-	var cycleStart CyclestartLine
-	var cycleStop CyclestopLine
-	sep := []byte{'\n'}
-
-	jsonLines := bytes.Split(data, sep)
-	//jsonStrings := strings.Split(string(data), "\n")
-	if len(jsonLines) != 3 && (len(jsonLines) != 4 || len(jsonLines[3]) != 0) {
-		return nil, ErrWrongNumberRecords
-	}
-
-	// TODO These (cycleStart/Stop checking) are not strictly necessary.  We'll keep them for a while for
-	// debugging, but will likely remove them soon, as they provide little value.
-	err := json.Unmarshal(jsonLines[0], &cycleStart)
-	if err != nil {
-		return nil, errors.New("invalid cycle-start")
-	}
-
-	err = json.Unmarshal(jsonLines[2], &cycleStop)
-	if err != nil {
-		return nil, errors.New("invalid cycle-stop")
-	}
-
-	var tracelb TracelbLine
-	err = json.Unmarshal(jsonLines[1], &tracelb)
-	if err != nil {
-		return nil, errors.New("invalid tracelb")
-	}
-	return &tracelb, nil
-}
-
-func ExtractTraceLine(data []byte) ([]byte, error) {
-	sep := []byte{'\n'}
-
-	jsonLines := bytes.Split(data, sep)
-	//jsonStrings := strings.Split(string(data), "\n")
-	if len(jsonLines) != 3 && (len(jsonLines) != 4 || len(jsonLines[3]) != 0) {
-		return nil, errors.New("test has wrong number of lines")
-	}
-
-	return jsonLines[1], nil
 }
