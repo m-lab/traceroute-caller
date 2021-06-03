@@ -1,3 +1,11 @@
+// parser package handles parsing of scamper JSONL.
+// The format of JSON can be found at
+// https://www.caida.org/tools/measurement/scamper/.
+// NB: It is not clear where at that URL the format can be found.
+// The structs here may just be derived from the actual scamper json files.
+// scamper-cvs-20191102 trace/scamper_trace.h contains C structs that
+// may be helpful for understanding this, though the structures are different
+// from the JSON structure.
 package parser
 
 import (
@@ -29,15 +37,6 @@ func InitParserVersion() string {
 	}
 	return gParserVersion
 }
-
-// Parse Scamper JSON filename like
-// The format of JSON can be found at
-// https://www.caida.org/tools/measurement/scamper/.
-// NB: It is not clear where at that URL the format can be found.
-// The structs here may just be derived from the actual scamper json files.
-// scamper-cvs-20191102 trace/scamper_trace.h contains C structs that
-// may be helpful for understanding this, though the structures are different
-// from the JSON structure.
 
 // TS contains a unix epoch timestamp.
 type TS struct {
