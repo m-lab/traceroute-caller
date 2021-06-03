@@ -1,13 +1,13 @@
-package parser
+// parser package (this file in particular) is obsolete and will soon be deleted
+// Parse PT filename like 20170320T23:53:10Z-98.162.212.214-53849-64.86.132.75-42677.paris
+// The format of legacy test file can be found at https://paris-traceroute.net/.
 
 // Much of this file is copied from code in etl/parser/pt.go.  This comment
 // (just below) doesn't really belong here.  Node, ProcessAllNodes, Unique,
 // ParseFirstLine, ParseOneTuple, and Parse are duplicated almost exactly
 // from etl.  However, much of that code is for handling different "legacy"
 // Paris traceroute data, and does not belong here.
-
-// Parse PT filename like 20170320T23:53:10Z-98.162.212.214-53849-64.86.132.75-42677.paris
-// The format of legacy test file can be found at https://paris-traceroute.net/.
+package parser
 
 import (
 	"errors"

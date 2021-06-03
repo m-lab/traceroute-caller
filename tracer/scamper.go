@@ -108,7 +108,7 @@ func (s *Scamper) trace(conn connection.Connection, t time.Time) (string, error)
 
 	rtx.PanicOnError(err, "Command %v failed", cmd)
 	rtx.PanicOnError(ioutil.WriteFile(filename, buff.Bytes(), 0666), "Could not save output to file")
-	return string(buff.Bytes()), nil
+	return buff.String(), nil
 }
 
 // ScamperDaemon contains a single instance of a scamper process. Once the ScamperDaemon has
@@ -218,5 +218,5 @@ func (d *ScamperDaemon) trace(conn connection.Connection, t time.Time) (string, 
 
 	rtx.PanicOnError(err, "Command %v failed", cmd)
 	rtx.PanicOnError(ioutil.WriteFile(filename, buff.Bytes(), 0666), "Could not save output to file")
-	return string(buff.Bytes()), nil
+	return buff.String(), nil
 }

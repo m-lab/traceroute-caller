@@ -35,7 +35,7 @@ func (ft *fakeTracer) Trace(conn connection.Connection, t time.Time) (string, er
 	log.Println("Tracing", conn)
 	ft.ips = append(ft.ips, conn.RemoteIP)
 	ft.wg.Done()
-	return "Fake test Result", nil
+	return "Fake test result", nil
 }
 
 func (ft *fakeTracer) TraceFromCachedTrace(conn connection.Connection, t time.Time, cachedTest string) error {
