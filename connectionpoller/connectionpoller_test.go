@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/m-lab/traceroute-caller/ipcache"
-	"github.com/m-lab/uuid-annotator/ipservice"
 
 	"github.com/m-lab/go/rtx"
 	"github.com/m-lab/traceroute-caller/connection"
@@ -122,29 +121,13 @@ func TestGetConnectionsWithFakeSS(t *testing.T) {
 	}
 }
 
-type testData struct {
-	data []byte
-}
-
-func (td testData) GetData() []byte {
-	return td.data
-}
-
-func (td testData) AnnotateHops(client ipservice.Client) error {
-	return nil
-}
-
-func (td testData) CachedTraceroute(newUUID string) ipcache.TracerouteData {
-	return td
-}
-
 type testTracer struct{}
 
-func (tt *testTracer) Trace(conn connection.Connection, t time.Time) (ipcache.TracerouteData, error) {
-	return testData{data: []byte("Fake Trace test")}, nil
+func (tt *testTracer) Trace(conn connection.Connection, t time.Time) (string, error) {
+	return "Fake Trace test", nil
 }
 
-func (tt *testTracer) TraceFromCachedTrace(conn connection.Connection, t time.Time, cachedTest ipcache.TracerouteData) error {
+func (tt *testTracer) TraceFromCachedTrace(conn connection.Connection, t time.Time, cachedTest string) error {
 	return nil
 }
 

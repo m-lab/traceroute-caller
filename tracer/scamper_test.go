@@ -7,7 +7,6 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
-	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -15,36 +14,13 @@ import (
 
 	"github.com/m-lab/go/prometheusx"
 	"github.com/m-lab/go/rtx"
-	"github.com/m-lab/go/warnonerror"
 	"github.com/m-lab/traceroute-caller/connection"
 	"github.com/m-lab/traceroute-caller/ipcache"
-	"github.com/m-lab/traceroute-caller/schema"
-	"github.com/m-lab/uuid-annotator/annotator"
-	"github.com/m-lab/uuid-annotator/asnannotator"
-	"github.com/m-lab/uuid-annotator/geoannotator"
-	"github.com/m-lab/uuid-annotator/ipservice"
 	"github.com/m-lab/uuid/prefix"
 )
 
-func TestExtractIP(t *testing.T) {
-	var hops []schema.ScamperHop
-	hops = append(hops, schema.ScamperHop{
-		Source: schema.HopIP{IP: "180.87.97.101"},
-	})
-	hops = append(hops, schema.ScamperHop{
-		Source: schema.HopIP{IP: "1.47.236.62"},
-	})
-	pt := schema.PTTestRaw{
-		Hop: hops,
-	}
-	output := extractIP(pt)
-	if len(output) != 2 {
-		t.Error("Should be 2 hop IPs")
-	}
-
-	if output[0] != "180.87.97.101" {
-		t.Error("Faile to extract hop IPs")
-	}
+func init() {
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
 }
 
 func TestScamper(t *testing.T) {
@@ -70,12 +46,21 @@ func TestScamper(t *testing.T) {
 
 	// Test Trace
 	out, err := s.Trace(conn, now)
-	if err == nil || err.Error() != "invalid test" {
-		t.Error("The faked test should fail the parsing for annotation")
+	if err != nil {
+		t.Error(err)
 	}
-
-	if out != nil {
-		t.Error("Should return empty output")
+	uuid, err := conn.UUID()
+	rtx.Must(err, "Could not make uuid")
+	expected := `{"UUID":"` + uuid + `","TracerouteCallerVersion":"` + prometheusx.GitShortCommit + `","CachedResult":false,"CachedUUID":""}
+-I tracelb -P icmp-echo -q 3 -O ptr 10.1.1.1 -o- -O json
+`
+	if strings.TrimSpace(out) != strings.TrimSpace(expected) {
+		t.Error("Bad output:", out)
+	}
+	contents, err := ioutil.ReadFile(dir + "/2003/11/09/20031109T155559Z_" + prefix.UnsafeString() + "_00000000000012AB.jsonl")
+	rtx.Must(err, "Could not read file")
+	if string(contents) != out {
+		t.Error("The contents of the file should equal the returned values from scraper")
 	}
 
 	s.Binary = "false"
@@ -202,8 +187,28 @@ func TestTraceWritesMeta(t *testing.T) {
 	prometheusx.GitShortCommit = "Fake Version"
 	_, err = d.Trace(c, faketime)
 
-	if err == nil || err.Error() != "invalid test" {
-		t.Error("Trace should fail with meta line only.")
+	if err != nil {
+		t.Error("Trace not done correctly.")
+	}
+	// Unmarshal the first line of the output file.
+	b, err := ioutil.ReadFile(tempdir + "/2019/04/01/20190401T034551Z_" + prefix.UnsafeString() + "_0000000000000001.jsonl")
+	rtx.Must(err, "Could not read file")
+
+	m := Metadata{}
+	lines := strings.Split(string(b), "\n")
+	if len(lines) < 2 {
+		t.Error("Not enough lines in", lines)
+	}
+	rtx.Must(json.Unmarshal([]byte(lines[0]), &m), "Could not unmarshal")
+
+	uuidChunks := strings.Split(m.UUID, "_")
+
+	if uuidChunks[len(uuidChunks)-1] != "0000000000000001" {
+		t.Error("Bad uuid:", m.UUID)
+	}
+
+	if m.TracerouteCallerVersion != "Fake Version" {
+		t.Error("Bad traceroute caller version:", m.TracerouteCallerVersion)
 	}
 }
 
@@ -239,7 +244,7 @@ func TestTraceTimeout(t *testing.T) {
 	if err.Error() != "timeout" {
 		t.Error("Should return TimeOut err, not ", err)
 	}
-	if data.GetData() != nil {
+	if data != "" {
 		t.Error("Should return empty string when TimeOut")
 	}
 }
@@ -271,27 +276,29 @@ func TestCreateCacheTest(t *testing.T) {
 
 	faketime := time.Date(2019, time.April, 1, 3, 45, 51, 0, time.UTC)
 	prometheusx.GitShortCommit = "Fake Version"
-	cachedTest := schema.PTTestRaw{
-		UUID:           "ndt-plh7v_1566050090_000000000004D64D",
-		ScamperVersion: "0.1",
-	}
+	cachedTest := `{"UUID": "ndt-plh7v_1566050090_000000000004D64D"}
+	{"type":"cycle-start", "list_name":"/tmp/scamperctrl:51811", "id":1, "hostname":"ndt-plh7v", "start_time":1566691298}
+	{"type":"tracelb", "version":"0.1", "userid":0, "method":"icmp-echo", "src":"::ffff:180.87.97.101", "dst":"::ffff:1.47.236.62", "start":{"sec":1566691298, "usec":476221, "ftime":"2019-08-25 00:01:38"}, "probe_size":60, "firsthop":1, "attempts":3, "confidence":95, "tos":0, "gaplimit":3, "wait_timeout":5, "wait_probe":250, "probec":0, "probec_max":3000, "nodec":0, "linkc":0}
+	{"type":"cycle-stop", "list_name":"/tmp/scamperctrl:51811", "id":1, "hostname":"ndt-plh7v", "stop_time":1566691298}`
 
-	var pt schema.PTTestRaw
-	d.TraceFromCachedTrace(c, faketime, &scamperData{data: pt})
+	d.TraceFromCachedTrace(c, faketime, "Broken cached test")
 	_, errInvalidTest := ioutil.ReadFile(tempdir + "/2019/04/01/20190401T034551Z_" + prefix.UnsafeString() + "_0000000000000001.jsonl")
 	if errInvalidTest == nil {
 		t.Error("should fail to generate cached test")
 	}
 
-	d.TraceFromCachedTrace(c, faketime, &scamperData{data: cachedTest})
+	d.TraceFromCachedTrace(c, faketime, cachedTest)
 
 	// Unmarshal the first line of the output file.
-	b, err := ioutil.ReadFile(tempdir + "/2019/04/01/20190401T034551Z_" + prefix.UnsafeString() + "_0000000000000001.json")
+	b, err := ioutil.ReadFile(tempdir + "/2019/04/01/20190401T034551Z_" + prefix.UnsafeString() + "_0000000000000001.jsonl")
 	rtx.Must(err, "Could not read file")
 
-	m := schema.PTTestRaw{}
-
-	rtx.Must(json.Unmarshal([]byte(b), &m), "Could not unmarshal")
+	m := Metadata{}
+	lines := strings.Split(string(b), "\n")
+	if len(lines) < 2 {
+		t.Error("Not enough lines in", lines)
+	}
+	rtx.Must(json.Unmarshal([]byte(lines[0]), &m), "Could not unmarshal")
 
 	uuidChunks := strings.Split(m.UUID, "_")
 
@@ -299,17 +306,21 @@ func TestCreateCacheTest(t *testing.T) {
 		t.Error("Bad uuid:", m.UUID)
 	}
 
-	if m.ScamperVersion != "0.1" {
-		t.Error("Bad traceroute caller version:", m.ScamperVersion)
+	if m.TracerouteCallerVersion != "Fake Version" {
+		t.Error("Bad traceroute caller version:", m.TracerouteCallerVersion)
 	}
 
 	if m.CachedResult != true {
 		t.Error("Bad traceroute CachedResult value:", m.CachedResult)
 	}
 
+	if m.CachedUUID != "ndt-plh7v_1566050090_000000000004D64D" {
+		t.Error("Bad traceroute CachedUUID value:", m.CachedUUID)
+	}
+
 	// Now test an error condition.
 	d.OutputPath = "/dev/null"
-	if d.TraceFromCachedTrace(c, faketime, &scamperData{data: cachedTest}) == nil {
+	if d.TraceFromCachedTrace(c, faketime, cachedTest) == nil {
 		t.Error("Should have had a test failure trying to write to /dev/null")
 	}
 }
@@ -375,96 +386,4 @@ func TestGetMetaline(t *testing.T) {
 // If this successfully compiles, then ScamperDaemon implements the Tracer interface.
 func assertScamperDaemonIsTracer(d *ScamperDaemon) {
 	func(t ipcache.Tracer) {}(d)
-}
-
-func TestAnnotateHops(t *testing.T) {
-	// Test IP service not exist
-	var hops []schema.ScamperHop
-	hops = append(hops, schema.ScamperHop{
-		Source: schema.HopIP{IP: "1.2.3.4"},
-	})
-	hops = append(hops, schema.ScamperHop{
-		Source: schema.HopIP{IP: "1.47.236.62"},
-	})
-	pt := schema.PTTestRaw{
-		Hop: hops,
-	}
-	sd := &scamperData{data: pt}
-	client := ipservice.NewClient("")
-	err := sd.AnnotateHops(client)
-	if err != nil {
-		t.Error("Should not fail with IP service not exist at all")
-	}
-
-	// Create fake service
-	dir, err := ioutil.TempDir("", "ExampleFakeServerForTesting")
-	rtx.Must(err, "could not create tempdir")
-	defer os.RemoveAll(dir)
-
-	*ipservice.SocketFilename = dir + "/ipservice.sock"
-	srv, err := ipservice.NewServer(*ipservice.SocketFilename,
-		asnannotator.NewFake(),
-		geoannotator.NewFake())
-	rtx.Must(err, "Could not create server")
-	defer warnonerror.Close(srv, "Could not stop the server")
-
-	go srv.Serve()
-
-	client2 := ipservice.NewClient(*ipservice.SocketFilename)
-	sd2 := &scamperData{data: pt}
-	err = sd2.AnnotateHops(client2)
-
-	if err != nil {
-		t.Error("Should succeed here")
-	}
-	// Notice that "asn" is 5 for IP "1.2.3.4"
-	expectedOutput := `{"schema_version":"","uuid":"","testtime":"0001-01-01T00:00:00Z","start_time":0,"stop_time":0,"scamper_version":"","serverIP":"","clientIP":"","probe_size":0,"probec":0,"hop":[{"source":{"ip":"1.2.3.4","hostname":"","geo":{"Missing":true},"network":{"CIDR":"1.2.3.4/32","ASNumber":5,"ASName":"Test Number Five","Systems":[{"ASNs":[5]}]}},"linkc":0,"link":null},{"source":{"ip":"1.47.236.62","hostname":"","geo":{"Missing":true},"network":{"Missing":true}},"linkc":0,"link":null}],"cached_result":false,"cached_uuid":"","traceroutecaller_commit":""}`
-	if string(sd2.GetData()) != string(expectedOutput) {
-		t.Error("Fail to add annotation.")
-	}
-}
-
-func TestInsertAnnotation(t *testing.T) {
-	fakeAnn := make(map[string]*annotator.ClientAnnotations)
-
-	var pt schema.PTTestRaw
-	output := insertAnnotation(fakeAnn, pt)
-	if !reflect.DeepEqual(pt, output) {
-		t.Error("Empty annotation should not change anything")
-	}
-
-	var hops []schema.ScamperHop
-	hops = append(hops, schema.ScamperHop{
-		Source: schema.HopIP{IP: "180.87.97.101"},
-	})
-	hops = append(hops, schema.ScamperHop{
-		Source: schema.HopIP{IP: "1.47.236.62"},
-	})
-	pt2 := schema.PTTestRaw{
-		Hop: hops,
-	}
-
-	fakeAnn["180.87.97.101"] = &annotator.ClientAnnotations{
-		Geo: &annotator.Geolocation{
-			ContinentCode: "NA",
-		},
-		Network: &annotator.Network{
-			ASNumber: 1234,
-		},
-	}
-
-	fakeAnn["1.47.236.62"] = &annotator.ClientAnnotations{
-		Geo: &annotator.Geolocation{
-			ContinentCode: "SA",
-		},
-		Network: &annotator.Network{
-			ASNumber: 5678,
-		},
-	}
-
-	output2 := insertAnnotation(fakeAnn, pt2)
-
-	if output2.Hop[0].Source.Network.ASNumber != 1234 {
-		t.Error("Cannot insert hop annotation")
-	}
 }
