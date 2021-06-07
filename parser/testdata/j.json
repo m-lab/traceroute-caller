@@ -1,0 +1,1225 @@
+{
+  "type": "tracelb",
+  "version": "0.1",
+  "userid": 0,
+  "method": "icmp-echo",
+  "src": "172.19.0.2",
+  "dst": "172.24.129.116",
+  "start": {
+    "sec": 1622745595,
+    "usec": 494138,
+    "ftime": "2021-06-03 18:39:55"
+  },
+  "probe_size": 44,
+  "firsthop": 1,
+  "attempts": 3,
+  "confidence": 95,
+  "tos": 0,
+  "gaplimit": 3,
+  "wait_timeout": 5,
+  "wait_probe": 250,
+  "probec": 44,
+  "probec_max": 3000,
+  "nodec": 9,
+  "linkc": 8,
+  "nodes": [
+    {
+      "addr": "172.19.0.1",
+      "name": "us-mtv-43-wmc1-vlan-250.n.corp.google.com",
+      "q_ttl": 1,
+      "linkc": 1,
+      "links": [
+        [
+          {
+            "addr": "100.116.79.252",
+            "probes": [
+              {
+                "tx": {
+                  "sec": 1622745595,
+                  "usec": 744337
+                },
+                "replyc": 1,
+                "ttl": 2,
+                "attempt": 0,
+                "flowid": 1,
+                "replies": [
+                  {
+                    "rx": {
+                      "sec": 1622745595,
+                      "usec": 745227
+                    },
+                    "ttl": 254,
+                    "rtt": 0.89,
+                    "ipid": 0,
+                    "icmp_type": 11,
+                    "icmp_code": 0,
+                    "icmp_q_tos": 0,
+                    "icmp_q_ttl": 1
+                  }
+                ]
+              },
+              {
+                "tx": {
+                  "sec": 1622745595,
+                  "usec": 995172
+                },
+                "replyc": 1,
+                "ttl": 2,
+                "attempt": 0,
+                "flowid": 2,
+                "replies": [
+                  {
+                    "rx": {
+                      "sec": 1622745595,
+                      "usec": 995430
+                    },
+                    "ttl": 254,
+                    "rtt": 0.258,
+                    "ipid": 0,
+                    "icmp_type": 11,
+                    "icmp_code": 0,
+                    "icmp_q_tos": 0,
+                    "icmp_q_ttl": 1
+                  }
+                ]
+              },
+              {
+                "tx": {
+                  "sec": 1622745596,
+                  "usec": 246021
+                },
+                "replyc": 1,
+                "ttl": 2,
+                "attempt": 0,
+                "flowid": 3,
+                "replies": [
+                  {
+                    "rx": {
+                      "sec": 1622745596,
+                      "usec": 246327
+                    },
+                    "ttl": 254,
+                    "rtt": 0.306,
+                    "ipid": 0,
+                    "icmp_type": 11,
+                    "icmp_code": 0,
+                    "icmp_q_tos": 0,
+                    "icmp_q_ttl": 1
+                  }
+                ]
+              },
+              {
+                "tx": {
+                  "sec": 1622745596,
+                  "usec": 496770
+                },
+                "replyc": 1,
+                "ttl": 2,
+                "attempt": 0,
+                "flowid": 4,
+                "replies": [
+                  {
+                    "rx": {
+                      "sec": 1622745596,
+                      "usec": 502909
+                    },
+                    "ttl": 254,
+                    "rtt": 6.139,
+                    "ipid": 0,
+                    "icmp_type": 11,
+                    "icmp_code": 0,
+                    "icmp_q_tos": 0,
+                    "icmp_q_ttl": 1
+                  }
+                ]
+              },
+              {
+                "tx": {
+                  "sec": 1622745596,
+                  "usec": 747323
+                },
+                "replyc": 1,
+                "ttl": 2,
+                "attempt": 0,
+                "flowid": 5,
+                "replies": [
+                  {
+                    "rx": {
+                      "sec": 1622745596,
+                      "usec": 747649
+                    },
+                    "ttl": 254,
+                    "rtt": 0.326,
+                    "ipid": 0,
+                    "icmp_type": 11,
+                    "icmp_code": 0,
+                    "icmp_q_tos": 0,
+                    "icmp_q_ttl": 1
+                  }
+                ]
+              },
+              {
+                "tx": {
+                  "sec": 1622745596,
+                  "usec": 998196
+                },
+                "replyc": 1,
+                "ttl": 2,
+                "attempt": 0,
+                "flowid": 6,
+                "replies": [
+                  {
+                    "rx": {
+                      "sec": 1622745596,
+                      "usec": 998964
+                    },
+                    "ttl": 254,
+                    "rtt": 0.768,
+                    "ipid": 0,
+                    "icmp_type": 11,
+                    "icmp_code": 0,
+                    "icmp_q_tos": 0,
+                    "icmp_q_ttl": 1
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      ]
+    },
+    {
+      "addr": "100.116.79.252",
+      "name": "us-svl-mp2-core1-irb-176.n.corp.google.com",
+      "q_ttl": 1,
+      "linkc": 1,
+      "links": [
+        [
+          {
+            "addr": "100.123.254.16",
+            "probes": [
+              {
+                "tx": {
+                  "sec": 1622745597,
+                  "usec": 248327
+                },
+                "replyc": 1,
+                "ttl": 3,
+                "attempt": 0,
+                "flowid": 1,
+                "replies": [
+                  {
+                    "rx": {
+                      "sec": 1622745597,
+                      "usec": 248729
+                    },
+                    "ttl": 253,
+                    "rtt": 0.402,
+                    "ipid": 0,
+                    "icmp_type": 11,
+                    "icmp_code": 0,
+                    "icmp_q_tos": 128,
+                    "icmp_q_ttl": 1
+                  }
+                ]
+              },
+              {
+                "tx": {
+                  "sec": 1622745597,
+                  "usec": 499345
+                },
+                "replyc": 1,
+                "ttl": 3,
+                "attempt": 0,
+                "flowid": 2,
+                "replies": [
+                  {
+                    "rx": {
+                      "sec": 1622745597,
+                      "usec": 499720
+                    },
+                    "ttl": 253,
+                    "rtt": 0.375,
+                    "ipid": 0,
+                    "icmp_type": 11,
+                    "icmp_code": 0,
+                    "icmp_q_tos": 128,
+                    "icmp_q_ttl": 1
+                  }
+                ]
+              },
+              {
+                "tx": {
+                  "sec": 1622745597,
+                  "usec": 750199
+                },
+                "replyc": 1,
+                "ttl": 3,
+                "attempt": 0,
+                "flowid": 3,
+                "replies": [
+                  {
+                    "rx": {
+                      "sec": 1622745597,
+                      "usec": 750650
+                    },
+                    "ttl": 253,
+                    "rtt": 0.451,
+                    "ipid": 0,
+                    "icmp_type": 11,
+                    "icmp_code": 0,
+                    "icmp_q_tos": 128,
+                    "icmp_q_ttl": 1
+                  }
+                ]
+              },
+              {
+                "tx": {
+                  "sec": 1622745598,
+                  "usec": 1233
+                },
+                "replyc": 1,
+                "ttl": 3,
+                "attempt": 0,
+                "flowid": 4,
+                "replies": [
+                  {
+                    "rx": {
+                      "sec": 1622745598,
+                      "usec": 1614
+                    },
+                    "ttl": 253,
+                    "rtt": 0.381,
+                    "ipid": 0,
+                    "icmp_type": 11,
+                    "icmp_code": 0,
+                    "icmp_q_tos": 128,
+                    "icmp_q_ttl": 1
+                  }
+                ]
+              },
+              {
+                "tx": {
+                  "sec": 1622745598,
+                  "usec": 252188
+                },
+                "replyc": 1,
+                "ttl": 3,
+                "attempt": 0,
+                "flowid": 5,
+                "replies": [
+                  {
+                    "rx": {
+                      "sec": 1622745598,
+                      "usec": 252591
+                    },
+                    "ttl": 253,
+                    "rtt": 0.403,
+                    "ipid": 0,
+                    "icmp_type": 11,
+                    "icmp_code": 0,
+                    "icmp_q_tos": 128,
+                    "icmp_q_ttl": 1
+                  }
+                ]
+              },
+              {
+                "tx": {
+                  "sec": 1622745598,
+                  "usec": 503115
+                },
+                "replyc": 1,
+                "ttl": 3,
+                "attempt": 0,
+                "flowid": 6,
+                "replies": [
+                  {
+                    "rx": {
+                      "sec": 1622745598,
+                      "usec": 503496
+                    },
+                    "ttl": 253,
+                    "rtt": 0.381,
+                    "ipid": 0,
+                    "icmp_type": 11,
+                    "icmp_code": 0,
+                    "icmp_q_tos": 128,
+                    "icmp_q_ttl": 1
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      ]
+    },
+    {
+      "addr": "100.123.254.16",
+      "name": "us-svl-mat3-bb1-ae7-0.n.corp.google.com",
+      "q_ttl": 1,
+      "linkc": 1,
+      "links": [
+        [
+          {
+            "addr": "100.123.254.2",
+            "probes": [
+              {
+                "tx": {
+                  "sec": 1622745598,
+                  "usec": 753788
+                },
+                "replyc": 1,
+                "ttl": 4,
+                "attempt": 0,
+                "flowid": 1,
+                "replies": [
+                  {
+                    "rx": {
+                      "sec": 1622745598,
+                      "usec": 754218
+                    },
+                    "ttl": 252,
+                    "rtt": 0.43,
+                    "ipid": 0,
+                    "icmp_type": 11,
+                    "icmp_code": 0,
+                    "icmp_q_tos": 128,
+                    "icmp_q_ttl": 1
+                  }
+                ]
+              },
+              {
+                "tx": {
+                  "sec": 1622745599,
+                  "usec": 4783
+                },
+                "replyc": 1,
+                "ttl": 4,
+                "attempt": 0,
+                "flowid": 2,
+                "replies": [
+                  {
+                    "rx": {
+                      "sec": 1622745599,
+                      "usec": 5252
+                    },
+                    "ttl": 252,
+                    "rtt": 0.469,
+                    "ipid": 0,
+                    "icmp_type": 11,
+                    "icmp_code": 0,
+                    "icmp_q_tos": 128,
+                    "icmp_q_ttl": 1
+                  }
+                ]
+              },
+              {
+                "tx": {
+                  "sec": 1622745599,
+                  "usec": 255769
+                },
+                "replyc": 1,
+                "ttl": 4,
+                "attempt": 0,
+                "flowid": 3,
+                "replies": [
+                  {
+                    "rx": {
+                      "sec": 1622745599,
+                      "usec": 256176
+                    },
+                    "ttl": 252,
+                    "rtt": 0.407,
+                    "ipid": 0,
+                    "icmp_type": 11,
+                    "icmp_code": 0,
+                    "icmp_q_tos": 128,
+                    "icmp_q_ttl": 1
+                  }
+                ]
+              },
+              {
+                "tx": {
+                  "sec": 1622745599,
+                  "usec": 506717
+                },
+                "replyc": 1,
+                "ttl": 4,
+                "attempt": 0,
+                "flowid": 4,
+                "replies": [
+                  {
+                    "rx": {
+                      "sec": 1622745599,
+                      "usec": 507208
+                    },
+                    "ttl": 252,
+                    "rtt": 0.491,
+                    "ipid": 0,
+                    "icmp_type": 11,
+                    "icmp_code": 0,
+                    "icmp_q_tos": 128,
+                    "icmp_q_ttl": 1
+                  }
+                ]
+              },
+              {
+                "tx": {
+                  "sec": 1622745599,
+                  "usec": 757649
+                },
+                "replyc": 1,
+                "ttl": 4,
+                "attempt": 0,
+                "flowid": 5,
+                "replies": [
+                  {
+                    "rx": {
+                      "sec": 1622745599,
+                      "usec": 758062
+                    },
+                    "ttl": 252,
+                    "rtt": 0.413,
+                    "ipid": 0,
+                    "icmp_type": 11,
+                    "icmp_code": 0,
+                    "icmp_q_tos": 128,
+                    "icmp_q_ttl": 1
+                  }
+                ]
+              },
+              {
+                "tx": {
+                  "sec": 1622745600,
+                  "usec": 8272
+                },
+                "replyc": 1,
+                "ttl": 4,
+                "attempt": 0,
+                "flowid": 6,
+                "replies": [
+                  {
+                    "rx": {
+                      "sec": 1622745600,
+                      "usec": 8687
+                    },
+                    "ttl": 252,
+                    "rtt": 0.415,
+                    "ipid": 0,
+                    "icmp_type": 11,
+                    "icmp_code": 0,
+                    "icmp_q_tos": 128,
+                    "icmp_q_ttl": 1
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      ]
+    },
+    {
+      "addr": "100.123.254.2",
+      "name": "us-svl-mat3-br1-ae1-706.n.corp.google.com",
+      "q_ttl": 1,
+      "linkc": 1,
+      "links": [
+        [
+          {
+            "addr": "100.101.246.68",
+            "probes": [
+              {
+                "tx": {
+                  "sec": 1622745600,
+                  "usec": 259137
+                },
+                "replyc": 1,
+                "ttl": 5,
+                "attempt": 0,
+                "flowid": 1,
+                "replies": [
+                  {
+                    "rx": {
+                      "sec": 1622745600,
+                      "usec": 259823
+                    },
+                    "ttl": 251,
+                    "rtt": 0.686,
+                    "ipid": 0,
+                    "icmp_type": 11,
+                    "icmp_code": 0,
+                    "icmp_q_tos": 128,
+                    "icmp_q_ttl": 1
+                  }
+                ]
+              },
+              {
+                "tx": {
+                  "sec": 1622745600,
+                  "usec": 509281
+                },
+                "replyc": 1,
+                "ttl": 5,
+                "attempt": 0,
+                "flowid": 2,
+                "replies": [
+                  {
+                    "rx": {
+                      "sec": 1622745600,
+                      "usec": 509975
+                    },
+                    "ttl": 251,
+                    "rtt": 0.694,
+                    "ipid": 0,
+                    "icmp_type": 11,
+                    "icmp_code": 0,
+                    "icmp_q_tos": 128,
+                    "icmp_q_ttl": 1
+                  }
+                ]
+              },
+              {
+                "tx": {
+                  "sec": 1622745600,
+                  "usec": 759465
+                },
+                "replyc": 1,
+                "ttl": 5,
+                "attempt": 0,
+                "flowid": 3,
+                "replies": [
+                  {
+                    "rx": {
+                      "sec": 1622745600,
+                      "usec": 760185
+                    },
+                    "ttl": 251,
+                    "rtt": 0.72,
+                    "ipid": 0,
+                    "icmp_type": 11,
+                    "icmp_code": 0,
+                    "icmp_q_tos": 128,
+                    "icmp_q_ttl": 1
+                  }
+                ]
+              },
+              {
+                "tx": {
+                  "sec": 1622745601,
+                  "usec": 9941
+                },
+                "replyc": 1,
+                "ttl": 5,
+                "attempt": 0,
+                "flowid": 4,
+                "replies": [
+                  {
+                    "rx": {
+                      "sec": 1622745601,
+                      "usec": 10676
+                    },
+                    "ttl": 251,
+                    "rtt": 0.735,
+                    "ipid": 0,
+                    "icmp_type": 11,
+                    "icmp_code": 0,
+                    "icmp_q_tos": 128,
+                    "icmp_q_ttl": 1
+                  }
+                ]
+              },
+              {
+                "tx": {
+                  "sec": 1622745601,
+                  "usec": 260080
+                },
+                "replyc": 1,
+                "ttl": 5,
+                "attempt": 0,
+                "flowid": 5,
+                "replies": [
+                  {
+                    "rx": {
+                      "sec": 1622745601,
+                      "usec": 260883
+                    },
+                    "ttl": 251,
+                    "rtt": 0.803,
+                    "ipid": 0,
+                    "icmp_type": 11,
+                    "icmp_code": 0,
+                    "icmp_q_tos": 128,
+                    "icmp_q_ttl": 1
+                  }
+                ]
+              },
+              {
+                "tx": {
+                  "sec": 1622745601,
+                  "usec": 510361
+                },
+                "replyc": 1,
+                "ttl": 5,
+                "attempt": 0,
+                "flowid": 6,
+                "replies": [
+                  {
+                    "rx": {
+                      "sec": 1622745601,
+                      "usec": 511081
+                    },
+                    "ttl": 251,
+                    "rtt": 0.72,
+                    "ipid": 0,
+                    "icmp_type": 11,
+                    "icmp_code": 0,
+                    "icmp_q_tos": 128,
+                    "icmp_q_ttl": 1
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      ]
+    },
+    {
+      "addr": "100.101.246.68",
+      "q_ttl": 1,
+      "linkc": 1,
+      "links": [
+        [
+          {
+            "addr": "89.207.231.70",
+            "probes": [
+              {
+                "tx": {
+                  "sec": 1622745601,
+                  "usec": 760763
+                },
+                "replyc": 1,
+                "ttl": 6,
+                "attempt": 0,
+                "flowid": 1,
+                "replies": [
+                  {
+                    "rx": {
+                      "sec": 1622745601,
+                      "usec": 900058
+                    },
+                    "ttl": 250,
+                    "rtt": 139.295,
+                    "ipid": 0,
+                    "icmp_type": 11,
+                    "icmp_code": 0,
+                    "icmp_q_tos": 128,
+                    "icmp_q_ttl": 1
+                  }
+                ]
+              },
+              {
+                "tx": {
+                  "sec": 1622745602,
+                  "usec": 11514
+                },
+                "replyc": 1,
+                "ttl": 6,
+                "attempt": 0,
+                "flowid": 2,
+                "replies": [
+                  {
+                    "rx": {
+                      "sec": 1622745602,
+                      "usec": 151084
+                    },
+                    "ttl": 250,
+                    "rtt": 139.57,
+                    "ipid": 0,
+                    "icmp_type": 11,
+                    "icmp_code": 0,
+                    "icmp_q_tos": 128,
+                    "icmp_q_ttl": 1
+                  }
+                ]
+              },
+              {
+                "tx": {
+                  "sec": 1622745602,
+                  "usec": 262573
+                },
+                "replyc": 1,
+                "ttl": 6,
+                "attempt": 0,
+                "flowid": 3,
+                "replies": [
+                  {
+                    "rx": {
+                      "sec": 1622745602,
+                      "usec": 401868
+                    },
+                    "ttl": 250,
+                    "rtt": 139.295,
+                    "ipid": 0,
+                    "icmp_type": 11,
+                    "icmp_code": 0,
+                    "icmp_q_tos": 128,
+                    "icmp_q_ttl": 1
+                  }
+                ]
+              },
+              {
+                "tx": {
+                  "sec": 1622745602,
+                  "usec": 513256
+                },
+                "replyc": 1,
+                "ttl": 6,
+                "attempt": 0,
+                "flowid": 4,
+                "replies": [
+                  {
+                    "rx": {
+                      "sec": 1622745602,
+                      "usec": 652474
+                    },
+                    "ttl": 250,
+                    "rtt": 139.218,
+                    "ipid": 0,
+                    "icmp_type": 11,
+                    "icmp_code": 0,
+                    "icmp_q_tos": 128,
+                    "icmp_q_ttl": 1
+                  }
+                ]
+              },
+              {
+                "tx": {
+                  "sec": 1622745602,
+                  "usec": 764018
+                },
+                "replyc": 1,
+                "ttl": 6,
+                "attempt": 0,
+                "flowid": 5,
+                "replies": [
+                  {
+                    "rx": {
+                      "sec": 1622745602,
+                      "usec": 903332
+                    },
+                    "ttl": 250,
+                    "rtt": 139.314,
+                    "ipid": 0,
+                    "icmp_type": 11,
+                    "icmp_code": 0,
+                    "icmp_q_tos": 128,
+                    "icmp_q_ttl": 1
+                  }
+                ]
+              },
+              {
+                "tx": {
+                  "sec": 1622745603,
+                  "usec": 14894
+                },
+                "replyc": 1,
+                "ttl": 6,
+                "attempt": 0,
+                "flowid": 6,
+                "replies": [
+                  {
+                    "rx": {
+                      "sec": 1622745603,
+                      "usec": 156529
+                    },
+                    "ttl": 250,
+                    "rtt": 141.635,
+                    "ipid": 0,
+                    "icmp_type": 11,
+                    "icmp_code": 0,
+                    "icmp_q_tos": 128,
+                    "icmp_q_ttl": 1
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      ]
+    },
+    {
+      "addr": "89.207.231.70",
+      "q_ttl": 1,
+      "linkc": 1,
+      "links": [
+        [
+          {
+            "addr": "89.207.231.71",
+            "probes": [
+              {
+                "tx": {
+                  "sec": 1622745603,
+                  "usec": 265699
+                },
+                "replyc": 1,
+                "ttl": 7,
+                "attempt": 0,
+                "flowid": 1,
+                "replies": [
+                  {
+                    "rx": {
+                      "sec": 1622745603,
+                      "usec": 409614
+                    },
+                    "ttl": 249,
+                    "rtt": 143.915,
+                    "ipid": 0,
+                    "icmp_type": 11,
+                    "icmp_code": 0,
+                    "icmp_q_tos": 128,
+                    "icmp_q_ttl": 1
+                  }
+                ]
+              },
+              {
+                "tx": {
+                  "sec": 1622745603,
+                  "usec": 516078
+                },
+                "replyc": 1,
+                "ttl": 7,
+                "attempt": 0,
+                "flowid": 2,
+                "replies": [
+                  {
+                    "rx": {
+                      "sec": 1622745603,
+                      "usec": 659981
+                    },
+                    "ttl": 249,
+                    "rtt": 143.903,
+                    "ipid": 0,
+                    "icmp_type": 11,
+                    "icmp_code": 0,
+                    "icmp_q_tos": 128,
+                    "icmp_q_ttl": 1
+                  }
+                ]
+              },
+              {
+                "tx": {
+                  "sec": 1622745603,
+                  "usec": 766462
+                },
+                "replyc": 1,
+                "ttl": 7,
+                "attempt": 0,
+                "flowid": 3,
+                "replies": [
+                  {
+                    "rx": {
+                      "sec": 1622745603,
+                      "usec": 910416
+                    },
+                    "ttl": 249,
+                    "rtt": 143.954,
+                    "ipid": 0,
+                    "icmp_type": 11,
+                    "icmp_code": 0,
+                    "icmp_q_tos": 128,
+                    "icmp_q_ttl": 1
+                  }
+                ]
+              },
+              {
+                "tx": {
+                  "sec": 1622745604,
+                  "usec": 16900
+                },
+                "replyc": 1,
+                "ttl": 7,
+                "attempt": 0,
+                "flowid": 4,
+                "replies": [
+                  {
+                    "rx": {
+                      "sec": 1622745604,
+                      "usec": 160829
+                    },
+                    "ttl": 249,
+                    "rtt": 143.929,
+                    "ipid": 0,
+                    "icmp_type": 11,
+                    "icmp_code": 0,
+                    "icmp_q_tos": 128,
+                    "icmp_q_ttl": 1
+                  }
+                ]
+              },
+              {
+                "tx": {
+                  "sec": 1622745604,
+                  "usec": 267222
+                },
+                "replyc": 1,
+                "ttl": 7,
+                "attempt": 0,
+                "flowid": 5,
+                "replies": [
+                  {
+                    "rx": {
+                      "sec": 1622745604,
+                      "usec": 411127
+                    },
+                    "ttl": 249,
+                    "rtt": 143.905,
+                    "ipid": 0,
+                    "icmp_type": 11,
+                    "icmp_code": 0,
+                    "icmp_q_tos": 128,
+                    "icmp_q_ttl": 1
+                  }
+                ]
+              },
+              {
+                "tx": {
+                  "sec": 1622745604,
+                  "usec": 517514
+                },
+                "replyc": 1,
+                "ttl": 7,
+                "attempt": 0,
+                "flowid": 6,
+                "replies": [
+                  {
+                    "rx": {
+                      "sec": 1622745604,
+                      "usec": 661405
+                    },
+                    "ttl": 249,
+                    "rtt": 143.891,
+                    "ipid": 0,
+                    "icmp_type": 11,
+                    "icmp_code": 0,
+                    "icmp_q_tos": 128,
+                    "icmp_q_ttl": 1
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      ]
+    },
+    {
+      "addr": "89.207.231.71",
+      "q_ttl": 1,
+      "linkc": 1,
+      "links": [
+        [
+          {
+            "addr": "172.24.141.197",
+            "probes": [
+              {
+                "tx": {
+                  "sec": 1622745604,
+                  "usec": 768420
+                },
+                "replyc": 1,
+                "ttl": 8,
+                "attempt": 0,
+                "flowid": 1,
+                "replies": [
+                  {
+                    "rx": {
+                      "sec": 1622745604,
+                      "usec": 912311
+                    },
+                    "ttl": 248,
+                    "rtt": 143.891,
+                    "ipid": 0,
+                    "icmp_type": 11,
+                    "icmp_code": 0,
+                    "icmp_q_tos": 128,
+                    "icmp_q_ttl": 1
+                  }
+                ]
+              },
+              {
+                "tx": {
+                  "sec": 1622745605,
+                  "usec": 18765
+                },
+                "replyc": 1,
+                "ttl": 8,
+                "attempt": 0,
+                "flowid": 2,
+                "replies": [
+                  {
+                    "rx": {
+                      "sec": 1622745605,
+                      "usec": 162742
+                    },
+                    "ttl": 248,
+                    "rtt": 143.977,
+                    "ipid": 0,
+                    "icmp_type": 11,
+                    "icmp_code": 0,
+                    "icmp_q_tos": 128,
+                    "icmp_q_ttl": 1
+                  }
+                ]
+              },
+              {
+                "tx": {
+                  "sec": 1622745605,
+                  "usec": 269139
+                },
+                "replyc": 1,
+                "ttl": 8,
+                "attempt": 0,
+                "flowid": 3,
+                "replies": [
+                  {
+                    "rx": {
+                      "sec": 1622745605,
+                      "usec": 414083
+                    },
+                    "ttl": 248,
+                    "rtt": 144.944,
+                    "ipid": 0,
+                    "icmp_type": 11,
+                    "icmp_code": 0,
+                    "icmp_q_tos": 128,
+                    "icmp_q_ttl": 1
+                  }
+                ]
+              },
+              {
+                "tx": {
+                  "sec": 1622745605,
+                  "usec": 519546
+                },
+                "replyc": 1,
+                "ttl": 8,
+                "attempt": 0,
+                "flowid": 4,
+                "replies": [
+                  {
+                    "rx": {
+                      "sec": 1622745605,
+                      "usec": 663410
+                    },
+                    "ttl": 248,
+                    "rtt": 143.864,
+                    "ipid": 0,
+                    "icmp_type": 11,
+                    "icmp_code": 0,
+                    "icmp_q_tos": 128,
+                    "icmp_q_ttl": 1
+                  }
+                ]
+              },
+              {
+                "tx": {
+                  "sec": 1622745605,
+                  "usec": 769793
+                },
+                "replyc": 1,
+                "ttl": 8,
+                "attempt": 0,
+                "flowid": 5,
+                "replies": [
+                  {
+                    "rx": {
+                      "sec": 1622745605,
+                      "usec": 913743
+                    },
+                    "ttl": 248,
+                    "rtt": 143.95,
+                    "ipid": 0,
+                    "icmp_type": 11,
+                    "icmp_code": 0,
+                    "icmp_q_tos": 128,
+                    "icmp_q_ttl": 1
+                  }
+                ]
+              },
+              {
+                "tx": {
+                  "sec": 1622745606,
+                  "usec": 20586
+                },
+                "replyc": 1,
+                "ttl": 8,
+                "attempt": 0,
+                "flowid": 6,
+                "replies": [
+                  {
+                    "rx": {
+                      "sec": 1622745606,
+                      "usec": 164464
+                    },
+                    "ttl": 248,
+                    "rtt": 143.878,
+                    "ipid": 0,
+                    "icmp_type": 11,
+                    "icmp_code": 0,
+                    "icmp_q_tos": 128,
+                    "icmp_q_ttl": 1
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      ]
+    },
+    {
+      "addr": "172.24.141.197",
+      "name": "tw-tao-dat1-dccore1-xe-3-0-1-0.n.corp.google.com",
+      "q_ttl": 1,
+      "linkc": 1,
+      "links": [
+        [
+          {
+            "addr": "172.24.129.116",
+            "probes": [
+              {
+                "tx": {
+                  "sec": 1622745606,
+                  "usec": 291599
+                },
+                "replyc": 1,
+                "ttl": 9,
+                "attempt": 0,
+                "flowid": 1,
+                "replies": [
+                  {
+                    "rx": {
+                      "sec": 1622745606,
+                      "usec": 433807
+                    },
+                    "ttl": 56,
+                    "rtt": 142.208,
+                    "ipid": 50611,
+                    "icmp_type": 0,
+                    "icmp_code": 0,
+                    "icmp_q_tos": 0
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      ]
+    }
+  ]
+}
+{
+  "type": "cycle-stop",
+  "list_name": "/tmp/scamperctrl:2",
+  "id": 1,
+  "hostname": "828d033995bd",
+  "stop_time": 1622745606
+}
