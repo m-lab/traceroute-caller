@@ -74,7 +74,7 @@ func TestTrace(t *testing.T) {
 	if tt.cctest != 0 {
 		t.Errorf("Should have had zero calls to CreateCachedTest, not %d", tt.cctest)
 	}
-	testCache.Trace(conn1) // This should be cached
+	_, _ = testCache.Trace(conn1) // This should be cached
 	if tt.cctest != 1 {
 		t.Errorf("Should have had one call to CreateCachedTest, not %d", tt.cctest)
 	}
@@ -117,7 +117,7 @@ func TestRecentIPCache(t *testing.T) {
 	defer cancel()
 	var tt testTracer
 	tmp := ipcache.New(ctx, &tt, 10*time.Millisecond, 1*time.Millisecond)
-	tmp.Trace(connection.Connection{
+	_, _ = tmp.Trace(connection.Connection{
 		RemoteIP:   "1.2.3.4",
 		RemotePort: 5,
 		LocalIP:    "6.7.8.9",

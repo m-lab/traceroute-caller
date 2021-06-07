@@ -144,7 +144,9 @@ func (c *connectionPoller) TraceClosedConnections() {
 	c.connectionPool = c.GetConnections()
 	for conn := range oldConn {
 		if _, hasConn := c.connectionPool[conn]; !hasConn {
-			go c.recentIPCache.Trace(conn)
+			go func() {
+				_, _ = c.recentIPCache.Trace(conn)
+			}()
 		}
 	}
 }

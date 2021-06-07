@@ -55,7 +55,9 @@ func TestListener(t *testing.T) {
 	rtx.Must(srv.Listen(), "Could not listen")
 	srvCtx, srvCancel := context.WithCancel(context.Background())
 	defer srvCancel()
-	go srv.Serve(srvCtx)
+	go func() {
+		_ = srv.Serve(srvCtx)
+	}()
 
 	// Create a new connectionlistener with a fake tracer.
 	ctx, cancel := context.WithCancel(context.Background())
