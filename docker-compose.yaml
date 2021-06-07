@@ -62,6 +62,5 @@ services:
       - -prometheusx.listen-address=:9992
       - -outputPath=/local/traceroute
       - -poll=false
-      - -ipservice.sock=/local/uuid-annotator.sock
       - -tcpinfo.eventsocket=/local/tcpevents.sock
       - -tracetool=scamper-daemon

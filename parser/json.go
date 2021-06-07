@@ -1,4 +1,4 @@
-// parser package handles parsing of scamper JSONL.
+// Package parser handles parsing of scamper JSONL.
 // The format of JSON can be found at
 // https://www.caida.org/tools/measurement/scamper/.
 // NB: It is not clear where at that URL the format can be found.

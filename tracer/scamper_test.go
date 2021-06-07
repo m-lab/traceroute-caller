@@ -15,7 +15,6 @@ import (
 	"github.com/m-lab/go/prometheusx"
 	"github.com/m-lab/go/rtx"
 	"github.com/m-lab/traceroute-caller/connection"
-	"github.com/m-lab/traceroute-caller/ipcache"
 	"github.com/m-lab/uuid/prefix"
 )
 
@@ -281,13 +280,13 @@ func TestCreateCacheTest(t *testing.T) {
 	{"type":"tracelb", "version":"0.1", "userid":0, "method":"icmp-echo", "src":"::ffff:180.87.97.101", "dst":"::ffff:1.47.236.62", "start":{"sec":1566691298, "usec":476221, "ftime":"2019-08-25 00:01:38"}, "probe_size":60, "firsthop":1, "attempts":3, "confidence":95, "tos":0, "gaplimit":3, "wait_timeout":5, "wait_probe":250, "probec":0, "probec_max":3000, "nodec":0, "linkc":0}
 	{"type":"cycle-stop", "list_name":"/tmp/scamperctrl:51811", "id":1, "hostname":"ndt-plh7v", "stop_time":1566691298}`
 
-	d.TraceFromCachedTrace(c, faketime, "Broken cached test")
+	_ = d.TraceFromCachedTrace(c, faketime, "Broken cached test")
 	_, errInvalidTest := ioutil.ReadFile(tempdir + "/2019/04/01/20190401T034551Z_" + prefix.UnsafeString() + "_0000000000000001.jsonl")
 	if errInvalidTest == nil {
 		t.Error("should fail to generate cached test")
 	}
 
-	d.TraceFromCachedTrace(c, faketime, cachedTest)
+	_ = d.TraceFromCachedTrace(c, faketime, cachedTest)
 
 	// Unmarshal the first line of the output file.
 	b, err := ioutil.ReadFile(tempdir + "/2019/04/01/20190401T034551Z_" + prefix.UnsafeString() + "_0000000000000001.jsonl")
@@ -351,7 +350,7 @@ func TestRecovery(t *testing.T) {
 
 	// Run both trace methods.
 	d.TraceAll([]connection.Connection{c})
-	d.Trace(c, time.Now())
+	_, _ = d.Trace(c, time.Now())
 	// If this doesn't crash, then the recovery process works!
 }
 
@@ -380,10 +379,4 @@ func TestGetMetaline(t *testing.T) {
 	if !strings.Contains(meta, "0000000000000ABC\",\"TracerouteCallerVersion\":\"Fake Version\",\"CachedResult\":true,\"CachedUUID\":\"00EF\"") {
 		t.Error("Fail to generate meta ", meta)
 	}
-}
-
-//lint:ignore U1000 This performs a compile time check.
-// If this successfully compiles, then ScamperDaemon implements the Tracer interface.
-func assertScamperDaemonIsTracer(d *ScamperDaemon) {
-	func(t ipcache.Tracer) {}(d)
 }
