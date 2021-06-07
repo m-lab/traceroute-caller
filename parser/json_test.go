@@ -3,7 +3,6 @@ package parser_test
 import (
 	"io/ioutil"
 	"log"
-	"sort"
 	"testing"
 
 	"github.com/buger/jsonparser"
@@ -170,20 +169,11 @@ func BenchmarkHopParsingBuger(b *testing.B) {
 	}
 
 	b.StartTimer()
-	var hops []string
 	for i := 0; i < b.N; i++ {
-		var err error
-		hops, err = parser.ExtractHops(data)
+		_, err := parser.ExtractHops(data)
 
-		if err != nil || len(hops) != 9 {
-			sort.Strings(hops)
-			//b.Fatal(err, len(hops), hops)
-		}
-	}
-	b.StopTimer()
-	for h := range hops {
-		if hops[h] == "<nil" {
-			b.Fatal("found <nil>")
+		if err != nil {
+			b.Fatal(err)
 		}
 	}
 }
@@ -197,21 +187,12 @@ func BenchmarkHopParsingSaied(b *testing.B) {
 		log.Fatal(err)
 	}
 
-	var hops []string
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		var err error
-		hops, err = parser.ExtractHops2(data)
+		_, err = parser.ExtractHops2(data)
 
-		if err != nil || len(hops) != 9 {
-			sort.Strings(hops)
-			//b.Fatal(err, len(hops), hops)
-		}
-	}
-	b.StopTimer()
-	for h := range hops {
-		if hops[h] == "<nil" {
-			b.Fatal("found <nil>")
+		if err != nil {
+			b.Fatal(err)
 		}
 	}
 }
