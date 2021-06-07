@@ -11,10 +11,12 @@ package parser
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"log"
 	"net"
 
 	"github.com/buger/jsonparser"
+	"github.com/m-lab/go/rtx"
 )
 
 var (
@@ -154,37 +156,47 @@ func ExtractHops1(tracelb *TracelbLine) ([]string, error) {
 	return hopStrings, nil
 }
 
-func getIP(data []byte) (net.IP, error) {
-	// XXX convert to GetString
+var validateIPs = false
+
+func getAddrString(data []byte) (string, error) {
 	addr, err := jsonparser.GetString(data, "addr")
-	switch addr {
-	case "*":
-		// These are expected, and parse to <nil>
-		return nil, nil
+	switch err {
+	case nil:
+		return addr, nil
+	case jsonparser.KeyPathNotFoundError:
+		// This will only happen if there are NO address fields in the input.
+		// It should not happen in normal scamper output.
+		return "", ErrNoAddr
 	default:
-		switch err {
-		case nil:
-			// Parse the IP string, to avoid formatting variations.
-			ip := net.ParseIP(string(addr))
-			// XXX Not clear whether we should check this - perhaps leave it
-			// for the caller to deal with.  In particular, we don't want
-			// a bad IP address to interfere with annotating good IPs
-			if ip.String() == "<nil>" {
-				// This happens if the IP address is not parseable.
-				// It likely means an error in scamper, or a change in scamper behavior
-				return ip, ErrInvalidIP
-			}
-			return ip, nil
-		case jsonparser.KeyPathNotFoundError:
-			// This will only happen if there are NO address fields in the input.
-			// It should not happen in normal scamper output.
-			return nil, ErrNoAddr
-		default:
-			// This is unexpected - we only expect KeyPathNotFoundError
-			log.Println(err)
-			return nil, err
-		}
+		// This is unexpected - we only expect KeyPathNotFoundError
+		log.Println(err)
+		return "", err
 	}
+
+}
+
+func getIP(data []byte) (string, error) {
+	addr, err := getAddrString(data)
+	if err != nil {
+		return "", err
+	}
+	if addr == "*" {
+		return "", nil
+	}
+	if validateIPs {
+		// Parse the IP string, to avoid formatting variations.
+		ip := net.ParseIP(string(addr))
+		// XXX Not clear whether we should check this - perhaps leave it
+		// for the caller to deal with.  In particular, we don't want
+		// a bad IP address to interfere with annotating good IPs
+		if ip.String() == "<nil>" {
+			// This happens if the IP address is not parseable.
+			// It likely means an error in scamper, or a change in scamper behavior
+			return "", ErrInvalidIP
+		}
+		return ip.String(), nil
+	}
+	return addr, nil
 }
 
 // ExtractTraceLine extracts the second of three lines in a scamper JSONL record,
@@ -214,9 +226,10 @@ func ExtractTraceLine(data []byte) ([]byte, error) {
 	return jsonLines[1], nil
 }
 
+var parseLinks = true
+
 // ExtractHops extracts the hop IP address from nodes in a tracelb json record.
 func ExtractHops(data []byte) ([]string, error) {
-	hops := make(map[string]struct{}, 100)
 
 	nodec, err := jsonparser.GetInt(data, "nodec")
 	if err != nil {
@@ -225,6 +238,7 @@ func ExtractHops(data []byte) ([]string, error) {
 	if nodec == 0 {
 		return nil, ErrNoNodes
 	}
+	hops := make(map[string]struct{}, nodec)
 
 	//	linkc, err := jsonparser.GetInt(data, "linkc")
 	//	if err != nil {
@@ -242,39 +256,40 @@ func ExtractHops(data []byte) ([]string, error) {
 			ip, e1 := getIP(nodeValue)
 			switch e1 {
 			case nil:
-				if ip != nil {
-					hops[ip.String()] = struct{}{}
+				if ip != "" {
+					hops[ip] = struct{}{}
 				}
 			default:
 			}
-
 			// XXX - this may not be necessary, as it seems that there is a node for every IP address
 			// and final links have destinations of "*"
 
-			// links is an array containing another unnamed array...
-			_, linkErr1 := jsonparser.ArrayEach(nodeValue,
-				func(linksValue []byte, datatype jsonparser.ValueType, offset int, err error) {
-					//				linkCount++
-					// Parser the inner array
-					_, linkErr2 := jsonparser.ArrayEach(linksValue,
-						func(linksValue2 []byte, datatype jsonparser.ValueType, offset int, err error) {
-							ip, ipErr := getIP(linksValue2)
-							if ipErr != nil {
-								addrErr = ipErr
-								return
-							}
-							if ip != nil {
-								hops[ip.String()] = struct{}{}
-							}
-						}) // No key, because the array in unnamed
-					if linkErr2 != nil {
-						// XXX Add a metric
-						log.Println(linkErr2, string(linksValue))
-					}
-				}, "links")
-			if linkErr1 != nil {
-				// XXX Add a metric
-				log.Println(linkErr1, string(nodeValue))
+			if parseLinks {
+				// links is an array containing another unnamed array...
+				_, linkErr1 := jsonparser.ArrayEach(nodeValue,
+					func(linksValue []byte, datatype jsonparser.ValueType, offset int, err error) {
+						//				linkCount++
+						// Parser the inner array
+						_, linkErr2 := jsonparser.ArrayEach(linksValue,
+							func(linksValue2 []byte, datatype jsonparser.ValueType, offset int, err error) {
+								ip, ipErr := getIP(linksValue2)
+								if ipErr != nil {
+									addrErr = ipErr
+									return
+								}
+								if ip != "" {
+									hops[ip] = struct{}{}
+								}
+							}) // No key, because the array in unnamed
+						if linkErr2 != nil {
+							// XXX Add a metric
+							log.Println(linkErr2, string(linksValue))
+						}
+					}, "links")
+				if linkErr1 != nil {
+					// XXX Add a metric
+					log.Println(linkErr1, string(nodeValue))
+				}
 			}
 		}, "nodes")
 
@@ -303,4 +318,60 @@ func ExtractHops(data []byte) ([]string, error) {
 	//		return hopStrings, ErrInternalInconsistency
 	//	}
 	return hopStrings, nil
+}
+
+// ExtractHops2 extracts all IP addresses from scamper's output in JSON format.
+func ExtractHops2(data []byte) ([]string, error) {
+	// "nodes" -> "addr": "172.19.0.1",
+	nodec, err := jsonparser.GetInt(data, "nodec")
+	if err != nil {
+		log.Println("failed to parse nodec")
+		return nil, err
+	}
+	hops := make([]string, 0, nodec)
+
+	// "src": "172.19.0.2",
+	// "dst": "172.24.129.116",
+	if false {
+		// We don't need the src and destination.  Those are already annotated by the uuid-annotator.
+		// We might want to discard the dst address, if it shows up on the links.  It should
+		// not show up in the nodes.
+		for _, s := range []string{"src", "dst"} {
+			hop, err := jsonparser.GetString(data, s)
+			rtx.Must(err, "failed to parse "+s)
+			addHop(&hops, hop)
+		}
+	}
+
+	for i := 0; i < int(nodec)-1; i++ {
+		hop, err := jsonparser.GetString(data, "nodes", fmt.Sprintf("[%d]", i), "addr")
+		if err != nil {
+			log.Printf("failed to parse nodes[%d].addr", i)
+			return nil, err
+		}
+		addHop(&hops, hop)
+	}
+
+	// "nodes" -> "links" -> "addr": "100.116.79.252",
+	linkc, err := jsonparser.GetInt(data, "linkc")
+	rtx.Must(err, "failed to parse linkc")
+	for i := 0; i < int(linkc); i++ {
+		hop, err := jsonparser.GetString(data, "nodes", fmt.Sprintf("[%d]", i), "links", "[0]", "[0]", "addr")
+		if err != nil {
+			log.Printf("failed to parse nodes[%d].links[0][0].addr", i)
+			return nil, err
+		}
+		addHop(&hops, hop)
+	}
+
+	return hops, nil
+}
+
+func addHop(hops *[]string, hop string) {
+	for _, h := range *hops {
+		if h == hop {
+			return
+		}
+	}
+	*hops = append(*hops, hop)
 }
