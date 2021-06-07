@@ -226,7 +226,7 @@ func ExtractTraceLine(data []byte) ([]byte, error) {
 	return jsonLines[1], nil
 }
 
-var parseLinks = true
+var parseLinks = false
 
 // ExtractHops extracts the hop IP address from nodes in a tracelb json record.
 func ExtractHops(data []byte) ([]string, error) {
