@@ -12,31 +12,8 @@ import (
 	"encoding/json"
 	"errors"
 	"net"
-	"os"
 	"strings"
 )
-
-func init() {
-	InitParserVersion()
-}
-
-var gParserVersion string
-
-// InitParserVersion initializes the gParserVersion variable for use by all parsers.
-func InitParserVersion() string {
-	release, ok := os.LookupEnv("RELEASE_TAG")
-	if ok && release != "empty_tag" {
-		gParserVersion = "https://github.com/m-lab/traceroute-caller/tree/" + release
-	} else {
-		hash := os.Getenv("COMMIT_HASH")
-		if len(hash) >= 8 {
-			gParserVersion = "https://github.com/m-lab/traceroute-caller/tree/" + hash[0:8]
-		} else {
-			gParserVersion = "local development"
-		}
-	}
-	return gParserVersion
-}
 
 // TS contains a unix epoch timestamp.
 type TS struct {

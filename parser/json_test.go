@@ -5,34 +5,11 @@ import (
 	"testing"
 
 	"github.com/kr/pretty"
-	"github.com/m-lab/go/osx"
 	"github.com/m-lab/traceroute-caller/parser"
 )
 
 func init() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
-}
-
-func TestInitParserVersion(t *testing.T) {
-	ver := parser.InitParserVersion()
-	if ver != "local development" {
-		t.Errorf("Error in InitParserVersion")
-	}
-
-	defer osx.MustSetenv("RELEASE_TAG", "v1.1")()
-	ver = parser.InitParserVersion()
-	if ver != "https://github.com/m-lab/traceroute-caller/tree/v1.1" {
-		t.Errorf("Error in InitParserVersion")
-	}
-}
-
-func TestInitParserVersionCommit(t *testing.T) {
-	defer osx.MustSetenv("RELEASE_TAG", "empty_tag")()
-	defer osx.MustSetenv("COMMIT_HASH", "d6e45f1fff")()
-	ver := parser.InitParserVersion()
-	if ver != "https://github.com/m-lab/traceroute-caller/tree/d6e45f1f" {
-		t.Errorf("Error in InitParserVersion")
-	}
 }
 
 func TestParseJsonSimple(t *testing.T) {
