@@ -149,18 +149,21 @@ func TestParseJsonComplexBuger(t *testing.T) {
 	pretty.Print(hops)
 }
 
-// Smaller inline data (6 nodes)
-// BenchmarkHopParsing2-8   	   91911	     12399 ns/op	    3288 B/op	      22 allocs/op
-// 13X faster with just node parsing
-// BenchmarkHopParsing2-8   	   32829	     36308 ns/op	    3880 B/op	      49 allocs/op
-// 5X faster when parsing nodes and links
-//  1882	    618678 ns/op	     454 B/op	      33 allocs/o
+// Benchmarks
+// Using buger/jsonparser with ArrayEach, and processing only the nodes (not
+// the links) provides about a 13X speedup and large memory savings over
+// using the standard json parser.
+//
+// Using ArrayEach speeds up parsing by roughly a factor of N compared to using
+// a for loop on nodes[i], where N is the number of nodes.
+// We should determine the number of nodes through prometheus metric, and may consider using
+// the for loop method if the average number of nodes is small.
+// For 9 nodes, the speedup using ArrayEach is approximately 9X
 
-// Larger data j.json - 9 nodes
-// No validation, just nodes
-// BenchmarkHopParsingBuger-8   	   10000	    107414 ns/op	     688 B/op	      18 allocs/op
-// No validation, nodes and links
-// BenchmarkHopParsingBuger-8   	    5158	    252766 ns/op	     688 B/op	      18 allocs/op
+// Parsing just nodes, no IP address validation, 9 nodes:
+// BenchmarkHopParsingBuger-4   	   19537	     62378 ns/op	     544 B/op	      10 allocs/op
+// BenchmarkHopParsingSaied-4   	    2072	    589318 ns/op	     288 B/op	      17 allocs/op
+
 func BenchmarkHopParsingBuger(b *testing.B) {
 	b.StopTimer()
 	data, err := ioutil.ReadFile("testdata/j.json")
@@ -178,8 +181,6 @@ func BenchmarkHopParsingBuger(b *testing.B) {
 	}
 }
 
-// Without IP validation or src/dest
-// BenchmarkHopParsingSaied-8   	    1863	    635374 ns/op	     432 B/op	      33 allocs/o
 func BenchmarkHopParsingSaied(b *testing.B) {
 	b.StopTimer()
 	data, err := ioutil.ReadFile("testdata/j.json")
@@ -189,8 +190,7 @@ func BenchmarkHopParsingSaied(b *testing.B) {
 
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		_, err = parser.ExtractHops2(data)
-
+		_, err := parser.ExtractHops2(data)
 		if err != nil {
 			b.Fatal(err)
 		}

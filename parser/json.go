@@ -184,13 +184,6 @@ func ExtractHops(data []byte) ([]string, error) {
 		hopStrings = append(hopStrings, h)
 	}
 
-	// It seems we don't actually understand the relationship between nodec/linkc
-	// and the number of parsed elements.
-	//
-	//	if int(linkc) != linkCount || int(nodec) != nodeCount {
-	//		log.Printf("%d/%d, %d/%d\n", nodeCount, nodec, linkCount, linkc)
-	//		return hopStrings, ErrInternalInconsistency
-	//	}
 	return hopStrings, nil
 }
 
@@ -203,19 +196,6 @@ func ExtractHops2(data []byte) ([]string, error) {
 		return nil, err
 	}
 	hops := make([]string, 0, nodec)
-
-	// "src": "172.19.0.2",
-	// "dst": "172.24.129.116",
-	if false {
-		// We don't need the src and destination.  Those are already annotated by the uuid-annotator.
-		// We might want to discard the dst address, if it shows up on the links.  It should
-		// not show up in the nodes.
-		for _, s := range []string{"src", "dst"} {
-			hop, err := jsonparser.GetString(data, s)
-			rtx.Must(err, "failed to parse "+s)
-			addHop(&hops, hop)
-		}
-	}
 
 	if parseLinks {
 		for i := 0; i < int(nodec)-1; i++ {
