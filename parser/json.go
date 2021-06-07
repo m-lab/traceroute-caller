@@ -65,14 +65,6 @@ type ScamperNode struct {
 //   TracelbLine
 //   CyclestopLine
 
-// Metadata contains the UUID and other metadata provided by the traceroute-caller code.
-type Metadata struct {
-	UUID                    string `json:"UUID" binding:"required"`
-	TracerouteCallerVersion string `json:"TracerouteCallerVersion"`
-	CachedResult            bool   `json:"CachedResult"`
-	CachedUUID              string `json:"CachedUUID"`
-}
-
 // CyclestartLine contains the information about the scamper "cyclestart"
 type CyclestartLine struct {
 	Type      string  `json:"type"`      // "cycle-start"
@@ -87,12 +79,12 @@ type CyclestartLine struct {
 type TracelbLine struct {
 	Type    string  `json:"type"`
 	Version string  `json:"version"`
-	Userid  float64 `json:"userid"` // XXX Integer?
+	Userid  float64 `json:"userid"` // TODO change to int?
 	Method  string  `json:"method"`
 	Src     string  `json:"src"`
 	Dst     string  `json:"dst"`
 	Start   TS      `json:"start"`
-	// XXX - None of these seem to be actual floats - change to int?
+	// TODO - None of these seem to be actual floats - change to int?
 	ProbeSize   float64       `json:"probe_size"`
 	Firsthop    float64       `json:"firsthop"`
 	Attempts    float64       `json:"attempts"`
@@ -113,7 +105,7 @@ type TracelbLine struct {
 type CyclestopLine struct {
 	Type     string  `json:"type"` // "cycle-stop"
 	ListName string  `json:"list_name"`
-	ID       float64 `json:"id"`
+	ID       float64 `json:"id"` // TODO - change to int?
 	Hostname string  `json:"hostname"`
 	StopTime float64 `json:"stop_time"` // This is a unix epoch time.
 }
@@ -121,7 +113,7 @@ type CyclestopLine struct {
 // XXX ^^^^^^ Everything above here is almost identical to the structs and
 // ParseJSONL code in etl/parser/pt.go
 
-// ExtractHops parses tracelb and extract all hop addresses.
+// ExtractHops parses tracelb and extracts all hop addresses.
 func ExtractHops(tracelb *TracelbLine) ([]string, error) {
 	// Unfortunately, net.IP cannot be used as map key.
 	hops := make(map[string]struct{}, 100)
@@ -149,7 +141,8 @@ func ExtractHops(tracelb *TracelbLine) ([]string, error) {
 	return hopStrings, nil
 }
 
-// ExtractTraceLB extracts the traceLB line from scamper JSONL
+// ExtractTraceLB extracts the traceLB line from scamper JSONL.
+// Not currently used, but expected to be used soon for hop annotations.
 func ExtractTraceLB(data []byte) (*TracelbLine, error) {
 	var cycleStart CyclestartLine
 	var cycleStop CyclestopLine
@@ -159,7 +152,8 @@ func ExtractTraceLB(data []byte) (*TracelbLine, error) {
 		return nil, errors.New("test has wrong number of lines")
 	}
 
-	// Are these necessary, or should we ignore errors in cycleStart/Stop?
+	// TODO These (cycleStart/Stop checking) are not strictly necessary.  We'll keep them for a while for
+	// debugging, but will likely remove them soon, as they provide little value.
 	err := json.Unmarshal([]byte(jsonStrings[0]), &cycleStart)
 	if err != nil {
 		return nil, errors.New("invalid cycle-start")
