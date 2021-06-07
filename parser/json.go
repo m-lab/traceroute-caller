@@ -343,13 +343,15 @@ func ExtractHops2(data []byte) ([]string, error) {
 		}
 	}
 
-	for i := 0; i < int(nodec)-1; i++ {
-		hop, err := jsonparser.GetString(data, "nodes", fmt.Sprintf("[%d]", i), "addr")
-		if err != nil {
-			log.Printf("failed to parse nodes[%d].addr", i)
-			return nil, err
+	if parseLinks {
+		for i := 0; i < int(nodec)-1; i++ {
+			hop, err := jsonparser.GetString(data, "nodes", fmt.Sprintf("[%d]", i), "addr")
+			if err != nil {
+				log.Printf("failed to parse nodes[%d].addr", i)
+				return nil, err
+			}
+			addHop(&hops, hop)
 		}
-		addHop(&hops, hop)
 	}
 
 	// "nodes" -> "links" -> "addr": "100.116.79.252",
