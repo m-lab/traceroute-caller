@@ -68,7 +68,7 @@ func TestParis(t *testing.T) {
 		Cookie:     "CDEF",
 	}
 	afterNow := time.Date(2003, 11, 9, 15, 58, 1, 0, time.UTC)
-	p.TraceFromCachedTrace(conn2, afterNow, out)
+	_ = p.TraceFromCachedTrace(conn2, afterNow, out)
 
 	contents, err = ioutil.ReadFile(dir + "/2003/11/09/20031109T15:58:01Z-UUID-" + prefix.UnsafeString() + "_000000000000CDEF.cached.paris")
 	rtx.Must(err, "Could not read file")
@@ -88,6 +88,6 @@ func TestParis(t *testing.T) {
 	if err == nil {
 		t.Error("You can't save data to /dev/null")
 	}
-	p.TraceFromCachedTrace(conn2, afterNow, out) // no crash == success
+	_ = p.TraceFromCachedTrace(conn2, afterNow, out) // no crash == success
 
 }

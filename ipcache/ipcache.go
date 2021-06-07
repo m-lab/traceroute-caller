@@ -71,7 +71,7 @@ func (rc *RecentIPCache) Trace(conn connection.Connection) (string, error) {
 	if cached {
 		<-c.dataReady
 		if c.err == nil {
-			t.TraceFromCachedTrace(conn, time.Now(), c.data)
+			_ = t.TraceFromCachedTrace(conn, time.Now(), c.data)
 			return c.data, nil
 		}
 		t.DontTrace(conn, c.err)

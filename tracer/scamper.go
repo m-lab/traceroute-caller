@@ -160,7 +160,9 @@ func (d *ScamperDaemon) MustStart(ctx context.Context) {
 	// if the user started those processes. This is also why we don't use
 	// CommandContext in the exec package - if the process isn't successfully
 	// killed by SIGKILL, then the code in that package doesn't work correctly.
-	command.Process.Signal(syscall.SIGKILL)
+	if err := command.Process.Signal(syscall.SIGKILL); err != nil {
+		log.Printf("failed to send SIGKILL to scamper daemon, error: %v\n", err)
+	}
 }
 
 // Trace starts a sc_attach connecting to the scamper process for each
@@ -186,7 +188,9 @@ func (d *ScamperDaemon) Trace(conn connection.Connection, t time.Time) (out stri
 func (d *ScamperDaemon) TraceAll(connections []connection.Connection) {
 	for _, c := range connections {
 		log.Printf("PT start: %s %d", c.RemoteIP, c.RemotePort)
-		go d.Trace(c, time.Now())
+		go func(c connection.Connection) {
+			_, _ = d.Trace(c, time.Now())
+		}(c)
 	}
 }
 

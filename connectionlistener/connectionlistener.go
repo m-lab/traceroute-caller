@@ -44,7 +44,9 @@ func (cl *connectionListener) Close(ctx context.Context, timestamp time.Time, uu
 	cl.mutex.Unlock()
 
 	if ok {
-		go cl.cache.Trace(conn)
+		go func() {
+			_, _ = cl.cache.Trace(conn)
+		}()
 	}
 }
 
