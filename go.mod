@@ -4,6 +4,7 @@ go 1.16
 
 require (
 	github.com/araddon/dateparse v0.0.0-20200409225146-d820a6159ab1 // indirect
+	github.com/buger/jsonparser v1.1.1
 	github.com/go-test/deep v1.0.7
 	github.com/gocarina/gocsv v0.0.0-20210408192840-02d7211d929d // indirect
 	github.com/kr/pretty v0.2.0
