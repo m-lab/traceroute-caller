@@ -11,6 +11,7 @@ require (
 	github.com/m-lab/go v1.4.0
 	github.com/m-lab/tcp-info v1.5.3
 	github.com/m-lab/uuid v0.0.0-20191115203855-549727171666
+	github.com/m-lab/uuid-annotator v0.4.4
 	github.com/prometheus/client_golang v1.10.0
 	github.com/stretchr/testify v1.7.0 // indirect
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
