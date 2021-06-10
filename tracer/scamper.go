@@ -223,10 +223,18 @@ func (d *ScamperDaemon) trace(conn connection.Connection, t time.Time) (string, 
 		pipe.Exec(d.Warts2JSONBinary),
 		pipe.Write(&buff),
 	)
+	start := time.Now()
 	err = pipe.RunTimeout(cmd, d.ScamperTimeout)
+	latency := time.Since(start).Seconds()
 	tracesPerformed.WithLabelValues("scamper-daemon").Inc()
+	if err != nil {
+		traceTimeHistogram.WithLabelValues("error").Observe(latency)
+	} else {
+		traceTimeHistogram.WithLabelValues("success").Observe(latency)
+	}
+
 	if err != nil && err.Error() == pipe.ErrTimeout.Error() {
-		log.Println("TimeOut for Trace: ", cmd)
+		log.Println("Trace timed out: ", cmd)
 		return "", err
 	}
 
