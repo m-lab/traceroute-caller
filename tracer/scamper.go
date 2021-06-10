@@ -1,4 +1,6 @@
 // Package tracer takes care of all interaction with traceroute systems.
+// TODO: tracer should return the trace, and the caller should handle the metadata
+// and writing the output to a file.
 package tracer
 
 import (
@@ -74,50 +76,66 @@ func (s *Scamper) Trace(conn connection.Connection, t time.Time) (out string, er
 	defer func() {
 		if r := recover(); r != nil {
 			log.Printf("Recovered (%v) a crashed trace for %v at %v\n", r, conn, t)
+			// TODO change to use a label within general trace counter.
 			crashedTraces.WithLabelValues("scamper").Inc()
 			err = errors.New(fmt.Sprint(r))
 		}
 	}()
 	tracesInProgress.WithLabelValues("scamper").Inc()
 	defer tracesInProgress.WithLabelValues("scamper").Dec()
-	return s.trace(conn, t)
+	out, err = s.trace(conn, t)
+	if err != nil {
+		// TODO change to use a label within general trace counter.
+		// possibly just use the latency histogram?
+		crashedTraces.WithLabelValues("scamper").Inc()
+	}
+	return
 }
 
 // trace a single connection using scamper as a standalone binary.
 func (s *Scamper) trace(conn connection.Connection, t time.Time) (string, error) {
 	dir, err := createTimePath(s.OutputPath, t)
-	rtx.PanicOnError(err, "Could not create directory")
+	if err != nil {
+		return "", errors.New("could not create output directory")
+	}
 	filename := dir + s.generateFilename(conn.Cookie, t)
+	// TODO this is very spammy.
 	log.Println("Starting a trace to be put in", filename)
 	buff := bytes.Buffer{}
 
 	// WriteString never errors, but may panic on OOM
 	_, _ = buff.WriteString(GetMetaline(conn, false, ""))
-	// TODO Should not use panic recovery.  Convert these to errors.
-	rtx.PanicOnError(err, "Could not write to buffer")
 
 	cmd := pipe.Line(
 		pipe.Exec(s.Binary, "-I", "tracelb -P icmp-echo -q 3 -O ptr "+conn.RemoteIP, "-o-", "-O", "json"),
 		pipe.Write(&buff),
 	)
+
+	// TODO - extract common code here?
 	start := time.Now()
 	err = pipe.RunTimeout(cmd, s.ScamperTimeout)
 	latency := time.Since(start).Seconds()
+	tracesPerformed.WithLabelValues("scamper").Inc()
+
 	if err != nil {
 		traceTimeHistogram.WithLabelValues("error").Observe(latency)
 	} else {
 		traceTimeHistogram.WithLabelValues("success").Observe(latency)
 	}
 
-	tracesPerformed.WithLabelValues("scamper").Inc()
 	if err != nil && err.Error() == pipe.ErrTimeout.Error() {
-		log.Println("Trace timed out: ", cmd)
+		log.Printf("Trace timed out after %v: %v\n", s.ScamperTimeout, cmd)
 		return "", err
 	}
+	if err != nil {
+		// TODO should log detail, but return generic error
+		return "", fmt.Errorf("command %v failed", cmd)
+	}
+	err = ioutil.WriteFile(filename, buff.Bytes(), 0666)
 
-	// TODO - should we really panic here?
-	rtx.PanicOnError(err, "Command %v failed", cmd)
-	rtx.PanicOnError(ioutil.WriteFile(filename, buff.Bytes(), 0666), "Could not save output to file")
+	if err != nil {
+		return "", errors.New("Could not save output to file")
+	}
 	return buff.String(), nil
 }
 
@@ -223,6 +241,7 @@ func (d *ScamperDaemon) trace(conn connection.Connection, t time.Time) (string, 
 		pipe.Exec(d.Warts2JSONBinary),
 		pipe.Write(&buff),
 	)
+
 	start := time.Now()
 	err = pipe.RunTimeout(cmd, d.ScamperTimeout)
 	latency := time.Since(start).Seconds()
@@ -234,11 +253,16 @@ func (d *ScamperDaemon) trace(conn connection.Connection, t time.Time) (string, 
 	}
 
 	if err != nil && err.Error() == pipe.ErrTimeout.Error() {
-		log.Println("Trace timed out: ", cmd)
+		log.Printf("Trace timed out after %v: %v\n", d.ScamperTimeout, cmd)
 		return "", err
 	}
-
-	rtx.PanicOnError(err, "Command %v failed", cmd)
-	rtx.PanicOnError(ioutil.WriteFile(filename, buff.Bytes(), 0666), "Could not save output to file")
+	if err != nil {
+		// TODO should log detail, but return generic error
+		return "", fmt.Errorf("command %v failed", cmd)
+	}
+	err = ioutil.WriteFile(filename, buff.Bytes(), 0666)
+	if err != nil {
+		return "", errors.New("could not save output to file")
+	}
 	return buff.String(), nil
 }
