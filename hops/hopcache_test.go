@@ -1,22 +1,39 @@
-package main
+package hops_test
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"log"
+	"math/rand"
+	"sync"
+	"sync/atomic"
 	"testing"
+	"time"
 
+	"github.com/m-lab/traceroute-caller/hops"
 	"github.com/m-lab/uuid-annotator/annotator"
 )
 
-// Implementation
-// TODO add a test that actually uses this?
-func hopGen(ctx context.Context, ip string, ann *annotator.ClientAnnotations) error {
-	log.Println("Pretend we wrote a file for", ip)
+// This is a fake implementation of the hop record generator.
+// It counts number of alls, and can return a series of errors.
+type fakeGen struct {
+	err   chan error // list of errors to return
+	calls int32      // number of times called
+}
+
+func (g *fakeGen) hopGen(ctx context.Context, ip string, ann *annotator.ClientAnnotations) error {
+	atomic.AddInt32(&g.calls, 1)
+	select {
+	case e := <-g.err:
+		return e
+	default:
+		log.Println("Pretend we wrote a file for", ip)
+	}
 	return nil
 }
 
-type fake struct {
-}
+type fake struct{}
 
 func (ann fake) Annotate(ctx context.Context, ips []string) (map[string]*annotator.ClientAnnotations, error) {
 	result := make(map[string]*annotator.ClientAnnotations, len(ips))
@@ -26,24 +43,54 @@ func (ann fake) Annotate(ctx context.Context, ips []string) (map[string]*annotat
 	return result, nil
 }
 
-func TestHopCache(t *testing.T) {
-	hc := New(&fake{}, hopGen)
-	n, k, err := hc.AnnotateNewHops(context.TODO(), []string{"1.2.3.4", "5.6.7.8"})
-	if err != nil {
-		t.Fatal(err)
+func expect(t *testing.T, ips []string, hc hops.Cache, nn, kk int) {
+	t.Helper()
+	n, k, _ := hc.AnnotateNewHops(context.TODO(), ips)
+
+	if n != nn || k != kk {
+		t.Errorf("req: %d/%d, actual: %d/%d\n", n, nn, k, kk)
 	}
-	t.Log(n, k)
-	n, k, err = hc.AnnotateNewHops(context.TODO(), []string{"5.6.7.8", "foo:bar"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Log(n, k)
-	hc.Clear()
-	n, k, err = hc.AnnotateNewHops(context.TODO(), []string{"5.6.7.8", "foo:bar"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Log(n, k)
 }
 
-// TODO add a complex multithreaded test
+func TestHopCache(t *testing.T) {
+	gen := fakeGen{err: make(chan error, 10)}
+	hc := hops.New(&fake{}, gen.hopGen)
+
+	expect(t, []string{"1.2.3.4", "5.6.7.8"}, hc, 2, 2)
+	expect(t, []string{"1.2.3.4", "5.6.7.8"}, hc, 0, 0)
+	hc.Clear()
+	expect(t, []string{"1.2.3.4", "5.6.7.8"}, hc, 2, 2)
+	expect(t, []string{"5.6.7.8", "a:b:c:d::e"}, hc, 1, 1)
+
+	gen.err <- errors.New("error")
+	expect(t, []string{"error"}, hc, 1, 0)
+	if gen.calls != 6 {
+		t.Error(gen.calls)
+	}
+}
+
+func TestConcurrent(t *testing.T) {
+	var wg sync.WaitGroup
+	gen := fakeGen{err: make(chan error, 10)}
+	hc := hops.New(&fake{}, gen.hopGen)
+
+	for i := 0; i < 1000; i++ {
+		wg.Add(1)
+		go func(n int) {
+			// Altogether, these will post all values from 0 to 1004, about 300,000 times
+			// each in semi-random order.
+			for j := 1; j < 100; j++ {
+				time.Sleep(time.Duration(rand.Int31n(1000000)))
+				hc.AnnotateNewHops(context.TODO(),
+					[]string{fmt.Sprint(n + j%3), fmt.Sprint(n + j%4), fmt.Sprint(n + j%5)})
+			}
+			wg.Done()
+		}(i)
+	}
+	wg.Wait()
+
+	calls := atomic.LoadInt32(&gen.calls)
+	if calls != 1004 {
+		t.Error("Should have been exactly 1004 calls to generator", calls)
+	}
+}
