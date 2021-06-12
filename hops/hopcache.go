@@ -5,8 +5,9 @@ import (
 	"context"
 	"sync"
 
-	// TODO these should both be in an m-lab/api repository containing only API defs.
 	"cloud.google.com/go/civil"
+
+	// TODO these should both be in an m-lab/api repository containing only API defs.
 	"github.com/m-lab/uuid-annotator/annotator"
 	"github.com/m-lab/uuid-annotator/ipservice"
 )
