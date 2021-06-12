@@ -36,14 +36,13 @@ type Cache interface {
 // HopAnnotation1 defines the schema for bigquery hop annotations
 // https://docs.google.com/document/d/1Kh-YbJnZhm1KhcPFo-qN48wdpxYpNsrKzNLvKF0_0UI#heading=h.1o8g4cz8a12n
 type HopAnnotation1 struct {
-	ID   string                       `bigquery:"id"`
+	ID   string                       `bigquery:"id"` // <date>_<machine-site>_<ip>.json
 	Date civil.Date                   `bigquery:"date"`
 	Raw  *annotator.ClientAnnotations `json:",omitempty" bigquery:"raw"`
 }
 
 // Hop filename should be <date>_<machine-site>_<ip>.json
 
-// TODO decide whether we want this in a package for isolation
 // HopGenerator is the type of the function that creates new hop annotation records.
 // TODO should this be an interface, rather than a function signature?
 type HopGenerator func(context.Context, string, *annotator.ClientAnnotations) error
