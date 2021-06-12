@@ -79,7 +79,7 @@ func TestConcurrent(t *testing.T) {
 		go func(n int) {
 			// Altogether, these will post all values from 0 to 1004, about 300,000 times
 			// each in semi-random order.
-			for j := 1; j < 100; j++ {
+			for j := 0; j < 100; j++ {
 				time.Sleep(time.Duration(rand.Int31n(1000000)))
 				hc.AnnotateNewHops(context.TODO(),
 					[]string{fmt.Sprint(n + j%3), fmt.Sprint(n + j%4), fmt.Sprint(n + j%5)})
@@ -93,4 +93,38 @@ func TestConcurrent(t *testing.T) {
 	if calls != 1004 {
 		t.Error("Should have been exactly 1004 calls to generator", calls)
 	}
+}
+
+// BenchmarkConcurrent-4   	   36865	     45702 ns/op	    1748 B/op	      81 allocs/op
+// 45 microseconds to make 10 calls with 3 ips each, with massive contention (37K goroutines).
+// Total of about 37K cache entries, 1M ips, in about 1.6 seconds?
+func BenchmarkConcurrent(b *testing.B) {
+	var wg sync.WaitGroup
+	start := make(chan struct{})
+
+	gen := func(ctx context.Context, ip string, ann *annotator.ClientAnnotations) error {
+		return nil
+	}
+	hc := hops.New(&fake{}, gen)
+
+	b.StopTimer()
+	for i := 0; i < b.N; i++ {
+		wg.Add(1)
+		go func(n int) {
+			<-start
+			// Altogether, these will post all values from 0 to b.N+4, about 30 times,
+			// in pseudo-random order.
+			for j := 0; j < 10; j++ {
+				//time.Sleep(time.Duration(rand.Int31n(1000)))
+				hc.AnnotateNewHops(context.TODO(),
+					[]string{fmt.Sprint(n + j%3), fmt.Sprint(n + j%4), fmt.Sprint(n + j%5)})
+			}
+			wg.Done()
+		}(i)
+	}
+
+	time.Sleep(10 * time.Millisecond)
+	b.StartTimer()
+	close(start)
+	wg.Wait()
 }
