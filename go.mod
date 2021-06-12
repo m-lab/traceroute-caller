@@ -3,6 +3,7 @@ module github.com/m-lab/traceroute-caller
 go 1.16
 
 require (
+	cloud.google.com/go v0.56.0
 	github.com/go-test/deep v1.0.7
 	github.com/kr/pretty v0.2.0
 	github.com/m-lab/go v0.1.45
