@@ -17,6 +17,10 @@ import (
 	pipe "gopkg.in/m-lab/pipe.v3"
 )
 
+func init() {
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+}
+
 type testTracer struct {
 	calls  int
 	cctest int

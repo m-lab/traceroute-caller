@@ -23,6 +23,10 @@ import (
 	"github.com/m-lab/tcp-info/eventsocket"
 )
 
+func init() {
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+}
+
 type fakeTracer struct {
 	ips   []string
 	mutex sync.Mutex
