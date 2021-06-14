@@ -1,4 +1,4 @@
-// traceroute-caller is a wrapper around the `paris-traceroute` and
+// traceroute-caller is a wrapper around the
 // `scamper` commands and can be invoked in two different poll and
 // listen modes:
 //
@@ -45,14 +45,12 @@ var (
 	scattachBin       = flag.String("scamper.sc_attach", "sc_attach", "The path to the sc_attach binary.")
 	scwarts2jsonBin   = flag.String("scamper.sc_warts2json", "sc_warts2json", "The path to the sc_warts2json binary.")
 	scamperCtrlSocket = flag.String("scamper.unixsocket", "/tmp/scamperctrl", "The name of the UNIX-domain socket that the scamper daemon should listen on")
-	scamperTimeout    = flag.Duration("scamper.timeout", 300*time.Second, "how long to wait to complete a scamper trace.")
-	parisBin          = flag.String("paris.bin", "paris-traceroute", "The path to the paris-traceroute binary.")
-	parisTimeout      = flag.Duration("paris.timeout", 60*time.Second, "how long to wait to complete a paris-traceroute trace.")
+	scamperTimeout    = flag.Duration("scamper.timeout", 900*time.Second, "how long to wait to complete a scamper trace.")
 	outputPath        = flag.String("outputPath", "/var/spool/scamper", "path of output")
 	waitTime          = flag.Duration("waitTime", 5*time.Second, "how long to wait between subsequent listings of open connections")
 	poll              = flag.Bool("poll", true, "Whether the polling method should be used to see new connections.")
 	tracerType        = flagx.Enum{
-		Options: []string{"paris-traceroute", "scamper", "scamper-daemon", "scamper-daemon-with-paris-backup", "scamper-daemon-with-scamper-backup"},
+		Options: []string{"scamper", "scamper-daemon", "scamper-daemon-with-scamper-backup"},
 		Value:   "scamper",
 	}
 
@@ -62,7 +60,7 @@ var (
 )
 
 func init() {
-	flag.Var(&tracerType, "tracetool", "Choose whether paris-traceroute or scamper should be used.")
+	flag.Var(&tracerType, "tracetool", "Choose whether scamper or scamper-daemon should be used.")
 }
 
 func main() {
@@ -89,18 +87,11 @@ func main() {
 		Warts2JSONBinary: *scwarts2jsonBin,
 		ControlSocket:    *scamperCtrlSocket,
 	}
-	parisTracer := &tracer.Paris{
-		Binary:     *parisBin,
-		OutputPath: *outputPath,
-		Timeout:    *parisTimeout,
-	}
 
 	var cache *ipcache.RecentIPCache
 
 	// Set up the cache three different ways, depending on the trace method requested.
 	switch tracerType.Value {
-	case "paris-traceroute":
-		cache = ipcache.New(ctx, parisTracer, *ipcache.IPCacheTimeout, *ipcache.IPCacheUpdatePeriod)
 	case "scamper":
 		cache = ipcache.New(ctx, scamper, *ipcache.IPCacheTimeout, *ipcache.IPCacheUpdatePeriod)
 	case "scamper-daemon":
@@ -120,15 +111,6 @@ func main() {
 			scamperDaemon.MustStart(ctx)
 			// When the scamper daemon dies, switch to scamper
 			cache.UpdateTracer(scamper)
-			wg.Done()
-		}()
-	case "scamper-daemon-with-paris-backup":
-		cache = ipcache.New(ctx, scamperDaemon, *ipcache.IPCacheTimeout, *ipcache.IPCacheUpdatePeriod)
-		wg.Add(1)
-		go func() {
-			scamperDaemon.MustStart(ctx)
-			// When the scamper daemon dies, switch to paris-traceroute.
-			cache.UpdateTracer(parisTracer)
 			wg.Done()
 		}()
 	}

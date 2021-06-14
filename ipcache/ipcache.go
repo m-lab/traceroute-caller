@@ -91,8 +91,7 @@ func (rc *RecentIPCache) GetCacheLength() int {
 	return len(rc.cache)
 }
 
-// UpdateTracer switches the Tracer being used. This allows us to dynamically
-// switch between scamper and paris-traceroute.
+// UpdateTracer switches the Tracer being used.
 func (rc *RecentIPCache) UpdateTracer(t Tracer) {
 	rc.mu.Lock()
 	defer rc.mu.Unlock()
