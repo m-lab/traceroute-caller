@@ -27,23 +27,30 @@ type Scamper struct {
 	ScamperTimeout     time.Duration
 }
 
-// generateFilename creates the string filename for storing the data.
-func (*Scamper) generateFilename(cookie string, t time.Time) string {
-	c, err := strconv.ParseInt(cookie, 16, 64)
-	rtx.PanicOnError(err, "Could not turn cookie into number")
-	return t.Format("20060102T150405Z") + "_" + uuid.FromCookie(uint64(c)) + ".jsonl"
+// generatesFilename creates the string filename for storing the data.
+func generateFilename(path string, cookie string, t time.Time) (string, error) {
+	dir, err := createTimePath(path, t)
+	if err != nil {
+		// TODO add metric here
+		return "", errors.New("could not create output directory")
+	}
+	c, err := strconv.ParseUint(cookie, 16, 64)
+	if err != nil {
+		// TODO add metric here
+		log.Println(err, "converting cookie", cookie)
+		return "", errors.New("error converting cookie")
+	}
+	return dir + t.Format("20060102T150405Z") + "_" + uuid.FromCookie(c) + ".jsonl", nil
 }
 
 // TraceFromCachedTrace creates test from cached trace.
 func (s *Scamper) TraceFromCachedTrace(conn connection.Connection, t time.Time, cachedTest []byte) error {
-	dir, err := createTimePath(s.OutputPath, t)
+	filename, err := generateFilename(s.OutputPath, conn.Cookie, t)
 	if err != nil {
-		log.Println("Could not create directories")
-		tracerCacheErrors.WithLabelValues("scamper", "baddir").Inc()
+		log.Println(err)
+		tracerCacheErrors.WithLabelValues("scamper", err.Error()).Inc()
 		return err
 	}
-	filename := dir + s.generateFilename(conn.Cookie, t)
-	log.Println("Starting a cached trace to be put in", filename)
 
 	// remove the first line of cachedTest
 	split := bytes.Index(cachedTest, []byte{'\n'})
@@ -84,10 +91,10 @@ func (s *Scamper) Trace(conn connection.Connection, t time.Time) (out []byte, er
 
 // trace a single connection using scamper as a standalone binary.
 func (s *Scamper) trace(conn connection.Connection, t time.Time) ([]byte, error) {
-	dir, err := createTimePath(s.OutputPath, t)
-	rtx.PanicOnError(err, "Could not create directory")
-	filename := dir + s.generateFilename(conn.Cookie, t)
-	log.Println("Starting a trace to be put in", filename)
+	filename, err := generateFilename(s.OutputPath, conn.Cookie, t)
+	if err != nil {
+		return nil, err
+	}
 	buff := bytes.Buffer{}
 
 	// WriteString never errors, but may panic on OOM
@@ -204,10 +211,10 @@ func (d *ScamperDaemon) TraceAll(connections []connection.Connection) {
 }
 
 func (d *ScamperDaemon) trace(conn connection.Connection, t time.Time) ([]byte, error) {
-	dir, err := createTimePath(d.OutputPath, t)
-	rtx.PanicOnError(err, "Could not create directory")
-	filename := dir + d.generateFilename(conn.Cookie, t)
-	log.Println("Starting a trace to be put in", filename)
+	filename, err := generateFilename(d.OutputPath, conn.Cookie, t)
+	if err != nil {
+		return nil, err
+	}
 	buff := bytes.Buffer{}
 
 	_, err = buff.Write(GetMetaline(conn, false, ""))
