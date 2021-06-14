@@ -12,6 +12,8 @@ import (
 
 var (
 	// IPCacheTimeout sets a lower bound on the amount of time between subsequent traceroutes to a single IP address.
+	// Since traces typically take 5 to 10 minutes, this cache timeout should probably be adjusted to something
+	// more like 15 minutes, or perhaps even an hour.
 	IPCacheTimeout = flag.Duration("IPCacheTimeout", 120*time.Second, "Timeout duration in seconds for IPCache")
 
 	// IPCacheUpdatePeriod determines how long to wait between cache-scrubbing attempts.
@@ -91,8 +93,7 @@ func (rc *RecentIPCache) GetCacheLength() int {
 	return len(rc.cache)
 }
 
-// UpdateTracer switches the Tracer being used. This allows us to dynamically
-// switch between scamper and paris-traceroute.
+// UpdateTracer switches the Tracer being used.
 func (rc *RecentIPCache) UpdateTracer(t Tracer) {
 	rc.mu.Lock()
 	defer rc.mu.Unlock()
@@ -117,6 +118,10 @@ func New(ctx context.Context, trace Tracer, ipCacheTimeout, ipCacheUpdatePeriod 
 			m.mu.Lock()
 			for k, v := range m.cache {
 				if now.Sub(v.timeStamp) > ipCacheTimeout {
+					// Note that if there is a trace in progress, the events
+					// waiting for it to complete will still get the result
+					// and save it.  But this allows a new trace to be started
+					// on the same IP address.
 					delete(m.cache, k)
 				}
 			}
