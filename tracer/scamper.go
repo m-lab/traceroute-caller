@@ -205,7 +205,6 @@ func (d *ScamperDaemon) TraceAll(connections []connection.Connection) {
 }
 
 func traceAndWrite(fn string, cmd pipe.Pipe, conn connection.Connection, t time.Time, timeout time.Duration) ([]byte, error) {
-
 	data, err := runTrace(cmd, conn, timeout)
 	if err != nil {
 		return nil, err
