@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"runtime"
 	"testing"
 	"time"
 
@@ -14,11 +15,18 @@ import (
 	"github.com/m-lab/tcp-info/eventsocket"
 )
 
+func init() {
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+}
+
 func TestMetrics(t *testing.T) {
 	promtest.LintMetrics(t)
 }
 
 func TestMain(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("Skipping for non-linux environment", runtime.GOOS)
+	}
 	dir, err := ioutil.TempDir("", "TestMain")
 	rtx.Must(err, "Could not create temp dir")
 	defer os.RemoveAll(dir)
@@ -41,6 +49,9 @@ func TestMain(t *testing.T) {
 }
 
 func TestScamper(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("Skipping for non-linux environment", runtime.GOOS)
+	}
 	dir, err := ioutil.TempDir("", "TestMain")
 	rtx.Must(err, "Could not create temp dir")
 	defer os.RemoveAll(dir)

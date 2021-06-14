@@ -128,6 +128,9 @@ func TestExistingFileStopsDaemonCreation(t *testing.T) {
 	// socket needs to exist in a well-known location. If there is already a file
 	// in that well-known location, then that is an indication that something has
 	// gone wrong with the surrounding environment.
+	if runtime.GOOS != "linux" {
+		t.Skip("Skipping for non-linux environment", runtime.GOOS)
+	}
 
 	defer func() {
 		logFatal = log.Fatal
