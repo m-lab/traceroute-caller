@@ -52,16 +52,18 @@ func TestScamper(t *testing.T) {
 	}
 	uuid, err := conn.UUID()
 	rtx.Must(err, "Could not make uuid")
-	expected := `{"UUID":"` + uuid + `","TracerouteCallerVersion":"` + prometheusx.GitShortCommit + `","CachedResult":false,"CachedUUID":""}
--I tracelb -P icmp-echo -q 3 -O ptr 10.1.1.1 -o- -O json
+	// We now omit the metadata string from the returned []byte
+	expectedMeta := `{"UUID":"` + uuid + `","TracerouteCallerVersion":"` + prometheusx.GitShortCommit + `","CachedResult":false,"CachedUUID":""}
 `
-	if strings.TrimSpace(string(out)) != strings.TrimSpace(expected) {
-		t.Error("Bad output:", out)
+	expectedData := `-I tracelb -P icmp-echo -q 3 -O ptr 10.1.1.1 -o- -O json
+`
+	if strings.TrimSpace(string(out)) != strings.TrimSpace(expectedData) {
+		t.Error("Bad output:\n", string(out), "!=\n", expectedData)
 	}
 	contents, err := ioutil.ReadFile(dir + "/2003/11/09/20031109T155559Z_" + prefix.UnsafeString() + "_00000000000012AB.jsonl")
 	rtx.Must(err, "Could not read file")
-	if string(contents) != string(out) {
-		t.Error("The contents of the file should equal the returned values from scraper")
+	if string(contents) != string(expectedMeta+expectedData) {
+		t.Error("The contents of the file should contain the metadata and the trace data")
 	}
 
 	s.Binary = "false"
@@ -235,8 +237,8 @@ func TestTraceTimeout(t *testing.T) {
 
 	defer func() {
 		r := recover()
-		if r == nil {
-			log.Println("Correct. timeout error should NOT trigger recover.")
+		if r != nil {
+			t.Error("timeout error should NOT trigger recover", r)
 		}
 	}()
 
