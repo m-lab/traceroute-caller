@@ -30,7 +30,7 @@ type Scamper struct {
 	TracelbWaitProbe   int
 }
 
-// generatesFilename creates the string filename for storing the data.
+// generateFilename creates the string filename for storing the data.
 func (*Scamper) generateFilename(cookie string, t time.Time) string {
 	c, err := strconv.ParseInt(cookie, 16, 64)
 	rtx.PanicOnError(err, "Could not turn cookie into number")
@@ -38,7 +38,7 @@ func (*Scamper) generateFilename(cookie string, t time.Time) string {
 }
 
 // TraceFromCachedTrace creates test from cached trace.
-func (s *Scamper) TraceFromCachedTrace(conn connection.Connection, t time.Time, cachedTest string) error {
+func (s *Scamper) TraceFromCachedTrace(conn connection.Connection, t time.Time, cachedTest []byte) error {
 	dir, err := createDatePath(s.OutputPath, t)
 	if err != nil {
 		log.Println("Could not create directories")
@@ -49,7 +49,7 @@ func (s *Scamper) TraceFromCachedTrace(conn connection.Connection, t time.Time, 
 	log.Println("Starting a cached trace to be put in", filename)
 
 	// remove the first line of cachedTest
-	split := strings.Index(cachedTest, "\n")
+	split := bytes.Index(cachedTest, []byte{'\n'})
 
 	if split <= 0 || split == len(cachedTest) {
 		log.Println("Invalid cached test")
@@ -58,7 +58,7 @@ func (s *Scamper) TraceFromCachedTrace(conn connection.Connection, t time.Time, 
 	}
 
 	// Get the uuid from the first line of cachedTest
-	newTest := GetMetaline(conn, true, extractUUID(cachedTest[:split])) + cachedTest[split+1:]
+	newTest := append(GetMetaline(conn, true, extractUUID(cachedTest[:split])), cachedTest[split+1:]...)
 	return ioutil.WriteFile(filename, []byte(newTest), 0666)
 }
 
@@ -72,7 +72,7 @@ func (*Scamper) DontTrace(conn connection.Connection, err error) {
 // Trace starts a new scamper process running the paris-traceroute algorithm to
 // every node. This uses more resources per-traceroute, but segfaults in the
 // called binaries have a much smaller "blast radius".
-func (s *Scamper) Trace(conn connection.Connection, t time.Time) (out string, err error) {
+func (s *Scamper) Trace(conn connection.Connection, t time.Time) (out []byte, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			log.Printf("Recovered (%v) a crashed trace for %v at %v\n", r, conn, t)
@@ -88,7 +88,7 @@ func (s *Scamper) Trace(conn connection.Connection, t time.Time) (out string, er
 // trace a single connection using scamper as a standalone binary.
 // TODO: The common code in trace() methods should be placed in a
 //       function that can be called from the methods.
-func (s *Scamper) trace(conn connection.Connection, t time.Time) (string, error) {
+func (s *Scamper) trace(conn connection.Connection, t time.Time) ([]byte, error) {
 	// Make sure a directory path based on the current date exists,
 	// generate a filename to save in that directory, and create
 	// a buffer to hold traceroute data.
@@ -96,7 +96,10 @@ func (s *Scamper) trace(conn connection.Connection, t time.Time) (string, error)
 	rtx.PanicOnError(err, "Could not create directory")
 	filename := dir + s.generateFilename(conn.Cookie, t)
 	buff := bytes.Buffer{}
-	_, err = buff.WriteString(GetMetaline(conn, false, ""))
+
+	// WriteString never errors, but may panic on OOM
+	_, _ = buff.Write(GetMetaline(conn, false, ""))
+	// TODO Should not use panic recovery.  Convert these to errors.
 	rtx.PanicOnError(err, "Could not write to buffer")
 
 	// Create a context and initialize command execution variables.
@@ -127,7 +130,7 @@ func (s *Scamper) trace(conn connection.Connection, t time.Time) (string, error)
 			// XXX - TestTraceTimeout() expects null string, so
 			// we return here but it's better to save partial data
 			// even in the case of a timeout.
-			return "", err
+			return nil, err
 		}
 		log.Printf("Trace failed in context %p (error: %v)\n", ctx, err)
 	} else {
@@ -139,7 +142,7 @@ func (s *Scamper) trace(conn connection.Connection, t time.Time) (string, error)
 	// error, the output won't be complete but we write whatever we have
 	// instead of discarding it.
 	rtx.PanicOnError(ioutil.WriteFile(filename, buff.Bytes(), 0666), "Could not save output to file")
-	return buff.String(), err
+	return buff.Bytes(), err
 }
 
 // ScamperDaemon contains a single instance of a scamper process. Once the ScamperDaemon has
@@ -204,7 +207,7 @@ func (d *ScamperDaemon) MustStart(ctx context.Context) {
 // All checks inside of this function and its subfunctions should call
 // PanicOnError instead of Must because each trace is independent of the others,
 // so we should prevent a single failed trace from crashing everything.
-func (d *ScamperDaemon) Trace(conn connection.Connection, t time.Time) (out string, err error) {
+func (d *ScamperDaemon) Trace(conn connection.Connection, t time.Time) (out []byte, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			log.Printf("Recovered (%v) a crashed trace for %v at %v\n", r, conn, t)
@@ -229,7 +232,7 @@ func (d *ScamperDaemon) TraceAll(connections []connection.Connection) {
 
 // TODO: The common code in trace() methods should be placed in a
 //       function that can be called from the methods.
-func (d *ScamperDaemon) trace(conn connection.Connection, t time.Time) (string, error) {
+func (d *ScamperDaemon) trace(conn connection.Connection, t time.Time) ([]byte, error) {
 	// Make sure a directory path based on the current date exists,
 	// generate a filename to save in that directory, and create
 	// a buffer to hold traceroute data.
@@ -237,7 +240,8 @@ func (d *ScamperDaemon) trace(conn connection.Connection, t time.Time) (string, 
 	rtx.PanicOnError(err, "Could not create directory")
 	filename := dir + d.generateFilename(conn.Cookie, t)
 	buff := bytes.Buffer{}
-	_, err = buff.WriteString(GetMetaline(conn, false, ""))
+
+	_, err = buff.Write(GetMetaline(conn, false, ""))
 	rtx.PanicOnError(err, "Could not write to buffer")
 
 	// Create a context and initialize command execution variables.
@@ -271,7 +275,7 @@ func (d *ScamperDaemon) trace(conn connection.Connection, t time.Time) (string, 
 			// XXX - TestTraceTimeout() expects null string, so
 			// we return here but it's better to save partial data
 			// even in the case of a timeout.
-			return "", err
+			return nil, err
 		}
 		log.Printf("Trace failed in context %p (error: %v)\n", ctx, err)
 	} else {
@@ -283,5 +287,5 @@ func (d *ScamperDaemon) trace(conn connection.Connection, t time.Time) (string, 
 	// error, the output won't be complete but we write whatever we have
 	// instead of discarding it.
 	rtx.PanicOnError(ioutil.WriteFile(filename, buff.Bytes(), 0666), "Could not save output to file")
-	return buff.String(), err
+	return buff.Bytes(), err
 }
