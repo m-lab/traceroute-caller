@@ -86,45 +86,22 @@ func (s *Scamper) Trace(conn connection.Connection, t time.Time) (out []byte, er
 	}()
 	tracesInProgress.WithLabelValues("scamper").Inc()
 	defer tracesInProgress.WithLabelValues("scamper").Dec()
-	return s.trace(conn, t)
-}
-
-// trace a single connection using scamper as a standalone binary.
-func (s *Scamper) trace(conn connection.Connection, t time.Time) ([]byte, error) {
-	filename, err := generateFilename(s.OutputPath, conn.Cookie, t)
+	fn, err := generateFilename(s.OutputPath, conn.Cookie, t)
 	if err != nil {
 		return nil, err
 	}
-	buff := bytes.Buffer{}
-
-	// WriteString never errors, but may panic on OOM
-	_, _ = buff.Write(GetMetaline(conn, false, ""))
-	// TODO Should not use panic recovery.  Convert these to errors.
-	rtx.PanicOnError(err, "Could not write to buffer")
 
 	cmd := pipe.Line(
 		pipe.Exec(s.Binary, "-I", "tracelb -P icmp-echo -q 3 -O ptr "+conn.RemoteIP, "-o-", "-O", "json"),
-		pipe.Write(&buff),
 	)
-	start := time.Now()
-	err = pipe.RunTimeout(cmd, s.ScamperTimeout)
-	latency := time.Since(start).Seconds()
+	out, err = traceAndWrite(fn, cmd, conn, t, s.ScamperTimeout)
 	if err != nil {
-		traceTimeHistogram.WithLabelValues("error").Observe(latency)
-	} else {
-		traceTimeHistogram.WithLabelValues("success").Observe(latency)
+		// TODO change to use a label within general trace counter.
+		// possibly just use the latency histogram?
+		crashedTraces.WithLabelValues("scamper").Inc()
+		log.Printf("Error running trace for %v:%v\n", conn, err)
 	}
-
-	tracesPerformed.WithLabelValues("scamper").Inc()
-	if err != nil && err.Error() == pipe.ErrTimeout.Error() {
-		log.Println("Trace timed out: ", cmd)
-		return nil, err
-	}
-
-	// TODO - should we really panic here?
-	rtx.PanicOnError(err, "Command %v failed", cmd)
-	rtx.PanicOnError(ioutil.WriteFile(filename, buff.Bytes(), 0666), "Could not save output to file")
-	return buff.Bytes(), nil
+	return
 }
 
 // ScamperDaemon contains a single instance of a scamper process. Once the ScamperDaemon has
@@ -197,7 +174,24 @@ func (d *ScamperDaemon) Trace(conn connection.Connection, t time.Time) (out []by
 	}()
 	tracesInProgress.WithLabelValues("scamper-daemon").Inc()
 	defer tracesInProgress.WithLabelValues("scamper-daemon").Dec()
-	return d.trace(conn, t)
+	cmd := pipe.Line(
+		pipe.Println("tracelb -P icmp-echo -q 3 -O ptr ", conn.RemoteIP),
+		pipe.Exec(d.AttachBinary, "-i-", "-o-", "-U", d.ControlSocket),
+		pipe.Exec(d.Warts2JSONBinary),
+	)
+	fn, err := generateFilename(d.OutputPath, conn.Cookie, t)
+	if err != nil {
+		return nil, err
+	}
+
+	out, err = traceAndWrite(fn, cmd, conn, t, d.ScamperTimeout)
+	if err != nil {
+		// TODO change to use a label within general trace counter.
+		// possibly just use the latency histogram?
+		crashedTraces.WithLabelValues("scamper").Inc()
+		log.Printf("Error running trace for %v:%v\n", conn, err)
+	}
+	return
 }
 
 // TraceAll runs N independent traces on N passed-in connections.
@@ -210,41 +204,48 @@ func (d *ScamperDaemon) TraceAll(connections []connection.Connection) {
 	}
 }
 
-func (d *ScamperDaemon) trace(conn connection.Connection, t time.Time) ([]byte, error) {
-	filename, err := generateFilename(d.OutputPath, conn.Cookie, t)
+func traceAndWrite(fn string, cmd pipe.Pipe, conn connection.Connection, t time.Time, timeout time.Duration) ([]byte, error) {
+
+	data, err := runTrace(cmd, conn, timeout)
 	if err != nil {
 		return nil, err
 	}
+	return data, writeTraceFile(data, fn, conn, t)
+}
+
+// runTrace executes a trace command and returns the data.
+func runTrace(cmd pipe.Pipe, conn connection.Connection, timeout time.Duration) ([]byte, error) {
+	// Add buffer write at end of cmd.
 	buff := bytes.Buffer{}
+	cmd = pipe.Line(cmd, pipe.Write(&buff))
 
-	_, err = buff.Write(GetMetaline(conn, false, ""))
-	rtx.PanicOnError(err, "Could not write to buffer")
-
-	log.Printf(
-		"Running: echo \"tracelb -P icmp-echo -q 3 -O ptr %s\" | %s -i- -o- -U %s | %s > %s\n",
-		conn.RemoteIP, d.AttachBinary, d.ControlSocket, d.Warts2JSONBinary, filename)
-	cmd := pipe.Line(
-		pipe.Println("tracelb -P icmp-echo -q 3 -O ptr ", conn.RemoteIP),
-		pipe.Exec(d.AttachBinary, "-i-", "-o-", "-U", d.ControlSocket),
-		pipe.Exec(d.Warts2JSONBinary),
-		pipe.Write(&buff),
-	)
 	start := time.Now()
-	err = pipe.RunTimeout(cmd, d.ScamperTimeout)
+	err := pipe.RunTimeout(cmd, timeout)
 	latency := time.Since(start).Seconds()
-	tracesPerformed.WithLabelValues("scamper-daemon").Inc()
+
 	if err != nil {
 		traceTimeHistogram.WithLabelValues("error").Observe(latency)
-	} else {
-		traceTimeHistogram.WithLabelValues("success").Observe(latency)
+		switch err {
+		case pipe.ErrTimeout:
+			log.Printf("Trace timed out after %v: %v\n", timeout, conn.RemoteIP)
+			tracesPerformed.WithLabelValues("timeout").Inc()
+			return nil, err
+		default:
+			tracesPerformed.WithLabelValues("failed").Inc()
+			log.Println("trace failed to", conn.RemoteIP)
+			return nil, err
+		}
 	}
-
-	if err != nil && err.Error() == pipe.ErrTimeout.Error() {
-		log.Println("Trace timed out: ", cmd)
-		return nil, err
-	}
-
-	rtx.PanicOnError(err, "Command %v failed", cmd)
-	rtx.PanicOnError(ioutil.WriteFile(filename, buff.Bytes(), 0666), "Could not save output to file")
+	traceTimeHistogram.WithLabelValues("success").Observe(latency)
+	tracesPerformed.WithLabelValues("success").Inc()
 	return buff.Bytes(), nil
+}
+
+// TODO - this should take an io.Writer?
+func writeTraceFile(data []byte, fn string, conn connection.Connection, t time.Time) error {
+	buff := bytes.Buffer{}
+	// buff.Write err is alway nil, but it may OOM
+	_, _ = buff.Write(GetMetaline(conn, false, ""))
+	_, _ = buff.Write(data)
+	return ioutil.WriteFile(fn, buff.Bytes(), 0666)
 }
