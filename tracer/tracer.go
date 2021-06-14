@@ -100,9 +100,9 @@ type Metadata struct {
 // extractUUID retrieves the UUID from a cached line.
 //
 // TODO: Eliminate the need to unmarshal data we marshaled in the first place.
-func extractUUID(metaline string) string {
+func extractUUID(metaline []byte) string {
 	var metaResult Metadata
-	err := json.Unmarshal([]byte(metaline), &metaResult)
+	err := json.Unmarshal(metaline, &metaResult)
 	if err != nil {
 		log.Println("Could not parse cached results:", metaline)
 		return ""
@@ -114,7 +114,7 @@ func extractUUID(metaline string) string {
 // be. Parameter isCache indicates whether this meta line is for an original
 // trace test or a cached test, and parameter cachedUUID is the original test if
 // isCache is 1.
-func GetMetaline(conn connection.Connection, isCache bool, cachedUUID string) string {
+func GetMetaline(conn connection.Connection, isCache bool, cachedUUID string) []byte {
 	// Write the UUID as the first line of the file. If we want to add other
 	// metadata, this is the place to do it.
 	//
@@ -133,7 +133,7 @@ func GetMetaline(conn connection.Connection, isCache bool, cachedUUID string) st
 
 	metaJSON, _ := json.Marshal(meta)
 
-	return string(metaJSON) + "\n"
+	return append(metaJSON, byte('\n'))
 }
 
 // createDatePath returns a string with date in format prefix/yyyy/mm/dd/ after
