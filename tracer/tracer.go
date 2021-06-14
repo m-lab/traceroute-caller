@@ -20,6 +20,7 @@ var (
 			Name: "trace_time_seconds",
 			Help: "scamper trace time in seconds",
 			Buckets: []float64{
+				// These are log spaced bins, 6 bins per decade
 				1, 1.47, 2.15, 3.16, 4.64, 6.81,
 				10, 14.7, 21.5, 31.6, 46.4, 68.1,
 				100, 147, 215, 316, 464, 681,
