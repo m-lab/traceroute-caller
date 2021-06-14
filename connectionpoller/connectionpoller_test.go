@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"reflect"
+	"runtime"
 	"testing"
 	"time"
 
@@ -15,6 +16,10 @@ import (
 	"github.com/m-lab/go/rtx"
 	"github.com/m-lab/traceroute-caller/connection"
 )
+
+func init() {
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+}
 
 func TestParseIPAndPort(t *testing.T) {
 	ip, port, err := parseIPAndPort("[2620:0:1003:416:a0ad:fd1a:62f:c862]:53890")
@@ -144,6 +149,9 @@ func (tf *testFinder) GetConnections() map[connection.Connection]struct{} {
 func TestConnectionPollerConstruction(t *testing.T) {
 	// The only thing we can verify by default is that the code does not crash.
 	// Which is not nothing, but it's not a lot.
+	if runtime.GOOS != "linux" {
+		t.Skip("Skipping for non-linux environment", runtime.GOOS)
+	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	var tt testTracer
