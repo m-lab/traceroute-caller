@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
@@ -77,13 +76,6 @@ func (*Scamper) DontTrace(conn connection.Connection, err error) {
 // every node. This uses more resources per-traceroute, but segfaults in the
 // called binaries have a much smaller "blast radius".
 func (s *Scamper) Trace(conn connection.Connection, t time.Time) (out []byte, err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			log.Printf("Recovered (%v) a crashed trace for %v at %v\n", r, conn, t)
-			crashedTraces.WithLabelValues("scamper").Inc()
-			err = errors.New(fmt.Sprint(r))
-		}
-	}()
 	tracesInProgress.WithLabelValues("scamper").Inc()
 	defer tracesInProgress.WithLabelValues("scamper").Dec()
 	fn, err := generateFilename(s.OutputPath, conn.Cookie, t)
@@ -165,13 +157,6 @@ func (d *ScamperDaemon) MustStart(ctx context.Context) {
 // PanicOnError instead of Must because each trace is independent of the others,
 // so we should prevent a single failed trace from crashing everything.
 func (d *ScamperDaemon) Trace(conn connection.Connection, t time.Time) (out []byte, err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			log.Printf("Recovered (%v) a crashed trace for %v at %v\n", r, conn, t)
-			crashedTraces.WithLabelValues("scamper-daemon").Inc()
-			err = errors.New(fmt.Sprint(r))
-		}
-	}()
 	tracesInProgress.WithLabelValues("scamper-daemon").Inc()
 	defer tracesInProgress.WithLabelValues("scamper-daemon").Dec()
 	cmd := pipe.Line(
@@ -194,16 +179,6 @@ func (d *ScamperDaemon) Trace(conn connection.Connection, t time.Time) (out []by
 	return
 }
 
-// TraceAll runs N independent traces on N passed-in connections.
-func (d *ScamperDaemon) TraceAll(connections []connection.Connection) {
-	for _, c := range connections {
-		log.Printf("PT start: %s %d", c.RemoteIP, c.RemotePort)
-		go func(c connection.Connection) {
-			_, _ = d.Trace(c, time.Now())
-		}(c)
-	}
-}
-
 func traceAndWrite(fn string, cmd pipe.Pipe, conn connection.Connection, t time.Time, timeout time.Duration) ([]byte, error) {
 	data, err := runTrace(cmd, conn, timeout)
 	if err != nil {
@@ -213,19 +188,19 @@ func traceAndWrite(fn string, cmd pipe.Pipe, conn connection.Connection, t time.
 }
 
 // runTrace executes a trace command and returns the data.
-func runTrace(cmd pipe.Pipe, conn connection.Connection, timeout time.Duration) ([]byte, error) {
+func runTrace(cmd pipe.Pipe, conn connection.Connection, timeout time.Duration) (result []byte, err error) {
 	// Add buffer write at end of cmd.
 	buff := bytes.Buffer{}
 	cmd = pipe.Line(cmd, pipe.Write(&buff))
 
 	start := time.Now()
-	err := pipe.RunTimeout(cmd, timeout)
+	err = pipe.RunTimeout(cmd, timeout)
 	latency := time.Since(start).Seconds()
 
 	if err != nil {
 		traceTimeHistogram.WithLabelValues("error").Observe(latency)
-		switch err {
-		case pipe.ErrTimeout:
+		switch err.Error() {
+		case "timeout":
 			log.Printf("Trace timed out after %v: %v\n", timeout, conn.RemoteIP)
 			tracesPerformed.WithLabelValues("timeout").Inc()
 			return nil, err

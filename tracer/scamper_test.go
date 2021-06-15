@@ -235,13 +235,6 @@ func TestTraceTimeout(t *testing.T) {
 		Warts2JSONBinary: "cat",
 	}
 
-	defer func() {
-		r := recover()
-		if r != nil {
-			t.Error("timeout error should NOT trigger recover", r)
-		}
-	}()
-
 	c := connection.Connection{
 		Cookie:   "1",
 		RemoteIP: "1.2.3.4",
@@ -334,8 +327,8 @@ func TestCreateCacheTest(t *testing.T) {
 	}
 }
 
-func TestRecovery(t *testing.T) {
-	tempdir, err := ioutil.TempDir("", "TestRecovery")
+func TestGenerateFilenameError(t *testing.T) {
+	tempdir, err := ioutil.TempDir("", "TestGenerateFilenameError")
 	rtx.Must(err, "Could not create tempdir")
 	defer os.RemoveAll(tempdir)
 
@@ -350,18 +343,22 @@ func TestRecovery(t *testing.T) {
 			OutputPath:     tempdir,
 			ScamperTimeout: 1 * time.Minute,
 		},
-		AttachBinary:     "echo",
+		AttachBinary:     "false",
 		Warts2JSONBinary: "cat",
 	}
 
 	c := connection.Connection{
-		Cookie: "not a number in base 16 at all",
+		Cookie: "not a valid base 16 number",
 	}
 
-	// Run both trace methods.
-	d.TraceAll([]connection.Connection{c})
 	_, _ = d.Trace(c, time.Now())
-	// If this doesn't crash, then the recovery process works!
+
+	s := &Scamper{
+		OutputPath:     tempdir,
+		ScamperTimeout: 1 * time.Minute,
+	}
+
+	_, _ = s.Trace(c, time.Now())
 }
 
 func TestExtractUUID(t *testing.T) {
