@@ -150,7 +150,7 @@ func (d *ScamperDaemon) MustStart(ctx context.Context) {
 		logFatal("The control socket file must not already exist: ", err)
 	}
 	defer os.Remove(d.ControlSocket)
-	command := exec.Command(d.Binary, "-U", d.ControlSocket)
+	command := exec.Command(d.Binary, "-U", d.ControlSocket, "-p", "10000")
 	// Start is non-blocking.
 	rtx.Must(command.Start(), "Could not start daemon")
 
