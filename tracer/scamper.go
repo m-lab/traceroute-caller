@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/m-lab/go/rtx"
+	"github.com/m-lab/go/shx"
 	"github.com/m-lab/traceroute-caller/connection"
 	"github.com/m-lab/uuid"
 	pipe "gopkg.in/m-lab/pipe.v3"
@@ -207,38 +208,52 @@ func (d *ScamperDaemon) TraceAll(connections []connection.Connection) {
 func (d *ScamperDaemon) trace(conn connection.Connection, t time.Time) (string, error) {
 	dir, err := createTimePath(d.OutputPath, t)
 	rtx.PanicOnError(err, "Could not create directory")
-	filename := dir + d.generateFilename(conn.Cookie, t)
-	log.Println("Starting a trace to be put in", filename)
 	buff := bytes.Buffer{}
-
 	_, err = buff.WriteString(GetMetaline(conn, false, ""))
 	rtx.PanicOnError(err, "Could not write to buffer")
 
-	log.Printf(
-		"Running: echo \"tracelb -P icmp-echo -q 3 -O ptr %s\" | %s -i- -o- -U %s | %s > %s\n",
-		conn.RemoteIP, d.AttachBinary, d.ControlSocket, d.Warts2JSONBinary, filename)
-	cmd := pipe.Line(
-		pipe.Println("tracelb -P icmp-echo -q 3 -O ptr ", conn.RemoteIP),
-		pipe.Exec(d.AttachBinary, "-i-", "-o-", "-U", d.ControlSocket),
-		pipe.Exec(d.Warts2JSONBinary),
-		pipe.Write(&buff),
+	ctx, cancel := context.WithTimeout(context.Background(), d.ScamperTimeout)
+	defer cancel()
+	filename := dir + d.generateFilename(conn.Cookie, t)
+	log.Printf("Starting a trace to be put in %s (context %p)", filename, ctx)
+	tracelbCmd := []string{"tracelb", "-P", "icmp-echo", "-q", "3", "-O", "ptr", conn.RemoteIP}
+	scAttachCmd := []string{d.AttachBinary, "-i-", "-o-", "-U", d.ControlSocket}
+	log.Printf("Running: echo %v | %v\n", tracelbCmd, scAttachCmd)
+	cmd := shx.Pipe(
+		shx.Exec("echo", tracelbCmd...),
+		shx.Exec(scAttachCmd[0], scAttachCmd[1:]...),
+		shx.Write(&buff),
 	)
+	done := make(chan error)
 	start := time.Now()
-	err = pipe.RunTimeout(cmd, d.ScamperTimeout)
-	latency := time.Since(start).Seconds()
+	var latency float64
+	go func() {
+		done <- cmd.Run(ctx, shx.New())
+	}()
+	select {
+	case <-ctx.Done():
+		latency = time.Since(start).Seconds()
+		if err = ctx.Err(); err.Error() != "context deadline exceeded" {
+			log.Printf("Context %p is done (error: %v)\n", ctx, err) // shouldn't happen
+		} else {
+			log.Printf("Trace timed out in context: %p\n", ctx)
+		}
+		traceTimeHistogram.WithLabelValues("error").Observe(latency)
+	case err = <-done:
+		latency = time.Since(start).Seconds()
+		if err != nil {
+			log.Printf("failed to run command in context %p (error: %v)\n", ctx, err)
+			traceTimeHistogram.WithLabelValues("error").Observe(latency)
+		} else {
+			log.Printf("succeeded to run command in context %p\n", ctx)
+			traceTimeHistogram.WithLabelValues("success").Observe(latency)
+		}
+	}
 	tracesPerformed.WithLabelValues("scamper-daemon").Inc()
 	if err != nil {
-		traceTimeHistogram.WithLabelValues("error").Observe(latency)
-	} else {
-		traceTimeHistogram.WithLabelValues("success").Observe(latency)
-	}
-
-	if err != nil && err.Error() == pipe.ErrTimeout.Error() {
-		log.Println("Trace timed out: ", cmd)
 		return "", err
 	}
 
-	rtx.PanicOnError(err, "Command %v failed", cmd)
 	rtx.PanicOnError(ioutil.WriteFile(filename, buff.Bytes(), 0666), "Could not save output to file")
 	return buff.String(), nil
 }
