@@ -226,13 +226,12 @@ func (d *ScamperDaemon) trace(conn connection.Connection, t time.Time) (string, 
 	)
 	done := make(chan error)
 	start := time.Now()
-	var latency float64
 	go func() {
 		done <- cmd.Run(ctx, shx.New())
 	}()
 	select {
 	case <-ctx.Done():
-		latency = time.Since(start).Seconds()
+		latency := time.Since(start).Seconds()
 		if err = ctx.Err(); err.Error() != "context deadline exceeded" {
 			log.Printf("Context %p is done (error: %v)\n", ctx, err) // shouldn't happen
 		} else {
@@ -240,7 +239,7 @@ func (d *ScamperDaemon) trace(conn connection.Connection, t time.Time) (string, 
 		}
 		traceTimeHistogram.WithLabelValues("error").Observe(latency)
 	case err = <-done:
-		latency = time.Since(start).Seconds()
+		latency := time.Since(start).Seconds()
 		if err != nil {
 			log.Printf("failed to run command in context %p (error: %v)\n", ctx, err)
 			traceTimeHistogram.WithLabelValues("error").Observe(latency)
