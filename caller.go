@@ -41,13 +41,21 @@ import (
 )
 
 var (
+	// TODO: scamper and its commands (e.g., tracelb) support a
+	// relatively large number of flags.  Instead of adding these
+	// flags one by one to traceroute-caller flags, going forward
+	// it's much better to have traceroute-caller read a configuration
+	// file in textproto format that would support all scamper and
+	// its command flags.
 	scamperBin        = flag.String("scamper.bin", "scamper", "The path to the scamper binary.")
 	scattachBin       = flag.String("scamper.sc_attach", "sc_attach", "The path to the sc_attach binary.")
 	scwarts2jsonBin   = flag.String("scamper.sc_warts2json", "sc_warts2json", "The path to the sc_warts2json binary.")
-	scamperCtrlSocket = flag.String("scamper.unixsocket", "/tmp/scamperctrl", "The name of the UNIX-domain socket that the scamper daemon should listen on")
-	scamperTimeout    = flag.Duration("scamper.timeout", 900*time.Second, "how long to wait to complete a scamper trace.")
-	outputPath        = flag.String("outputPath", "/var/spool/scamper", "path of output")
-	waitTime          = flag.Duration("waitTime", 5*time.Second, "how long to wait between subsequent listings of open connections")
+	scamperCtrlSocket = flag.String("scamper.unixsocket", "/tmp/scamperctrl", "The name of the UNIX-domain socket that the scamper daemon should listen on.")
+	scamperTimeout    = flag.Duration("scamper.timeout", 900*time.Second, "How long to wait to complete a scamper trace.")
+	scamperNoPTR      = flag.Bool("scamper.tracelb-no-ptr", false, "Do not look up DNS pointer records for IP addresses.")
+	scamperWaitProbe  = flag.Int("scamper.tracelb-W", 25, "How long to wait between probes in 1/100ths of seconds (min 15, max 200).")
+	outputPath        = flag.String("outputPath", "/var/spool/scamper", "The path of output.")
+	waitTime          = flag.Duration("waitTime", 5*time.Second, "How long to wait between subsequent listings of open connections.")
 	poll              = flag.Bool("poll", true, "Whether the polling method should be used to see new connections.")
 	tracerType        = flagx.Enum{
 		Options: []string{"scamper", "scamper-daemon", "scamper-daemon-with-scamper-backup"},
@@ -77,9 +85,11 @@ func main() {
 	defer promSrv.Shutdown(ctx)
 
 	scamper := &tracer.Scamper{
-		Binary:         *scamperBin,
-		OutputPath:     *outputPath,
-		ScamperTimeout: *scamperTimeout,
+		Binary:           *scamperBin,
+		OutputPath:       *outputPath,
+		ScamperTimeout:   *scamperTimeout,
+		TracelbNoPTR:     *scamperNoPTR,
+		TracelbWaitProbe: *scamperWaitProbe,
 	}
 	scamperDaemon := &tracer.ScamperDaemon{
 		Scamper:          scamper,

@@ -51,7 +51,7 @@ func TestScamper(t *testing.T) {
 	uuid, err := conn.UUID()
 	rtx.Must(err, "Could not make uuid")
 	expected := `{"UUID":"` + uuid + `","TracerouteCallerVersion":"` + prometheusx.GitShortCommit + `","CachedResult":false,"CachedUUID":""}
--I tracelb -P icmp-echo -q 3 -O ptr 10.1.1.1 -o- -O json
+-I "tracelb -P icmp-echo -q 3 -W 0 -O ptr 10.1.1.1" -o- -O json
 `
 	if strings.TrimSpace(out) != strings.TrimSpace(expected) {
 		t.Error("Bad output:", out)
