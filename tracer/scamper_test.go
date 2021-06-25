@@ -30,6 +30,7 @@ func TestScamper(t *testing.T) {
 		OutputPath:     dir,
 		Binary:         "echo",
 		ScamperTimeout: time.Duration(time.Hour),
+		TracelbPTR:     true,
 	}
 
 	// Test that it can perform a trace
@@ -240,7 +241,7 @@ func TestTraceTimeout(t *testing.T) {
 	faketime := time.Date(2019, time.April, 1, 3, 45, 51, 0, time.UTC)
 	prometheusx.GitShortCommit = "Fake Version"
 	data, err := d.Trace(c, faketime)
-	if err.Error() != "context deadline exceeded" {
+	if !errors.Is(err, context.DeadlineExceeded) {
 		t.Error("Should return TimeOut err, not ", err)
 	}
 	if data != "" {

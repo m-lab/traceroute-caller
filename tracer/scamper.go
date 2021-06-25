@@ -26,7 +26,7 @@ import (
 type Scamper struct {
 	Binary, OutputPath string
 	ScamperTimeout     time.Duration
-	TracelbNoPTR       bool
+	TracelbPTR         bool
 	TracelbWaitProbe   int
 }
 
@@ -103,7 +103,7 @@ func (s *Scamper) trace(conn connection.Connection, t time.Time) (string, error)
 	ctx, cancel := context.WithTimeout(context.Background(), s.ScamperTimeout)
 	defer cancel()
 	tracelbCmd := []string{"tracelb", "-P", "icmp-echo", "-q", "3", "-W", strconv.Itoa(s.TracelbWaitProbe)}
-	if !s.TracelbNoPTR {
+	if s.TracelbPTR {
 		tracelbCmd = append(tracelbCmd, []string{"-O", "ptr"}...)
 	}
 	tracelbCmd = append(tracelbCmd, conn.RemoteIP)
@@ -113,8 +113,8 @@ func (s *Scamper) trace(conn connection.Connection, t time.Time) (string, error)
 	)
 
 	// Now run the command.
-	log.Printf("Starting a trace to save in %s (context %p)", filename, ctx)
-	log.Printf("Running: %s -I %s -o- -O json\n", s.Binary, fmt.Sprintf("%q", strings.Join(tracelbCmd, " ")))
+	log.Printf("Trace started in context %p (%s -I \"%s\" -o- -O json)\n",
+		ctx, s.Binary, strings.Join(tracelbCmd, " "))
 	start := time.Now()
 	err = cmd.Run(ctx, shx.New())
 	latency := time.Since(start).Seconds()
@@ -129,7 +129,7 @@ func (s *Scamper) trace(conn connection.Connection, t time.Time) (string, error)
 			// even in the case of a timeout.
 			return "", err
 		}
-		fmt.Printf("Trace failed in context %p (error: %v)\n", ctx, err)
+		log.Printf("Trace failed in context %p (error: %v)\n", ctx, err)
 	} else {
 		log.Printf("Trace succeeded in context %p\n", ctx)
 		traceTimeHistogram.WithLabelValues("success").Observe(latency)
@@ -174,7 +174,7 @@ func (d *ScamperDaemon) MustStart(ctx context.Context) {
 	cmdFlags := []string{"-U", d.ControlSocket, "-p", "10000"}
 	command := exec.Command(d.Binary, cmdFlags...)
 	// Start is non-blocking.
-	log.Printf("Starting scamper as a daemon: %s %q\n", d.Binary, cmdFlags)
+	log.Printf("Starting scamper as a daemon: %s %s\n", d.Binary, strings.Join(cmdFlags, " "))
 	rtx.Must(command.Start(), "Could not start daemon")
 
 	// Liveness guarantee: either the process will die and then the derived context
@@ -244,7 +244,7 @@ func (d *ScamperDaemon) trace(conn connection.Connection, t time.Time) (string, 
 	ctx, cancel := context.WithTimeout(context.Background(), d.ScamperTimeout)
 	defer cancel()
 	tracelbCmd := []string{"tracelb", "-P", "icmp-echo", "-q", "3", "-W", strconv.Itoa(d.TracelbWaitProbe)}
-	if !d.TracelbNoPTR {
+	if d.TracelbPTR {
 		tracelbCmd = append(tracelbCmd, []string{"-O", "ptr"}...)
 	}
 	tracelbCmd = append(tracelbCmd, conn.RemoteIP)
@@ -257,8 +257,8 @@ func (d *ScamperDaemon) trace(conn connection.Connection, t time.Time) (string, 
 	)
 
 	// Now run the command.
-	log.Printf("Starting a trace to save in %s (context %p)", filename, ctx)
-	log.Printf("Running: echo %v | %v\n", tracelbCmd, scAttachCmd)
+	log.Printf("Trace started in context %p (echo %s | %s | %s)\n", ctx,
+		strings.Join(tracelbCmd, " "), strings.Join(scAttachCmd, " "), d.Warts2JSONBinary)
 	start := time.Now()
 	err = cmd.Run(ctx, shx.New())
 	latency := time.Since(start).Seconds()
@@ -273,7 +273,7 @@ func (d *ScamperDaemon) trace(conn connection.Connection, t time.Time) (string, 
 			// even in the case of a timeout.
 			return "", err
 		}
-		fmt.Printf("Trace failed in context %p (error: %v)\n", ctx, err)
+		log.Printf("Trace failed in context %p (error: %v)\n", ctx, err)
 	} else {
 		log.Printf("Trace succeeded in context %p\n", ctx)
 		traceTimeHistogram.WithLabelValues("success").Observe(latency)

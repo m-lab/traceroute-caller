@@ -52,7 +52,7 @@ var (
 	scwarts2jsonBin   = flag.String("scamper.sc_warts2json", "sc_warts2json", "The path to the sc_warts2json binary.")
 	scamperCtrlSocket = flag.String("scamper.unixsocket", "/tmp/scamperctrl", "The name of the UNIX-domain socket that the scamper daemon should listen on.")
 	scamperTimeout    = flag.Duration("scamper.timeout", 900*time.Second, "How long to wait to complete a scamper trace.")
-	scamperNoPTR      = flag.Bool("scamper.tracelb-no-ptr", false, "Do not look up DNS pointer records for IP addresses.")
+	scamperPTR        = flag.Bool("scamper.tracelb-ptr", true, "Look up DNS pointer records for IP addresses.")
 	scamperWaitProbe  = flag.Int("scamper.tracelb-W", 25, "How long to wait between probes in 1/100ths of seconds (min 15, max 200).")
 	outputPath        = flag.String("outputPath", "/var/spool/scamper", "The path of output.")
 	waitTime          = flag.Duration("waitTime", 5*time.Second, "How long to wait between subsequent listings of open connections.")
@@ -88,7 +88,7 @@ func main() {
 		Binary:           *scamperBin,
 		OutputPath:       *outputPath,
 		ScamperTimeout:   *scamperTimeout,
-		TracelbNoPTR:     *scamperNoPTR,
+		TracelbPTR:       *scamperPTR,
 		TracelbWaitProbe: *scamperWaitProbe,
 	}
 	scamperDaemon := &tracer.ScamperDaemon{
