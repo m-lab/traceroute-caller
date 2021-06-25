@@ -30,6 +30,7 @@ func TestScamper(t *testing.T) {
 		OutputPath:     dir,
 		Binary:         "echo",
 		ScamperTimeout: time.Duration(time.Hour),
+		TracelbPTR:     true,
 	}
 
 	// Test that it can perform a trace
@@ -51,7 +52,7 @@ func TestScamper(t *testing.T) {
 	uuid, err := conn.UUID()
 	rtx.Must(err, "Could not make uuid")
 	expected := `{"UUID":"` + uuid + `","TracerouteCallerVersion":"` + prometheusx.GitShortCommit + `","CachedResult":false,"CachedUUID":""}
--I tracelb -P icmp-echo -q 3 -O ptr 10.1.1.1 -o- -O json
+-I "tracelb -P icmp-echo -q 3 -W 0 -O ptr 10.1.1.1" -o- -O json
 `
 	if strings.TrimSpace(out) != strings.TrimSpace(expected) {
 		t.Error("Bad output:", out)
@@ -240,7 +241,7 @@ func TestTraceTimeout(t *testing.T) {
 	faketime := time.Date(2019, time.April, 1, 3, 45, 51, 0, time.UTC)
 	prometheusx.GitShortCommit = "Fake Version"
 	data, err := d.Trace(c, faketime)
-	if err.Error() != "timeout" {
+	if !errors.Is(err, context.DeadlineExceeded) {
 		t.Error("Should return TimeOut err, not ", err)
 	}
 	if data != "" {

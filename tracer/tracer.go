@@ -136,9 +136,9 @@ func GetMetaline(conn connection.Connection, isCache bool, cachedUUID string) st
 	return string(metaJSON) + "\n"
 }
 
-// createTimePath returns a string with date in format prefix/yyyy/mm/dd/ after
+// createDatePath returns a string with date in format prefix/yyyy/mm/dd/ after
 // creating a directory of the same name.
-func createTimePath(outputPath string, t time.Time) (string, error) {
+func createDatePath(outputPath string, t time.Time) (string, error) {
 	dir := outputPath + "/" + t.Format("2006/01/02") + "/"
 	err := os.MkdirAll(dir, 0777)
 	return dir, err
