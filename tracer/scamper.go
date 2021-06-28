@@ -107,14 +107,14 @@ func (s *Scamper) trace(conn connection.Connection, t time.Time) (string, error)
 		tracelbCmd = append(tracelbCmd, []string{"-O", "ptr"}...)
 	}
 	tracelbCmd = append(tracelbCmd, conn.RemoteIP)
+	iVal := strings.Join(tracelbCmd, " ")
 	cmd := shx.Pipe(
-		shx.Exec(s.Binary, "-I", fmt.Sprintf("%q", strings.Join(tracelbCmd, " ")), "-o-", "-O", "json"),
+		shx.Exec(s.Binary, "-I", iVal, "-o-", "-O", "json"),
 		shx.Write(&buff),
 	)
 
 	// Now run the command.
-	log.Printf("Trace started in context %p (%s -I \"%s\" -o- -O json)\n",
-		ctx, s.Binary, strings.Join(tracelbCmd, " "))
+	log.Printf("Trace started in context %p (%s -I %q -o- -O json)\n", ctx, s.Binary, iVal)
 	start := time.Now()
 	err = cmd.Run(ctx, shx.New())
 	latency := time.Since(start).Seconds()
