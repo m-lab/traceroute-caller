@@ -33,16 +33,6 @@ RUN ./configure --prefix=/scamper
 RUN make -j 8
 RUN make install
 
-# Build and install paris-traceroute
-RUN mkdir /pt-src
-ADD ./third_party/libparistraceroute/ /pt-src
-WORKDIR /pt-src
-RUN mkdir -p m4
-RUN ./autogen.sh
-RUN ./configure --prefix=/paris-traceroute
-RUN make -j 8
-RUN make install
-
 # Create an image for the binaries that are called by traceroute-caller without
 # any of the build tools.
 FROM ubuntu:20.04
@@ -59,14 +49,12 @@ COPY --from=build_caller /go/bin/traceroute-caller /
 # Bring the dynamically-linked traceroute binaries and their associated
 # libraries from their build image.
 COPY --from=build_tracers /scamper /usr/local
-COPY --from=build_tracers /paris-traceroute /usr/local
 
 # They are dynamically-linked, so make sure to run ldconfig to locate all new
 # libraries.
 RUN ldconfig
 
 # Verify that all the binaries we depend on are actually available
-RUN which paris-traceroute
 RUN which scamper
 RUN which sc_attach
 RUN which sc_warts2json
