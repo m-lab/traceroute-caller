@@ -49,7 +49,7 @@ func TestScamper(t *testing.T) {
 	// Test Trace
 	out, err := s.Trace(conn, now)
 	if err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	}
 	uuid, err := conn.UUID()
 	rtx.Must(err, "Could not make uuid")
@@ -57,7 +57,7 @@ func TestScamper(t *testing.T) {
 -I tracelb -P icmp-echo -q 3 -W 0 -O ptr 10.1.1.1 -o- -O json
 `
 	if strings.TrimSpace(string(out)) != strings.TrimSpace(expected) {
-		t.Error("Bad output:", out)
+		t.Error("Bad output:", string(out))
 	}
 	contents, err := ioutil.ReadFile(dir + "/2003/11/09/20031109T155559Z_" + prefix.UnsafeString() + "_00000000000012AB.jsonl")
 	rtx.Must(err, "Could not read file")
