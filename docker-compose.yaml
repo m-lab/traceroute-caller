@@ -63,9 +63,9 @@ services:
       - -outputPath=/local/traceroute
       - -poll=false
       - -tcpinfo.eventsocket=/local/tcpevents.sock
-      - -tracetool=scamper-daemon
-      - -scamper.timeout=3600s
-      - -scamper.tracelb-ptr=false
-      - -scamper.tracelb-W=30
-      - -IPCacheTimeout=600s
-      - -IPCacheUpdatePeriod=60s
+      - -tracetool=scamper
+      - -IPCacheTimeout=10m
+      - -IPCacheUpdatePeriod=1m
+      - -scamper.timeout=30m
+      - -scamper.tracelb-W=15
+      #- -scamper.tracelb-ptr=false

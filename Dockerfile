@@ -49,7 +49,7 @@ FROM ubuntu:20.04
 # Install all the packages we need and then remove the apt-get lists.
 # iproute2 gives us ss
 RUN apt-get update && \
-    apt-get install -y iproute2 && \
+    apt-get install -y iproute2 tini && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
@@ -73,4 +73,4 @@ RUN which sc_warts2json
 RUN which ss
 
 WORKDIR /
-ENTRYPOINT ["/traceroute-caller"]
+ENTRYPOINT ["tini", "--", "/traceroute-caller"]
