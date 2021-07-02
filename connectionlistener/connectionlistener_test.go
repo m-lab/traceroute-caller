@@ -23,22 +23,26 @@ import (
 	"github.com/m-lab/tcp-info/eventsocket"
 )
 
+func init() {
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+}
+
 type fakeTracer struct {
 	ips   []string
 	mutex sync.Mutex
 	wg    sync.WaitGroup
 }
 
-func (ft *fakeTracer) Trace(conn connection.Connection, t time.Time) (string, error) {
+func (ft *fakeTracer) Trace(conn connection.Connection, t time.Time) ([]byte, error) {
 	ft.mutex.Lock() // Must have a lock to avoid race conditions around the append.
 	defer ft.mutex.Unlock()
 	log.Println("Tracing", conn)
 	ft.ips = append(ft.ips, conn.RemoteIP)
 	ft.wg.Done()
-	return "Fake test result", nil
+	return []byte("Fake test result"), nil
 }
 
-func (ft *fakeTracer) TraceFromCachedTrace(conn connection.Connection, t time.Time, cachedTest string) error {
+func (ft *fakeTracer) TraceFromCachedTrace(conn connection.Connection, t time.Time, cachedTest []byte) error {
 	log.Println("Create cached test for: ", conn)
 	return nil
 }

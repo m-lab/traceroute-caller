@@ -17,17 +17,21 @@ import (
 	pipe "gopkg.in/m-lab/pipe.v3"
 )
 
+func init() {
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+}
+
 type testTracer struct {
 	calls  int
 	cctest int
 }
 
-func (tf *testTracer) Trace(conn connection.Connection, t time.Time) (string, error) {
+func (tf *testTracer) Trace(conn connection.Connection, t time.Time) ([]byte, error) {
 	tf.calls++
-	return "Fake trace test " + conn.RemoteIP, nil
+	return []byte("Fake trace test " + conn.RemoteIP), nil
 }
 
-func (tf *testTracer) TraceFromCachedTrace(conn connection.Connection, t time.Time, cachedTest string) error {
+func (tf *testTracer) TraceFromCachedTrace(conn connection.Connection, t time.Time, cachedTest []byte) error {
 	tf.cctest++
 	return nil
 }
@@ -53,7 +57,7 @@ func TestTrace(t *testing.T) {
 	if err != nil {
 		t.Error("trace not working correctly.")
 	}
-	if tmp != "Fake trace test 1.1.1.2" {
+	if string(tmp) != "Fake trace test 1.1.1.2" {
 		t.Error("cache not trace correctly ")
 	}
 
@@ -68,7 +72,7 @@ func TestTrace(t *testing.T) {
 	if err != nil {
 		t.Error("trace not working correctly.")
 	}
-	if t2 != "Fake trace test 1.1.1.5" {
+	if string(t2) != "Fake trace test 1.1.1.5" {
 		t.Error("cache did not trace")
 	}
 	if tt.cctest != 0 {
@@ -148,19 +152,19 @@ type pausingTracer struct {
 	successes            int64
 }
 
-func (pt *pausingTracer) Trace(conn connection.Connection, t time.Time) (string, error) {
+func (pt *pausingTracer) Trace(conn connection.Connection, t time.Time) ([]byte, error) {
 	randomDelay()
 	if conn.RemoteIP == pt.traceToBlock || conn.RemoteIP == pt.traceToBlockAndError {
 		<-pt.ctx.Done()
 	}
 	atomic.AddInt64(&pt.successes, 1)
 	if conn.RemoteIP == pt.traceToError || conn.RemoteIP == pt.traceToBlockAndError {
-		return "", errors.New(pipe.ErrTimeout.Error())
+		return nil, errors.New(pipe.ErrTimeout.Error())
 	}
-	return "Trace to " + conn.RemoteIP, nil
+	return []byte("Trace to " + conn.RemoteIP), nil
 }
 
-func (pt *pausingTracer) TraceFromCachedTrace(conn connection.Connection, t time.Time, cachedTest string) error {
+func (pt *pausingTracer) TraceFromCachedTrace(conn connection.Connection, t time.Time, cachedTest []byte) error {
 	randomDelay()
 	atomic.AddInt64(&pt.successes, 1)
 	return nil
@@ -204,7 +208,7 @@ func TestCacheWithBlockedTests(t *testing.T) {
 				if err != nil {
 					t.Errorf("Trace %d not done correctly.", j)
 				}
-				if s != expected {
+				if string(s) != expected {
 					t.Errorf("Bad trace output: %q, should be %s", s, expected)
 				}
 			}

@@ -2,6 +2,7 @@ package connection
 
 import (
 	"errors"
+	"log"
 	"net"
 	"reflect"
 	"strings"
@@ -10,6 +11,10 @@ import (
 	"github.com/m-lab/go/rtx"
 	"github.com/m-lab/tcp-info/inetdiag"
 )
+
+func init() {
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+}
 
 func TestUUID(t *testing.T) {
 	conn := Connection{Cookie: "1be3"}
