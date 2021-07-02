@@ -80,7 +80,7 @@ func (*Scamper) DontTrace(conn connection.Connection, err error) {
 // every node. This uses more resources per-traceroute, but segfaults in the
 // called binaries have a much smaller "blast radius".
 func (s *Scamper) Trace(conn connection.Connection, t time.Time) (out []byte, err error) {
-	// XXX Is this still useful?  Does shx.PipeJob we ever panic?
+	// TODO Is this still useful?  Does shx.PipeJob we ever panic?
 	defer func() {
 		if r := recover(); r != nil {
 			log.Printf("Recovered (%v) a crashed trace for %v at %v\n", r, conn, t)
@@ -177,7 +177,7 @@ func (d *ScamperDaemon) MustStart(ctx context.Context) {
 // Trace starts a sc_attach connecting to the scamper process for each
 // connection.
 func (d *ScamperDaemon) Trace(conn connection.Connection, t time.Time) (out []byte, err error) {
-	// XXX Is this still useful?  Does shx.PipeJob we ever panic?
+	// TODO Is this still useful?  Does shx.PipeJob we ever panic?
 	defer func() {
 		if r := recover(); r != nil {
 			log.Printf("Recovered (%v) a crashed trace for %v at %v\n", r, conn, t)
@@ -269,12 +269,10 @@ func runTrace(ctx context.Context, label string, cmd shx.Job, conn connection.Co
 			log.Printf("Trace failed in context %p (error: %v)\n", ctx, err)
 		}
 		return buff.Bytes(), err
-	} else {
-		log.Printf("Trace succeeded in context %p\n", ctx)
-		traceTimeHistogram.WithLabelValues("success").Observe(latency)
 	}
 
-	tracesPerformed.WithLabelValues("success").Inc()
+	log.Printf("Trace succeeded in context %p\n", ctx)
+	traceTimeHistogram.WithLabelValues("success").Observe(latency)
 	return buff.Bytes(), nil
 }
 
