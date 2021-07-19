@@ -2,6 +2,7 @@
 package cache
 
 import (
+	"errors"
 	"sync"
 	"time"
 
@@ -9,67 +10,71 @@ import (
 	"github.com/m-lab/traceroute-caller/ipcache"
 )
 
-// The cache stores key value pair, and will execute an arbitrary function to
-// fill an entry if one does not exist.
-
-type prompt interface {
-	key() string
+type Entry interface {
+	Populate(data []byte, err error) error
+	Value() (data []byte, err error) // Blocks until ready
 }
 
-type cacheable struct {
-	prompt interface{} // pointer to a custom struct containing whatever is needed
-
-}
-
+// An item in the cache must track a few different conditions
 type item struct {
-	expiry time.Time
-	data   []byte
-	ready  chan struct{}
-	err    error
+	expiryTime time.Time     // The expiration time of this entry.
+	data       []byte        // The cached data.  May be nil.
+	ready      chan struct{} // Indicates that the item has been populated or action completed (or errored).
+	err        error         // Indicates that an error occurred when populating the item.
 }
 
-type cache struct {
-	values map[string]*item
-	expiry time.Duration
-	mu     sync.Mutex
-}
+var ErrAlreadyPopulated = errors.New("item already populated")
 
-type fetchFunc func(string) ([]byte, error)
-
-func (c *cache) get(key string, f fetchFunc) ([]byte, error) {
-	e, cached := c.getEntry(key)
-	if cached {
-		<-e.ready
-	} else {
-		e.data, e.err = f(key)
-		close(e.ready)
+// Populate populates the content of a previously created item.
+func (v *item) Populate(data []byte, err error) error {
+	select {
+	case <-v.ready: // already closed
+		return ErrAlreadyPopulated
+	default:
+		v.data = data
+		v.err = err
+		close(v.ready)
 	}
-	return e.data, e.err
+	return nil
+}
+
+// Value blocks until the item value is ready, then returns the data and error values.
+func (v *item) Value() ([]byte, error) {
+	<-v.ready
+	return v.data, v.err
+}
+
+// The PendingCache itself contains the map from key to items, the expiration interval (may be 0 if no expiration).
+type PendingCache struct {
+	values         map[string]*item
+	expiryInterval time.Duration
+	mu             sync.Mutex
 }
 
 // gets an entry, or creates a pending entry if no entry exists
-func (c *cache) getEntry(key string) (*item, bool) {
+func (c *PendingCache) Get(key string) (Entry, bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	e, existed := c.values[key]
 	if !existed {
 		e = &item{
-			expiry: time.Now().Add(c.expiry),
-			ready:  make(chan struct{}),
+			expiryTime: time.Now().Add(c.expiryInterval),
+			ready:      make(chan struct{}),
 		}
 		c.values[key] = e
 	}
 	return e, existed
 }
 
+// Example use for IP cache.
 type RecentIPCache struct {
-	cache
+	PendingCache
 
 	tracer ipcache.Tracer
 }
 
-func (rc *RecentIPCache) getEntry(ip string) (*item, bool) {
-	return rc.cache.getEntry(ip)
+func (rc *RecentIPCache) getEntry(ip string) (Entry, bool) {
+	return rc.PendingCache.Get(ip)
 }
 
 func (rc *RecentIPCache) getTracer() ipcache.Tracer {
@@ -83,23 +88,16 @@ func (rc *RecentIPCache) getTracer() ipcache.Tracer {
 // as a side effect.
 func (rc *RecentIPCache) Trace(conn connection.Connection) ([]byte, error) {
 	t := rc.getTracer()
-	f := func(string) ([]byte, error) {
-		return t.Trace(conn, time.Now())
+	e, cached := rc.Get(conn.RemoteIP)
+	if !cached {
+		data, err := t.Trace(conn, time.Now())
+		e.Populate(data, err)
 	}
-	c, err := rc.get(conn.RemoteIP, f)
-	if err != nil {
-		return nil, err
+	data, err := e.Value()
+	if err == nil {
+		_ = t.TraceFromCachedTrace(conn, time.Now(), data)
+		return data, nil
 	}
-	if cached {
-		<-c.ready
-		if c.err == nil {
-			_ = t.TraceFromCachedTrace(conn, time.Now(), c.data)
-			return c.data, nil
-		}
-		t.DontTrace(conn, c.err)
-		return nil, c.err
-	}
-	c.data, c.err = t.Trace(conn, time.Now())
-	close(c.ready)
-	return c.data, c.err
+	t.DontTrace(conn, err)
+	return nil, err
 }
