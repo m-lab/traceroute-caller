@@ -28,16 +28,17 @@ import (
 	"time"
 
 	"github.com/m-lab/traceroute-caller/connection"
+	"github.com/m-lab/traceroute-caller/connectionlistener"
+	"github.com/m-lab/traceroute-caller/connectionpoller"
+	"github.com/m-lab/traceroute-caller/hopannotation"
+	"github.com/m-lab/traceroute-caller/ipcache"
 	"github.com/m-lab/traceroute-caller/tracer"
 
 	"github.com/m-lab/go/flagx"
+	"github.com/m-lab/go/prometheusx"
 	"github.com/m-lab/go/rtx"
 	"github.com/m-lab/tcp-info/eventsocket"
-
-	"github.com/m-lab/go/prometheusx"
-	"github.com/m-lab/traceroute-caller/connectionlistener"
-	"github.com/m-lab/traceroute-caller/connectionpoller"
-	"github.com/m-lab/traceroute-caller/ipcache"
+	"github.com/m-lab/uuid-annotator/ipservice"
 )
 
 var (
@@ -58,7 +59,7 @@ var (
 	waitTime          = flag.Duration("waitTime", 5*time.Second, "How long to wait between subsequent listings of open connections.")
 	poll              = flag.Bool("poll", true, "Whether the polling method should be used to see new connections.")
 	tracerType        = flagx.Enum{
-		Options: []string{"scamper", "scamper-daemon", "scamper-daemon-with-scamper-backup"},
+		Options: []string{"scamper", "scamper-daemon"},
 		Value:   "scamper",
 	}
 
@@ -75,8 +76,11 @@ func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
 	flag.Parse()
-	rtx.Must(flagx.ArgsFromEnv(flag.CommandLine), "Could not get args from environment")
-	rtx.Must(os.MkdirAll(*outputPath, 0777), "Could not create data directory")
+	rtx.Must(flagx.ArgsFromEnv(flag.CommandLine), "failed to get args from environment")
+	if !*poll && *eventsocket.Filename == "" {
+		logFatal("either specify poll mode or provide a value for --tcpinfo.eventsocket")
+	}
+	rtx.Must(os.MkdirAll(*outputPath, 0777), "failed to create data directory")
 
 	defer cancel()
 	wg := sync.WaitGroup{}
@@ -98,14 +102,13 @@ func main() {
 		ControlSocket:    *scamperCtrlSocket,
 	}
 
-	var cache *ipcache.RecentIPCache
-
-	// Set up the cache three different ways, depending on the trace method requested.
+	// Set up the ipCache depending on the trace method requested.
+	var ipCache *ipcache.RecentIPCache
 	switch tracerType.Value {
 	case "scamper":
-		cache = ipcache.New(ctx, scamper, *ipcache.IPCacheTimeout, *ipcache.IPCacheUpdatePeriod)
+		ipCache = ipcache.New(ctx, scamper, *ipcache.IPCacheTimeout, *ipcache.IPCacheUpdatePeriod)
 	case "scamper-daemon":
-		cache = ipcache.New(ctx, scamperDaemon, *ipcache.IPCacheTimeout, *ipcache.IPCacheUpdatePeriod)
+		ipCache = ipcache.New(ctx, scamperDaemon, *ipcache.IPCacheTimeout, *ipcache.IPCacheUpdatePeriod)
 		wg.Add(1)
 		go func() {
 			scamperDaemon.MustStart(ctx)
@@ -113,22 +116,12 @@ func main() {
 			cancel()
 			wg.Done()
 		}()
-	// These are hacks - the scamper daemon should not fail at all.
-	case "scamper-daemon-with-scamper-backup":
-		cache = ipcache.New(ctx, scamperDaemon, *ipcache.IPCacheTimeout, *ipcache.IPCacheUpdatePeriod)
-		wg.Add(1)
-		go func() {
-			scamperDaemon.MustStart(ctx)
-			// When the scamper daemon dies, switch to scamper
-			cache.UpdateTracer(scamper)
-			wg.Done()
-		}()
 	}
 
+	wg.Add(1)
 	if *poll {
-		wg.Add(1)
-		go func(c *ipcache.RecentIPCache) {
-			connPoller := connectionpoller.New(c)
+		go func() {
+			connPoller := connectionpoller.New(ipCache)
 			for ctx.Err() == nil {
 				connPoller.TraceClosedConnections()
 
@@ -138,18 +131,17 @@ func main() {
 				}
 			}
 			wg.Done()
-		}(cache)
-	} else if *eventsocket.Filename != "" {
-		wg.Add(1)
+		}()
+	} else {
 		go func() {
 			connCreator, err := connection.NewCreator()
-			rtx.Must(err, "Could not discover local IPs")
-			connListener := connectionlistener.New(connCreator, cache)
+			rtx.Must(err, "failed to discover local IPs")
+			ipserviceClient := ipservice.NewClient(*ipservice.SocketFilename)
+			hopCache := hopannotation.New(ipserviceClient, *outputPath)
+			connListener := connectionlistener.New(connCreator, ipCache, hopCache)
 			eventsocket.MustRun(ctx, *eventsocket.Filename, connListener)
 			wg.Done()
 		}()
-	} else {
-		logFatal("--poll was false but --tcpinfo.eventsocket was set to \"\". This is a nonsensical configuration.")
 	}
 	wg.Wait()
 }

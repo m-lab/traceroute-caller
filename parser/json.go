@@ -11,6 +11,7 @@ package parser
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net"
 	"strings"
 )
@@ -141,33 +142,58 @@ func ExtractHops(tracelb *TracelbLine) ([]string, error) {
 	return hopStrings, nil
 }
 
-// ExtractTraceLB extracts the traceLB line from scamper JSONL.
-// Not currently used, but expected to be used soon for hop annotations.
+// ExtractTraceLB extracts the tracelb line from scamper JSONL output,
+// passed as data.
+//
+// XXX As noted earlier, there are 4 lines in the output:
+//   {"UUID":...}
+//   {"type":"cycle-start"...}
+//   {"type":"tracelb"...}
+//   {"type":"cycle-stop"...}
+// The package testing code, however, does not provide the first line,
+// so account for it here for now but we should fix the package testing
+// code.
 func ExtractTraceLB(data []byte) (*TracelbLine, error) {
 	var cycleStart CyclestartLine
+	var tracelb TracelbLine
 	var cycleStop CyclestopLine
 
-	jsonStrings := strings.Split(string(data), "\n")
-	if len(jsonStrings) != 3 && (len(jsonStrings) != 4 || strings.TrimSpace(jsonStrings[3]) != "") {
-		return nil, errors.New("test has wrong number of lines")
+	lines := 4
+	if !strings.HasPrefix(string(data), "{\"UUID\":") {
+		lines = 3
+	}
+	jsonStrings := strings.Split(strings.TrimSpace(string(data)), "\n")
+	n := len(jsonStrings)
+	if n != lines {
+		return nil, fmt.Errorf("test has wrong number of lines")
 	}
 
-	// TODO These (cycleStart/Stop checking) are not strictly necessary.  We'll keep them for a while for
-	// debugging, but will likely remove them soon, as they provide little value.
-	err := json.Unmarshal([]byte(jsonStrings[0]), &cycleStart)
+	// Validate the cycle-start line.
+	err := json.Unmarshal([]byte(jsonStrings[n-3]), &cycleStart)
 	if err != nil {
 		return nil, errors.New("invalid cycle-start")
 	}
+	if cycleStart.Type != "cycle-start" {
+		return nil, fmt.Errorf("invalid cycleStart type: %v", cycleStart.Type)
+	}
 
-	err = json.Unmarshal([]byte(jsonStrings[2]), &cycleStop)
+	// Validate the tracelb line.
+	err = json.Unmarshal([]byte(jsonStrings[n-2]), &tracelb)
+	if err != nil {
+		return nil, fmt.Errorf("invalid tracelb")
+	}
+	if tracelb.Type != "tracelb" {
+		return nil, fmt.Errorf("invalid tracelb type: %v", tracelb.Type)
+	}
+
+	// Validate the cycle-stop line.
+	err = json.Unmarshal([]byte(jsonStrings[n-1]), &cycleStop)
 	if err != nil {
 		return nil, errors.New("invalid cycle-stop")
 	}
-
-	var tracelb TracelbLine
-	err = json.Unmarshal([]byte(jsonStrings[1]), &tracelb)
-	if err != nil {
-		return nil, errors.New("invalid tracelb")
+	if cycleStop.Type != "cycle-stop" {
+		return nil, fmt.Errorf("invalid cycleStop type: %v", cycleStop.Type)
 	}
+
 	return &tracelb, nil
 }

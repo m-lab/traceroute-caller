@@ -12,15 +12,17 @@ import (
 	"time"
 
 	"github.com/go-test/deep"
-	"github.com/m-lab/tcp-info/inetdiag"
-	"github.com/m-lab/uuid"
 
 	"github.com/m-lab/traceroute-caller/connection"
 	"github.com/m-lab/traceroute-caller/connectionlistener"
+	"github.com/m-lab/traceroute-caller/hopannotation"
 	"github.com/m-lab/traceroute-caller/ipcache"
 
 	"github.com/m-lab/go/rtx"
 	"github.com/m-lab/tcp-info/eventsocket"
+	"github.com/m-lab/tcp-info/inetdiag"
+	"github.com/m-lab/uuid"
+	"github.com/m-lab/uuid-annotator/ipservice"
 )
 
 func init() {
@@ -67,13 +69,14 @@ func TestListener(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	ft := &fakeTracer{}
-	cache := ipcache.New(ctx, ft, 100*time.Second, time.Second)
+	ipCache := ipcache.New(ctx, ft, 100*time.Second, time.Second)
 
 	ft.wg.Add(2)
 
 	localIP := net.ParseIP("10.0.0.1")
 	creator := connection.NewFakeCreator([]*net.IP{&localIP})
-	cl := connectionlistener.New(creator, cache)
+	hopCache := hopannotation.New(ipservice.NewClient(*ipservice.SocketFilename), "/some/path")
+	cl := connectionlistener.New(creator, ipCache, hopCache)
 	cl.Open(ctx, time.Now(), "", nil) // Test that nil pointer to Open does not cause a crash.
 
 	// Connect the connectionlistener to the server
