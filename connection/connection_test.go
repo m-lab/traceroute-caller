@@ -43,7 +43,7 @@ func TestSrcDestSwap(t *testing.T) {
 		}, nil
 	}
 
-	c, err := NewCreator()
+	c, err := NewLocalIPs()
 	rtx.Must(err, "Could not use fake netInterfaceAddrs")
 
 	tests := []struct {
@@ -141,7 +141,7 @@ type fakeIP struct{}
 func (fakeIP) String() string  { return "" }
 func (fakeIP) Network() string { return "" }
 
-func TestNewCreatorWithBadInterfaceAddrs(t *testing.T) {
+func TestNewLocalIPs(t *testing.T) {
 	oldFunc := netInterfaceAddrs
 	defer func() { netInterfaceAddrs = oldFunc }()
 
@@ -149,7 +149,7 @@ func TestNewCreatorWithBadInterfaceAddrs(t *testing.T) {
 		return nil, errors.New("error for testing")
 	}
 
-	_, err := NewCreator()
+	_, err := NewLocalIPs()
 	if err == nil {
 		t.Error("Should have had an error but was nil")
 	}
@@ -158,7 +158,7 @@ func TestNewCreatorWithBadInterfaceAddrs(t *testing.T) {
 		return []net.Addr{fakeIP{}}, nil
 	}
 
-	_, err = NewCreator()
+	_, err = NewLocalIPs()
 	if err == nil {
 		t.Error("Should have had an error but was nil")
 	}

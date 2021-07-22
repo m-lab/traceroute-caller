@@ -43,7 +43,8 @@ func generateFilename(path string, cookie string, t time.Time) (string, error) {
 		log.Println(err, "converting cookie", cookie)
 		return "", errors.New("error converting cookie")
 	}
-	return dir + t.Format("20060102T150405Z") + "_" + uuid.FromCookie(c) + ".jsonl", nil
+	s := dir + t.Format("20060102T150405Z") + "_" + uuid.FromCookie(c) + ".jsonl"
+	return s, nil
 }
 
 // TraceFromCachedTrace creates test from cached trace.
