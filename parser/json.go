@@ -129,7 +129,7 @@ func ExtractHops(tracelb *TracelbLine) ([]string, error) {
 				link := &links[k]
 				// Parse the IP string, to avoid formatting variations.
 				ip := net.ParseIP(link.Addr)
-				if ip.String() != "" {
+				if ip.String() != "<nil>" {
 					hops[ip.String()] = struct{}{}
 				}
 			}

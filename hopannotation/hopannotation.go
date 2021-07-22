@@ -15,19 +15,22 @@ import (
 	"time"
 
 	"cloud.google.com/go/civil"
+	"github.com/m-lab/go/rtx"
 
-	// TODO these should both be in an m-lab/api repository containing only API defs.
-	"github.com/m-lab/traceroute-caller/parser"
+	// TODO: These should both be in a common location containing API definitions.
 	"github.com/m-lab/uuid-annotator/annotator"
 	"github.com/m-lab/uuid-annotator/ipservice"
 )
 
-// HopArchiver is for blackbox package testing.
-var HopArchiver = archiveHop
+var (
+	// HopArchiver is for blackbox package testing.
+	HopArchiver = archiveHopAnnotation
+	hostname    string
+)
 
 // HopAnnotation1 defines the schema for BigQuery hop annotations.
 type HopAnnotation1 struct {
-	ID   string                       `bigquery:"id"` // <date>_<machine-site>_<ip>.json
+	ID   string                       `bigquery:"id"` // see hopAnnotationFilename()
 	Date civil.Date                   `bigquery:"date"`
 	Raw  *annotator.ClientAnnotations `json:",omitempty" bigquery:"raw"`
 }
@@ -38,6 +41,12 @@ type HopCache struct {
 	doneList   map[string]bool  // list of IP addresses already handled
 	mu         sync.Mutex       // lock protecting doneList
 	outputPath string           // path to direcotry for writing archives
+}
+
+func init() {
+	var err error
+	hostname, err = os.Hostname()
+	rtx.Must(err, "failed to get hostname")
 }
 
 // New returns a new HopCache that will use the provided ipservice.Client
@@ -59,48 +68,24 @@ func (hc *HopCache) Clear() {
 	hc.doneList = make(map[string]bool, len(hc.doneList)+len(hc.doneList)/4)
 }
 
-// ProcessHops takes the output of a trace, extracts all tracelb's hop
-// IP addresses, annotates, and archives (writes to a file) the annotated
-// hop IPs.
-func (hc *HopCache) ProcessHops(ctx context.Context, timestamp time.Time, uuid string, traceOutput []byte) (int, int, error) {
-	tracelb, err := parser.ExtractTraceLB(traceOutput)
-	if err != nil {
-		return 0, 0, err
-	}
-	if tracelb.Type != "tracelb" {
-		return 0, 0, fmt.Errorf("tracelb output has invalid type: %v", tracelb.Type)
-	}
-	if len(tracelb.Nodes) == 0 {
-		return 0, 0, fmt.Errorf("no nodes in tracelb output")
-	}
-	ips, err := parser.ExtractHops(tracelb)
-	if err != nil {
-		return 0, 0, err
-	}
-	if len(ips) == 0 {
-		return 0, 0, fmt.Errorf("no hop IPs in tracelb output")
-	}
-	return hc.AnnotateNewHops(ctx, ips, timestamp, uuid)
-}
-
-// AnnotateNewHops annotates and archives new hop IP addresses.
+// AnnotateArchive annotates and archives new hop IP addresses.
 // It returns the number of new hops that should have been annotated,
 // number actually annotated, and a compound error summarizing any errors
 // encountered.
-func (hc *HopCache) AnnotateNewHops(ctx context.Context, ips []string, timestamp time.Time, uuid string) (int, int, error) {
-	for _, ip := range ips {
-		if net.ParseIP(ip) == nil {
-			log.Printf("AnnorateNewHops(): invalid IP address ip=%v\n", ip)
+func (hc *HopCache) AnnotateArchive(ctx context.Context, hops []string, timestamp time.Time) (int, int, error) {
+	// Validate hops in case our caller hasn't done so.
+	for _, hop := range hops {
+		if net.ParseIP(hop).String() == "<nil>" {
 			return 0, 0, fmt.Errorf("invalid IP address")
 		}
 	}
-	newHops := hc.getNewHops(ips)
+
+	newHops := hc.getNewHops(hops)
 
 	// Not holding lock
 	//     Perform anonymization on hop IPs (eventually - not needed yet).
 	//     Request annotations from the annotation service for all new nodes.
 	//     annotations is map[string]*annotator.ClientAnnotations
-	//
 	annotations, err := hc.annotator.Annotate(context.Background(), newHops) // uuid-annotator/ipservice/client.go:Annotate()
 	if err != nil {
 		log.Printf("failed to annotate hops (error: %v)\n", err)
@@ -110,15 +95,17 @@ func (hc *HopCache) AnnotateNewHops(ctx context.Context, ips []string, timestamp
 	success := 0
 	// Create archive records for the new annotations (by calling the generator, possibly in parallel)
 	// Aggregate and return errors and counts.
-	for ip, annotation := range annotations {
-		filename, err := generateFilename(hc.outputPath, timestamp, uuid, ip)
-		log.Printf(">>> AnnorateNewHops(): archiving ip=%v annotation in %v\n", ip, filename)
+	for hop, annotation := range annotations {
+		filename, err := hopAnnotationFilename(hc.outputPath, timestamp, hop)
+		log.Printf("AnnotateArchive(): archiving %q annotation in %q\n", hop, filename)
 		if err != nil {
 			log.Printf("failed to generate filename (error: %v)\n", err)
 			return len(newHops), success, err
 		}
 		if err := HopArchiver(ctx, filename, annotation); err != nil {
-			// XXX Returning after the first error (i.e., not aggregating).
+			// TODO: Try to annotate all hops and return
+			// aggregated errors instead of returning after
+			// the first error.
 			return len(newHops), success, err
 		}
 		success++
@@ -127,26 +114,37 @@ func (hc *HopCache) AnnotateNewHops(ctx context.Context, ips []string, timestamp
 }
 
 // getNewHops returns the list of new hops that should be annotated and archived.
-func (hc *HopCache) getNewHops(ips []string) []string {
+func (hc *HopCache) getNewHops(hops []string) []string {
 	var newHops []string
 	hc.mu.Lock()
 	defer hc.mu.Unlock()
 	// Add new hops to the annotated map and the newHops slice.
-	for _, ip := range ips {
-		_, ok := hc.doneList[ip]
+	for _, hop := range hops {
+		_, ok := hc.doneList[hop]
 		if !ok {
-			// XXX Isn't marking this as true premature since
-			//     we haven't either annotated or archived yet.
-			hc.doneList[ip] = true
-			newHops = append(newHops, ip)
+			// TODO: Maintain 3 states: not started, in progress, and done.
+			hc.doneList[hop] = true
+			newHops = append(newHops, hop)
 		}
 	}
 	return newHops
 }
 
-// archiveHop archives the given hop IP. The archive filename should be in the
-// "<date>_<machine-site>_<ip>.json" format.
-func archiveHop(ctx context.Context, filename string, annotation *annotator.ClientAnnotations) error {
+// hopAnnotationFilename returns the full pathname of an annotation file
+// in the format: "<yyyymmdd>_<hostname>_<ip>.json".
+func hopAnnotationFilename(dirPath string, timestamp time.Time, hop string) (string, error) {
+	// TODO: This should possibly be combined with functions in
+	//       tracer/tracer.go and put in a packge to be used by both.
+	dir := dirPath + "/" + timestamp.Format("2006/01/02")
+	if err := os.MkdirAll(dir, 0777); err != nil {
+		return "", errors.New("could not create output directory") // TODO add metric here
+	}
+	return fmt.Sprintf("%s/%s_%s_%s.json", dir, timestamp.Format("20060102"), hostname, hop), nil
+}
+
+// archiveHopAnnotation writes the given hop annotation to a file
+// specified by filename.
+func archiveHopAnnotation(ctx context.Context, filename string, annotation *annotator.ClientAnnotations) error {
 	b, err := json.Marshal(annotation)
 	if err != nil {
 		log.Printf("failed to marshal annotation to json")
@@ -157,14 +155,4 @@ func archiveHop(ctx context.Context, filename string, annotation *annotator.Clie
 		log.Printf("failed to write marshaled annotation")
 	}
 	return err
-}
-
-// XXX This should be combined with functions in tracer/tracer.go and
-// put in a packge to be used by both.
-func generateFilename(dirPath string, timestamp time.Time, uuid, ip string) (string, error) {
-	dir := dirPath + "/" + timestamp.Format("2006/01/02") + "/"
-	if err := os.MkdirAll(dir, 0777); err != nil {
-		return "", errors.New("could not create output directory") // TODO add metric here
-	}
-	return dir + timestamp.Format("20060102T150405Z") + "_" + uuid + "_" + ip + ".json", nil
 }

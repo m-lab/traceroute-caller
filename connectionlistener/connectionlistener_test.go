@@ -75,8 +75,8 @@ func TestListener(t *testing.T) {
 
 	localIP := net.ParseIP("10.0.0.1")
 	creator := connection.NewFakeCreator([]*net.IP{&localIP})
-	hopCache := hopannotation.New(ipservice.NewClient(*ipservice.SocketFilename), "/some/path")
-	cl := connectionlistener.New(creator, ipCache, hopCache)
+	hopAnnotator := hopannotation.New(ipservice.NewClient(*ipservice.SocketFilename), "/some/path")
+	cl := connectionlistener.New(creator, ipCache, hopAnnotator)
 	cl.Open(ctx, time.Now(), "", nil) // Test that nil pointer to Open does not cause a crash.
 
 	// Connect the connectionlistener to the server

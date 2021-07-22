@@ -134,11 +134,11 @@ func main() {
 		}()
 	} else {
 		go func() {
-			connCreator, err := connection.NewCreator()
+			localIPs, err := connection.NewLocalIPs()
 			rtx.Must(err, "failed to discover local IPs")
 			ipserviceClient := ipservice.NewClient(*ipservice.SocketFilename)
-			hopCache := hopannotation.New(ipserviceClient, *outputPath)
-			connListener := connectionlistener.New(connCreator, ipCache, hopCache)
+			hopAnnotator := hopannotation.New(ipserviceClient, *outputPath)
+			connListener := connectionlistener.New(localIPs, ipCache, hopAnnotator)
 			eventsocket.MustRun(ctx, *eventsocket.Filename, connListener)
 			wg.Done()
 		}()

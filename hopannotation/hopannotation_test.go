@@ -20,23 +20,23 @@ type fakeIPServiceClient struct {
 	calls int32
 }
 
-func (f *fakeIPServiceClient) Annotate(ctx context.Context, ips []string) (map[string]*annotator.ClientAnnotations, error) {
+func (f *fakeIPServiceClient) Annotate(ctx context.Context, hops []string) (map[string]*annotator.ClientAnnotations, error) {
 	atomic.AddInt32(&f.calls, 1)
 	m := make(map[string]*annotator.ClientAnnotations)
-	for _, ip := range ips {
-		m[ip] = &annotator.ClientAnnotations{}
+	for _, hop := range hops {
+		m[hop] = &annotator.ClientAnnotations{}
 	}
 	return m, nil
 }
 
-var fakeArchiveHopCalls int32
+var fakeArchiveHopAnnotationCalls int32
 
-func fakeArchiveHop(ctx context.Context, ip string, annotation *annotator.ClientAnnotations) error {
-	atomic.AddInt32(&fakeArchiveHopCalls, 1)
+func fakeArchiveHopAnnotation(ctx context.Context, hop string, annotation *annotator.ClientAnnotations) error {
+	atomic.AddInt32(&fakeArchiveHopAnnotationCalls, 1)
 	return nil
 }
 
-func TestAnnotateNewHops(t *testing.T) {
+func TestAnnotateArchive(t *testing.T) {
 	tests := []struct {
 		input   []string
 		wantN   int
@@ -52,7 +52,7 @@ func TestAnnotateNewHops(t *testing.T) {
 	}
 
 	saveHopArchiver := hopannotation.HopArchiver
-	hopannotation.HopArchiver = fakeArchiveHop
+	hopannotation.HopArchiver = fakeArchiveHopAnnotation
 	defer func() {
 		hopannotation.HopArchiver = saveHopArchiver
 	}()
@@ -60,7 +60,7 @@ func TestAnnotateNewHops(t *testing.T) {
 	hc := hopannotation.New(ipServiceClient, "./local")
 	for i, test := range tests {
 		wantN, wantK, wantErr := test.wantN, test.wantK, test.wantErr
-		gotN, gotK, gotErr := hc.AnnotateNewHops(context.TODO(), test.input, time.Now(), "some-uuid")
+		gotN, gotK, gotErr := hc.AnnotateArchive(context.TODO(), test.input, time.Now())
 		failed := false
 		if gotN != wantN || gotK != wantK {
 			failed = true
@@ -73,7 +73,7 @@ func TestAnnotateNewHops(t *testing.T) {
 			failed = true
 		}
 		if failed {
-			t.Errorf("hc.AnnotateNewHops() = %v/%v/%v, want: %v/%v/%v", gotN, gotK, gotErr, wantN, wantK, wantErr)
+			t.Errorf("hc.AnnotateArchive() = %v/%v/%v, want: %v/%v/%v", gotN, gotK, gotErr, wantN, wantK, wantErr)
 		}
 		if i == 1 {
 			hc.Clear()
@@ -84,7 +84,7 @@ func TestAnnotateNewHops(t *testing.T) {
 		t.Errorf("got %d calls to Annotate(), want 4", ipServiceClient.calls)
 	}
 	// There are 2+2+1 *new* addresses in tests.
-	if fakeArchiveHopCalls != 5 {
-		t.Errorf("got %d calls to fakeArchiveHop(), want 5", fakeArchiveHopCalls)
+	if fakeArchiveHopAnnotationCalls != 5 {
+		t.Errorf("got %d calls to fakeArchiveHopAnnotation(), want 5", fakeArchiveHopAnnotationCalls)
 	}
 }
