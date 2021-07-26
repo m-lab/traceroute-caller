@@ -5,7 +5,6 @@ package hopannotation
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -137,7 +136,8 @@ func hopAnnotationFilename(dirPath string, timestamp time.Time, hop string) (str
 	//       tracer/tracer.go and put in a packge to be used by both.
 	dir := dirPath + "/" + timestamp.Format("2006/01/02")
 	if err := os.MkdirAll(dir, 0777); err != nil {
-		return "", errors.New("could not create output directory") // TODO add metric here
+		// TODO: Add a metric here.
+		return "", err
 	}
 	return fmt.Sprintf("%s/%s_%s_%s.json", dir, timestamp.Format("20060102"), hostname, hop), nil
 }

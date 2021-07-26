@@ -108,9 +108,9 @@ func NewLocalIPs() (Creator, error) {
 	return c, err
 }
 
-// NewFakeCreator makes a fake creator with hardcoded local IPs to enable
-// testing in diverse network environments.
-func NewFakeCreator(localIPs []*net.IP) Creator {
+// NewFakeLocalIPs makes a fake creator with hardcoded local IPs to
+// enable testing in diverse network environments.
+func NewFakeLocalIPs(localIPs []*net.IP) Creator {
 	return &creator{
 		localIPs: localIPs,
 	}

@@ -1,4 +1,4 @@
-// Package connectionlistener provides two handles for open and close
+// Package connectionlistener provides two handlers for open and close
 // events called for each network connection.
 //
 // XXX The name connectionListener is terribly misleading because this
@@ -63,7 +63,7 @@ func (cl *connectionListener) Close(ctx context.Context, timestamp time.Time, uu
 }
 
 // traceAnnotateArchive runs a traceroute, takes its output, extracts all tracelb's hop
-// IP addresses, annotates the IPs, and archives the annotations (writes to a file).
+// IP addresses, annotates the IPs, and writes the annotations to one or more files.
 func (cl *connectionListener) traceAnnotateArchive(ctx context.Context, conn connection.Connection, timestamp time.Time) {
 	// First, run a traceroute.
 	traceOutput, err := cl.ipCache.Trace(conn) // ipcache/ipcachge.go
@@ -93,6 +93,7 @@ func (cl *connectionListener) traceAnnotateArchive(ctx context.Context, conn con
 		log.Printf("failed to extract hops from tracelb (error: %v)", err)
 		return
 	}
+	// TODO: Add a histogram metric for hops.
 	if len(hops) == 0 {
 		log.Printf("tracelb output has no hops")
 		return

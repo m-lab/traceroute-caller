@@ -133,7 +133,7 @@ func TestSrcDestSwap(t *testing.T) {
 		})
 	}
 
-	c = NewFakeCreator([]*net.IP{}) // Just call it to make sure it doesn't crash.
+	c = NewFakeLocalIPs([]*net.IP{}) // Just call it to make sure it doesn't crash.
 }
 
 type fakeIP struct{}
