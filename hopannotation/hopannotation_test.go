@@ -31,7 +31,7 @@ func (f *fakeIPServiceClient) Annotate(ctx context.Context, hops []string) (map[
 
 var fakeArchiveHopAnnotationCalls int32
 
-func fakeArchiveHopAnnotation(ctx context.Context, hop string, annotation *annotator.ClientAnnotations) error {
+func fakeArchiveHopAnnotation(ctx context.Context, hop string, annotation *annotator.ClientAnnotations, filepath string, timestamp time.Time) error {
 	atomic.AddInt32(&fakeArchiveHopAnnotationCalls, 1)
 	return nil
 }

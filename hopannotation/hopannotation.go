@@ -10,6 +10,8 @@ import (
 	"log"
 	"net"
 	"os"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -25,11 +27,12 @@ var (
 	// HopArchiver is for blackbox package testing.
 	HopArchiver = archiveHopAnnotation
 	hostname    string
+	boottime    int64
 )
 
 // HopAnnotation1 defines the schema for BigQuery hop annotations.
 type HopAnnotation1 struct {
-	ID   string                       `bigquery:"id"` // see hopAnnotationFilename()
+	ID   string                       `bigquery:"id"` // see hopAnnotationFilepath()
 	Date civil.Date                   `bigquery:"date"`
 	Raw  *annotator.ClientAnnotations `json:",omitempty" bigquery:"raw"`
 }
@@ -42,10 +45,30 @@ type HopCache struct {
 	outputPath string           // path to direcotry for writing archives
 }
 
+// init saves (caches) the host name and its boot time for all future
+// references because they don't change. They will be used in generating
+// the hop annotation file name and ID.
 func init() {
 	var err error
 	hostname, err = os.Hostname()
 	rtx.Must(err, "failed to get hostname")
+
+	// TODO: Put the following code (based on "uuid/prefix/prefix.go")
+	//       in a package to be used anywhere we need to compute boot time.
+	now := time.Now()
+	uptimeBytes, err := ioutil.ReadFile("/proc/uptime")
+	if err != nil {
+		rtx.Must(err, "failed to read /proc/uptime")
+	}
+	uptimePieces := strings.Split(string(uptimeBytes), " ")
+	if len(uptimePieces) < 2 {
+		rtx.Must(err, "failed to tokenize /proc/uptime")
+	}
+	uptimeFloat, err := strconv.ParseFloat(uptimePieces[0], 64)
+	if err != nil {
+		rtx.Must(err, "failed to parse /proc/uptime")
+	}
+	boottime = now.Add(-1 * time.Duration(uptimeFloat*1000000) * time.Microsecond).Unix()
 }
 
 // New returns a new HopCache that will use the provided ipservice.Client
@@ -95,13 +118,13 @@ func (hc *HopCache) AnnotateArchive(ctx context.Context, hops []string, timestam
 	// Create archive records for the new annotations (by calling the generator, possibly in parallel)
 	// Aggregate and return errors and counts.
 	for hop, annotation := range annotations {
-		filename, err := hopAnnotationFilename(hc.outputPath, timestamp, hop)
-		log.Printf("AnnotateArchive(): archiving %q annotation in %q\n", hop, filename)
+		filepath, err := hopAnnotationFilepath(hop, hc.outputPath, timestamp)
 		if err != nil {
-			log.Printf("failed to generate filename (error: %v)\n", err)
 			return len(newHops), success, err
 		}
-		if err := HopArchiver(ctx, filename, annotation); err != nil {
+		// TODO: Remove the following line after debugging is done.
+		log.Printf(">>> AnnotateArchive(): archiving %q annotation in %q\n", hop, filepath)
+		if err := HopArchiver(ctx, hop, annotation, filepath, timestamp); err != nil {
 			// TODO: Try to annotate all hops and return
 			// aggregated errors instead of returning after
 			// the first error.
@@ -129,28 +152,35 @@ func (hc *HopCache) getNewHops(hops []string) []string {
 	return newHops
 }
 
-// hopAnnotationFilename returns the full pathname of an annotation file
-// in the format: "<yyyymmdd>_<hostname>_<ip>.json".
-func hopAnnotationFilename(dirPath string, timestamp time.Time, hop string) (string, error) {
+// hopAnnotationFilepath returns the full pathname of a hop annotation file
+// in the format "<timestamp>_<hostname>_<boottime>_<ip>.json"
+func hopAnnotationFilepath(hop, outPath string, timestamp time.Time) (string, error) {
 	// TODO: This should possibly be combined with functions in
 	//       tracer/tracer.go and put in a packge to be used by both.
-	dir := dirPath + "/" + timestamp.Format("2006/01/02")
-	if err := os.MkdirAll(dir, 0777); err != nil {
+	dirPath := outPath + "/" + timestamp.Format("2006/01/02")
+	if err := os.MkdirAll(dirPath, 0777); err != nil {
 		// TODO: Add a metric here.
+		log.Printf("failed to generate directory path (error: %v)\n", err)
 		return "", err
 	}
-	return fmt.Sprintf("%s/%s_%s_%s.json", dir, timestamp.Format("20060102"), hostname, hop), nil
+	datetime := timestamp.Format("20060102T150405Z")
+	return fmt.Sprintf("%s/%s_%s_%d_%s.json", dirPath, datetime, hostname, boottime, hop), nil
 }
 
 // archiveHopAnnotation writes the given hop annotation to a file
-// specified by filename.
-func archiveHopAnnotation(ctx context.Context, filename string, annotation *annotator.ClientAnnotations) error {
-	b, err := json.Marshal(annotation)
+// specified by filepath.
+func archiveHopAnnotation(ctx context.Context, hop string, annotation *annotator.ClientAnnotations, filepath string, timestamp time.Time) error {
+	yyyymmdd := timestamp.Format("20060102")
+	b, err := json.Marshal(HopAnnotation1{
+		ID:   fmt.Sprintf("%s_%s_%d_%s", yyyymmdd, hostname, boottime, hop),
+		Date: civil.DateOf(timestamp),
+		Raw:  annotation},
+	)
 	if err != nil {
 		log.Printf("failed to marshal annotation to json")
 		return err
 	}
-	err = ioutil.WriteFile(filename, b, 0666)
+	err = ioutil.WriteFile(filepath, b, 0666)
 	if err != nil {
 		log.Printf("failed to write marshaled annotation")
 	}
