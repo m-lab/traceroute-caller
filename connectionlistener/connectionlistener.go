@@ -88,14 +88,10 @@ func (cl *connectionListener) traceAnnotateArchive(ctx context.Context, conn con
 	}
 
 	// Now, extract hop IP addresses from tracelb.
-	hops, err := parser.ExtractHops(tracelb)
-	if err != nil {
-		log.Printf("failed to extract hops from tracelb (error: %v)", err)
-		return
-	}
-	// TODO: Add a histogram metric for hops.
+	hops := parser.ExtractHops(tracelb)
 	if len(hops) == 0 {
-		log.Printf("tracelb output has no hops")
+		// TODO: Add a histogram metric for hops.
+		log.Printf("failed to extract hops from tracelb %+v", tracelb)
 		return
 	}
 

@@ -22,10 +22,7 @@ func TestParseJsonSimple(t *testing.T) {
 		t.Fatalf("Err during json parsing %v", err)
 	}
 
-	output, err := parser.ExtractHops(tracelb)
-	if err != nil {
-		t.Fatalf("Err during hop extraction %v", err)
-	}
+	output := parser.ExtractHops(tracelb)
 	if len(output) != 0 {
 		t.Fatal("Wrong results!", len(output))
 	}
@@ -37,8 +34,7 @@ func ParseJSON(fn string, data []byte) ([]string, error) {
 		return nil, err
 	}
 
-	hops, err := parser.ExtractHops(tracelb)
-	return hops, err
+	return parser.ExtractHops(tracelb), nil
 }
 
 func TestParseJsonFailure(t *testing.T) {

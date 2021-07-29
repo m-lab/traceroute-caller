@@ -103,6 +103,9 @@ func (hc *HopCache) AnnotateArchive(ctx context.Context, hops []string, timestam
 	}
 
 	newHops := hc.getNewHops(hops)
+	if len(newHops) == 0 {
+		return 0, 0, nil
+	}
 
 	// Not holding lock
 	//     Perform anonymization on hop IPs (eventually - not needed yet).
@@ -149,6 +152,7 @@ func (hc *HopCache) getNewHops(hops []string) []string {
 			newHops = append(newHops, hop)
 		}
 	}
+	log.Printf(">>> getNewHops(): len(hc.doneList)=%v len(hops)=%v len(newHops)=%v", len(hc.doneList), len(hops), len(newHops))
 	return newHops
 }
 

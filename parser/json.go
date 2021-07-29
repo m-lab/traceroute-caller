@@ -16,6 +16,10 @@ import (
 	"strings"
 )
 
+// TODO: The above structs are almost identical to the structs
+//       etl/parser/pt.go and should be defined in one place to
+//       be used by both.
+
 // TS contains a unix epoch timestamp.
 type TS struct {
 	Sec  int64 `json:"sec"`
@@ -111,15 +115,10 @@ type CyclestopLine struct {
 	StopTime float64 `json:"stop_time"` // This is a unix epoch time.
 }
 
-// XXX ^^^^^^ Everything above here is almost identical to the structs and
-// ParseJSONL code in etl/parser/pt.go
-
 // ExtractHops parses tracelb and extracts all hop addresses.
-func ExtractHops(tracelb *TracelbLine) ([]string, error) {
-	// Unfortunately, net.IP cannot be used as map key.
+func ExtractHops(tracelb *TracelbLine) []string {
+	// We cannot use net.IP as key because it is a slice.
 	hops := make(map[string]struct{}, 100)
-
-	// Parse the json into struct
 	for i := range tracelb.Nodes {
 		node := &tracelb.Nodes[i]
 		hops[node.Addr] = struct{}{}
@@ -139,7 +138,7 @@ func ExtractHops(tracelb *TracelbLine) ([]string, error) {
 	for h := range hops {
 		hopStrings = append(hopStrings, h)
 	}
-	return hopStrings, nil
+	return hopStrings
 }
 
 // ExtractTraceLB extracts the tracelb line from scamper JSONL output,
