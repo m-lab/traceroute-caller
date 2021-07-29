@@ -43,12 +43,12 @@ func TestAnnotateArchive(t *testing.T) {
 		wantK   int
 		wantErr error
 	}{
-		{[]string{"1.2.3.4", "5.6.7.8"}, 2, 2, nil},
-		{[]string{"1.2.3.4", "5.6.7.8"}, 0, 0, nil},
+		{[]string{"1.2.3.4", "5.6.7.8"}, 2, 2, nil}, // should call Annotate()
+		{[]string{"1.2.3.4", "5.6.7.8"}, 0, 0, nil}, // should not call Annotate()
 		// Clear the cache before the next test.
-		{[]string{"1.2.3.4", "5.6.7.8"}, 2, 2, nil},
-		{[]string{"5.6.7.8", "a:b:c:d::e"}, 1, 1, nil},
-		{[]string{"1.2.3"}, 0, 0, errInvalidIP},
+		{[]string{"1.2.3.4", "5.6.7.8"}, 2, 2, nil},    // should call Annotate()
+		{[]string{"5.6.7.8", "a:b:c:d::e"}, 1, 1, nil}, // should call Annotate()
+		{[]string{"1.2.3"}, 0, 0, errInvalidIP},        // should not call Annotate()
 	}
 
 	saveHopArchiver := hopannotation.HopArchiver
@@ -80,8 +80,8 @@ func TestAnnotateArchive(t *testing.T) {
 		}
 	}
 	// There are 4 valid rows in tests.
-	if ipServiceClient.calls != 4 {
-		t.Errorf("got %d calls to Annotate(), want 4", ipServiceClient.calls)
+	if ipServiceClient.calls != 3 {
+		t.Errorf("got %d calls to Annotate(), want 3", ipServiceClient.calls)
 	}
 	// There are 2+2+1 *new* addresses in tests.
 	if fakeArchiveHopAnnotationCalls != 5 {

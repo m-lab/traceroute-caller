@@ -104,6 +104,7 @@ func (hc *HopCache) AnnotateArchive(ctx context.Context, hops []string, timestam
 
 	newHops := hc.getNewHops(hops)
 	if len(newHops) == 0 {
+		log.Printf(">>> AnnotateArchive(): no new hops to annotate len(hops)=%v len(newHops)=%v\n", len(hops), len(newHops))
 		return 0, 0, nil
 	}
 
