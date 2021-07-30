@@ -3,6 +3,7 @@ package hopannotation_test
 import (
 	"context"
 	"errors"
+	"io/fs"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -12,16 +13,18 @@ import (
 )
 
 var (
-	invalidIP    = "invalid IP address"
+	invalidIP    = "failed to parse hop IP address: 1.2.3"
 	errInvalidIP = errors.New(invalidIP)
+
+	fakeWriteFileCalls int32
 )
 
 type fakeIPServiceClient struct {
-	calls int32
+	annotateCalls int32
 }
 
 func (f *fakeIPServiceClient) Annotate(ctx context.Context, hops []string) (map[string]*annotator.ClientAnnotations, error) {
-	atomic.AddInt32(&f.calls, 1)
+	atomic.AddInt32(&f.annotateCalls, 1)
 	m := make(map[string]*annotator.ClientAnnotations)
 	for _, hop := range hops {
 		m[hop] = &annotator.ClientAnnotations{}
@@ -29,62 +32,64 @@ func (f *fakeIPServiceClient) Annotate(ctx context.Context, hops []string) (map[
 	return m, nil
 }
 
-var fakeArchiveHopAnnotationCalls int32
-
-func fakeArchiveHopAnnotation(ctx context.Context, hop string, annotation *annotator.ClientAnnotations, filepath string, timestamp time.Time) error {
-	atomic.AddInt32(&fakeArchiveHopAnnotationCalls, 1)
+func fakeWriteFile(filename string, data []byte, perm fs.FileMode) error {
+	atomic.AddInt32(&fakeWriteFileCalls, 1)
 	return nil
 }
 
 func TestAnnotateArchive(t *testing.T) {
 	tests := []struct {
-		input   []string
-		wantN   int
-		wantK   int
-		wantErr error
+		input          []string
+		wantAllErrs    []error
+		annotateCalls  int32
+		writeFileCalls int32
 	}{
-		{[]string{"1.2.3.4", "5.6.7.8"}, 2, 2, nil}, // should call Annotate()
-		{[]string{"1.2.3.4", "5.6.7.8"}, 0, 0, nil}, // should not call Annotate()
+		{[]string{"1.2.3.4", "5.6.7.8"}, nil, 1, 2}, // should annotate and archive both
+		{[]string{"1.2.3.4", "5.6.7.8"}, nil, 1, 2}, // should not annotate and archive either
 		// Clear the cache before the next test.
-		{[]string{"1.2.3.4", "5.6.7.8"}, 2, 2, nil},    // should call Annotate()
-		{[]string{"5.6.7.8", "a:b:c:d::e"}, 1, 1, nil}, // should call Annotate()
-		{[]string{"1.2.3"}, 0, 0, errInvalidIP},        // should not call Annotate()
+		{[]string{"1.2.3.4", "5.6.7.8"}, nil, 2, 4},      // should annotate and archive both
+		{[]string{"5.6.7.8", "a:b:c:d::e"}, nil, 3, 5},   // should annotate and archive just one
+		{[]string{"1.2.3"}, []error{errInvalidIP}, 3, 5}, // should return error
 	}
 
-	saveHopArchiver := hopannotation.HopArchiver
-	hopannotation.HopArchiver = fakeArchiveHopAnnotation
+	// Mock WriteFile.
+	saveWriteFile := hopannotation.WriteFile
+	hopannotation.WriteFile = fakeWriteFile
 	defer func() {
-		hopannotation.HopArchiver = saveHopArchiver
+		hopannotation.WriteFile = saveWriteFile
 	}()
+
 	ipServiceClient := &fakeIPServiceClient{}
 	hc := hopannotation.New(ipServiceClient, "./local")
 	for i, test := range tests {
-		wantN, wantK, wantErr := test.wantN, test.wantK, test.wantErr
-		gotN, gotK, gotErr := hc.AnnotateArchive(context.TODO(), test.input, time.Now())
-		failed := false
-		if gotN != wantN || gotK != wantK {
-			failed = true
-		}
-		if wantErr == nil {
-			if gotErr != nil {
-				failed = true
-			}
-		} else if gotErr == nil || gotErr.Error() != wantErr.Error() {
-			failed = true
-		}
-		if failed {
-			t.Errorf("hc.AnnotateArchive() = %v/%v/%v, want: %v/%v/%v", gotN, gotK, gotErr, wantN, wantK, wantErr)
-		}
-		if i == 1 {
+		if i == 2 {
 			hc.Clear()
 		}
-	}
-	// There are 4 valid rows in tests.
-	if ipServiceClient.calls != 3 {
-		t.Errorf("got %d calls to Annotate(), want 3", ipServiceClient.calls)
-	}
-	// There are 2+2+1 *new* addresses in tests.
-	if fakeArchiveHopAnnotationCalls != 5 {
-		t.Errorf("got %d calls to fakeArchiveHopAnnotation(), want 5", fakeArchiveHopAnnotationCalls)
+		gotAllErrs := hc.AnnotateArchive(context.TODO(), test.input, time.Now())
+
+		// Verify that we got the right errors, if any.
+		failed := false
+		if len(gotAllErrs) != len(test.wantAllErrs) {
+			failed = true
+		} else {
+			for i := range gotAllErrs {
+				if gotAllErrs[i].Error() != test.wantAllErrs[i].Error() {
+					failed = true
+				}
+			}
+		}
+		if failed {
+			t.Errorf("hc.AnnotateArchive() = %+v, want: %+v", gotAllErrs, test.wantAllErrs)
+		}
+
+		// Verify the number of annotate calls.
+		if ipServiceClient.annotateCalls != test.annotateCalls {
+			t.Errorf("got %d annotate calls, want %d", ipServiceClient.annotateCalls, test.annotateCalls)
+		}
+
+		// Verify the number of WriteFile calls.
+		if fakeWriteFileCalls != test.writeFileCalls {
+			t.Errorf("got %d WriteFile calls, want %d", fakeWriteFileCalls, test.writeFileCalls)
+		}
 	}
 }

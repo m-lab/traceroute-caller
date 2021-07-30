@@ -96,9 +96,9 @@ func (cl *connectionListener) traceAnnotateArchive(ctx context.Context, conn con
 	}
 
 	// Finally annotate the new hops and archive.
-	n, k, err := cl.hopAnnotator.AnnotateArchive(ctx, hops, timestamp)
-	if err != nil {
-		log.Printf("failed to annotate and archive %v (n=%v k=%v err=%v)\n", conn.RemoteIP, n, k, err)
+	allErrs := cl.hopAnnotator.AnnotateArchive(ctx, hops, timestamp)
+	if len(allErrs) != 0 {
+		log.Printf("failed to annotate and archive %+v\n", allErrs)
 	}
 }
 
