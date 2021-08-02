@@ -33,19 +33,23 @@ type connectionListener struct {
 }
 
 // Open is called when a network connection is opened.
-func (cl *connectionListener) Open(ctx context.Context, timestamp time.Time, uuid string, id *inetdiag.SockID) {
-	// XXX If id is nil, this just eats up CPU cycles.
-	//     Shouldn't this function keep track of no-ops?
+func (cl *connectionListener) Open(ctx context.Context, timestamp time.Time, uuid string, sockID *inetdiag.SockID) {
+	if sockID == nil {
+		// XXX Test code passes nil which makes this function
+		//     effectively a no-op.  Can sockID be nil in
+		//     production? Add a metric here.
+		log.Printf("sockID is nil")
+		return
+	}
+
 	cl.mutex.Lock()
 	defer cl.mutex.Unlock()
-	if id != nil {
-		conn, err := cl.creator.FromSockID(*id)
-		if err != nil {
-			log.Printf("Could not create connection from SockID %+v\n", *id)
-			return
-		}
-		cl.conns[uuid] = conn // XXX Are we guaranteed uuid is never empty (i.e., "")?
+	conn, err := cl.creator.FromSockID(*sockID)
+	if err != nil {
+		log.Printf("failed to create connection from SockID %+v\n", *sockID)
+		return
 	}
+	cl.conns[uuid] = conn // XXX Are we guaranteed uuid is never empty (i.e., "")?
 }
 
 // Close is called when a network connection is closed.

@@ -41,7 +41,7 @@ func (ft *fakeTracer) Trace(conn connection.Connection, t time.Time) ([]byte, er
 	log.Println("Tracing", conn)
 	ft.ips = append(ft.ips, conn.RemoteIP)
 	ft.wg.Done()
-	return []byte("Fake test result"), nil
+	return ioutil.ReadFile("testdata/trace-output.jsonl")
 }
 
 func (ft *fakeTracer) TraceFromCachedTrace(conn connection.Connection, t time.Time, cachedTest []byte) error {
@@ -56,7 +56,7 @@ func TestListener(t *testing.T) {
 	rtx.Must(err, "Could not create tempdir")
 	defer os.RemoveAll(dir)
 
-	// Start up a eventsocket server
+	// Start up an eventsocket server.
 	srv := eventsocket.New(dir + "/tcpevents.sock")
 	rtx.Must(srv.Listen(), "Could not listen")
 	srvCtx, srvCancel := context.WithCancel(context.Background())
@@ -77,43 +77,51 @@ func TestListener(t *testing.T) {
 	localIPs := connection.NewFakeLocalIPs([]*net.IP{&localIP})
 	hopAnnotator := hopannotation.New(ipservice.NewClient(*ipservice.SocketFilename), "/some/path")
 	cl := connectionlistener.New(localIPs, ipCache, hopAnnotator)
-	cl.Open(ctx, time.Now(), "", nil) // Test that nil pointer to Open does not cause a crash.
+	// Test that nil pointer to Open does not cause a crash.
+	// The actual Open and Close methods will be called indirectly
+	// through srv.FlowCreateed and srv.FlowDeleted calls below.
+	cl.Open(ctx, time.Now(), "", nil)
 
-	// Connect the connectionlistener to the server
+	// Connect the connectionlistener to the server and
+	// give the client some time to connect.
 	go eventsocket.MustRun(ctx, dir+"/tcpevents.sock", cl)
-
-	// Give the client some time to connect
 	time.Sleep(100 * time.Millisecond)
 
-	// Send some events from the server
-	// This spurious UUID should not cause a trace to occur.
-	srv.FlowDeleted(time.Now(), uuid.FromCookie(10000))
+	// Now send some events from the server.
 
-	firstid := inetdiag.SockID{
+	// This event should not cause a trace to occur because
+	// there was no FlowCreated call for this UUID.
+	srv.FlowDeleted(time.Now(), uuid.FromCookie(1))
+
+	// This event should cause a trace.
+	sockID1 := inetdiag.SockID{
 		SPort:  2,
 		DPort:  3,
 		SrcIP:  "192.168.0.1",
 		DstIP:  "10.0.0.1",
 		Cookie: 1,
 	}
-
-	srv.FlowCreated(time.Now(), uuid.FromCookie(1), firstid)
+	srv.FlowCreated(time.Now(), uuid.FromCookie(1), sockID1)
 	srv.FlowDeleted(time.Now(), uuid.FromCookie(1))
-	secondid := firstid
-	secondid.Cookie = 2
-	srv.FlowCreated(time.Now(), uuid.FromCookie(2), secondid)
+
+	// This event should cause a trace to 192.168.0.1.
+	sockID2 := sockID1
+	sockID2.Cookie = 2
+	srv.FlowCreated(time.Now(), uuid.FromCookie(2), sockID2)
 	srv.FlowDeleted(time.Now(), uuid.FromCookie(2))
 
-	thirdid := inetdiag.SockID{
+	// This event should cause a trace to 192.168.0.2.
+	sockID3 := inetdiag.SockID{
 		SPort:  2,
 		DPort:  3,
 		DstIP:  "192.168.0.2",
 		SrcIP:  "10.0.0.1",
 		Cookie: 3,
 	}
-	srv.FlowCreated(time.Now(), uuid.FromCookie(3), thirdid)
+	srv.FlowCreated(time.Now(), uuid.FromCookie(3), sockID3)
 	srv.FlowDeleted(time.Now(), uuid.FromCookie(3))
 
+	// This event should cause an error.
 	badid := inetdiag.SockID{
 		SPort:  2,
 		DPort:  3,
@@ -122,6 +130,9 @@ func TestListener(t *testing.T) {
 		Cookie: 3,
 	}
 	srv.FlowCreated(time.Now(), uuid.FromCookie(4), badid)
+
+	// Allow the goroutines that were started by Close() to finish.
+	time.Sleep(1 * time.Second)
 
 	// Verify that the right calls were made to the fake tracer.
 	ft.wg.Wait()
