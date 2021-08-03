@@ -33,6 +33,7 @@ type connectionListener struct {
 }
 
 // Open is called when a network connection is opened.
+// XXX This function ignores timestamp.
 func (cl *connectionListener) Open(ctx context.Context, timestamp time.Time, uuid string, sockID *inetdiag.SockID) {
 	if sockID == nil {
 		// XXX Test code passes nil which makes this function
@@ -84,10 +85,6 @@ func (cl *connectionListener) traceAnnotateArchive(ctx context.Context, conn con
 	}
 	if tracelb.Type != "tracelb" {
 		log.Printf("tracelb output has invalid type: %q", tracelb.Type)
-		return
-	}
-	if len(tracelb.Nodes) == 0 {
-		log.Printf("tracelb output has no nodes")
 		return
 	}
 
