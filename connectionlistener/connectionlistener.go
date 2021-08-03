@@ -25,7 +25,7 @@ import (
 // to build a simple client for that service using the libraries from the
 // service itself.
 type connectionListener struct {
-	mutex        sync.Mutex
+	connsLock    sync.Mutex
 	conns        map[string]connection.Connection
 	ipCache      *ipcache.RecentIPCache
 	creator      connection.Creator
@@ -43,8 +43,8 @@ func (cl *connectionListener) Open(ctx context.Context, timestamp time.Time, uui
 		return
 	}
 
-	cl.mutex.Lock()
-	defer cl.mutex.Unlock()
+	cl.connsLock.Lock()
+	defer cl.connsLock.Unlock()
 	conn, err := cl.creator.FromSockID(*sockID)
 	if err != nil {
 		log.Printf("failed to create connection from SockID %+v\n", *sockID)
@@ -55,14 +55,14 @@ func (cl *connectionListener) Open(ctx context.Context, timestamp time.Time, uui
 
 // Close is called when a network connection is closed.
 func (cl *connectionListener) Close(ctx context.Context, timestamp time.Time, uuid string) {
-	cl.mutex.Lock()
+	cl.connsLock.Lock()
 	conn, ok := cl.conns[uuid]
 	if ok {
 		delete(cl.conns, uuid)
-		cl.mutex.Unlock()
+		cl.connsLock.Unlock()
 		go cl.traceAnnotateArchive(ctx, conn, timestamp)
 	} else {
-		cl.mutex.Unlock()
+		cl.connsLock.Unlock()
 		log.Printf("failed to find connection for UUID %v", uuid)
 	}
 }
@@ -81,10 +81,6 @@ func (cl *connectionListener) traceAnnotateArchive(ctx context.Context, conn con
 	tracelb, err := parser.ExtractTraceLB(traceOutput)
 	if err != nil {
 		log.Printf("failed to extract tracelb from trace output (error: %v)", err)
-		return
-	}
-	if tracelb.Type != "tracelb" {
-		log.Printf("tracelb output has invalid type: %q", tracelb.Type)
 		return
 	}
 
