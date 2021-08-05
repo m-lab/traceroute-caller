@@ -2,6 +2,7 @@ package connectionlistener_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -23,7 +24,7 @@ import (
 	"github.com/m-lab/tcp-info/eventsocket"
 	"github.com/m-lab/tcp-info/inetdiag"
 	"github.com/m-lab/uuid"
-	"github.com/m-lab/uuid-annotator/ipservice"
+	"github.com/m-lab/uuid-annotator/annotator"
 )
 
 var (
@@ -37,7 +38,7 @@ var (
 	sockIDGolden = inetdiag.SockID{
 		SPort:  2,
 		DPort:  3,
-		SrcIP:  "192.168.0.1",
+		SrcIP:  "",
 		DstIP:  "10.0.0.1",
 		Cookie: 0,
 	}
@@ -83,6 +84,17 @@ func (ft *fakeTracer) TraceFromCachedTrace(conn connection.Connection, t time.Ti
 
 func (*fakeTracer) DontTrace(conn connection.Connection, err error) {}
 
+type fakeAnnotator struct {
+}
+
+func (fa *fakeAnnotator) Annotate(ctx context.Context, ips []string) (map[string]*annotator.ClientAnnotations, error) {
+	annotations := make(map[string]*annotator.ClientAnnotations, len(ips))
+	for _, ip := range ips {
+		annotations[ip] = &annotator.ClientAnnotations{}
+	}
+	return annotations, errors.New("forced annotation error")
+}
+
 func TestListener(t *testing.T) {
 	dir, err := ioutil.TempDir("", "TestEventSocketClient")
 	rtx.Must(err, "Could not create tempdir")
@@ -106,7 +118,7 @@ func TestListener(t *testing.T) {
 	// Create a new hop cache.
 	localIP := net.ParseIP("10.0.0.1")
 	localIPs := connection.NewFakeLocalIPs([]*net.IP{&localIP})
-	hopAnnotator := hopannotation.New(ipservice.NewClient(*ipservice.SocketFilename), "/some/path")
+	hopAnnotator := hopannotation.New(&fakeAnnotator{}, "./testdata")
 
 	// Create a new connectionlistener with our fake tracer and hop
 	// cache, connect the connectionlistener to the server and give
@@ -130,7 +142,7 @@ func runTests(t *testing.T, srv eventsocket.Server, ft *fakeTracer, cl eventsock
 		cookie    uint64
 		goroutine bool
 	}{
-		{"", uint64(traceFailed), true},                 // This should cause a trace but we force our fake Trace() to fail.
+		{"192.168.0.1", uint64(traceFailed), true},      // should cause a trace but we force our fake Trace() to fail
 		{"192.168.0.2", uint64(traceNoTracelb), true},   // failed to extract tracelb from trace output (error: %v)
 		{"192.168.0.3", uint64(traceInvalidType), true}, // tracelb output has invalid type: %q
 		{"192.168.0.4", uint64(traceNoNodes), true},     // tracelb output has no nodes
@@ -142,12 +154,8 @@ func runTests(t *testing.T, srv eventsocket.Server, ft *fakeTracer, cl eventsock
 			ft.wg.Add(1)
 		}
 		sockID1 := sockIDGolden
-		if test.srcIP != "" {
-			sockID1.SrcIP = test.srcIP
-		}
-		if test.cookie != 0 {
-			sockID1.Cookie = int64(test.cookie)
-		}
+		sockID1.SrcIP = test.srcIP
+		sockID1.Cookie = int64(test.cookie)
 		srv.FlowCreated(time.Now(), uuid.FromCookie(uint64(i)+1), sockID1)
 		srv.FlowDeleted(time.Now(), uuid.FromCookie(uint64(i)+1))
 		if test.goroutine {
@@ -161,6 +169,6 @@ func runTests(t *testing.T, srv eventsocket.Server, ft *fakeTracer, cl eventsock
 	// Check the results.
 	sort.StringSlice(ft.gotIPs).Sort()
 	if diff := deep.Equal(ft.gotIPs, ft.wantIPs); diff != nil {
-		t.Errorf("got ips %+v, want %v", ft.gotIPs, ft.wantIPs)
+		t.Errorf("IPs: %+v, want: %v", ft.gotIPs, ft.wantIPs)
 	}
 }

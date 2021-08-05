@@ -1,30 +1,36 @@
-package hopannotation_test
+package hopannotation
 
 import (
 	"context"
 	"errors"
 	"io/fs"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
 
-	"github.com/m-lab/traceroute-caller/hopannotation"
 	"github.com/m-lab/uuid-annotator/annotator"
 )
 
 var (
 	invalidIP    = "failed to parse hop IP address: 1.2.3"
 	errInvalidIP = errors.New(invalidIP)
+	forcedError  = "forced annotate failure"
+	errForced    = errors.New(forcedError)
+	errorOnIP    = "0.0.0.0"
 
 	fakeWriteFileCalls int32
 )
 
-type fakeIPServiceClient struct {
+type fakeAnnotator struct {
 	annotateCalls int32
 }
 
-func (f *fakeIPServiceClient) Annotate(ctx context.Context, hops []string) (map[string]*annotator.ClientAnnotations, error) {
-	atomic.AddInt32(&f.annotateCalls, 1)
+func (fa *fakeAnnotator) Annotate(ctx context.Context, hops []string) (map[string]*annotator.ClientAnnotations, error) {
+	atomic.AddInt32(&fa.annotateCalls, 1)
+	if len(hops) > 0 && hops[0] == errorOnIP {
+		return nil, errForced
+	}
 	m := make(map[string]*annotator.ClientAnnotations)
 	for _, hop := range hops {
 		m[hop] = &annotator.ClientAnnotations{}
@@ -38,34 +44,36 @@ func fakeWriteFile(filename string, data []byte, perm fs.FileMode) error {
 }
 
 func TestAnnotateArchive(t *testing.T) {
+	// Mock WriteFile.
+	saveWriteFile := WriteFile
+	WriteFile = fakeWriteFile
+	defer func() {
+		WriteFile = saveWriteFile
+	}()
+
 	tests := []struct {
-		input          []string
+		hops           []string
 		wantAllErrs    []error
 		annotateCalls  int32
 		writeFileCalls int32
 	}{
-		{[]string{"1.2.3.4", "5.6.7.8"}, nil, 1, 2}, // should annotate and archive both
-		{[]string{"1.2.3.4", "5.6.7.8"}, nil, 1, 2}, // should not annotate and archive either
-		// Clear the cache before the next test.
-		{[]string{"1.2.3.4", "5.6.7.8"}, nil, 2, 4},      // should annotate and archive both
-		{[]string{"5.6.7.8", "a:b:c:d::e"}, nil, 3, 5},   // should annotate and archive just one
-		{[]string{"1.2.3"}, []error{errInvalidIP}, 3, 5}, // should return error
+		{[]string{errorOnIP, errorOnIP}, []error{errForced}, 1, 0}, // we force the first call to Annotate() to fail
+		{[]string{"1.2.3.4", "5.6.7.8"}, nil, 2, 2},                // should annotate and archive both
+		{[]string{"1.2.3.4", "5.6.7.8"}, nil, 2, 2},                // should not annotate and archive either
+		{[]string{"clear-cache", ""}, nil, 0, 0},                   // not a test, just clear the cache
+		{[]string{"1.2.3.4", "5.6.7.8"}, nil, 3, 4},                // should annotate and archive both
+		{[]string{"5.6.7.8", "a:b:c:d::e"}, nil, 4, 5},             // should annotate and archive just one
+		{[]string{"1.2.3"}, []error{errInvalidIP}, 4, 5},           // should return error
 	}
-
-	// Mock WriteFile.
-	saveWriteFile := hopannotation.WriteFile
-	hopannotation.WriteFile = fakeWriteFile
-	defer func() {
-		hopannotation.WriteFile = saveWriteFile
-	}()
-
-	ipServiceClient := &fakeIPServiceClient{}
-	hc := hopannotation.New(ipServiceClient, "./local")
+	fa := &fakeAnnotator{}
+	hc := New(fa, "./testdata")
 	for i, test := range tests {
-		if i == 2 {
+		if test.hops[0] == "clear-cache" {
 			hc.Clear()
+			continue
 		}
-		gotAllErrs := hc.AnnotateArchive(context.TODO(), test.input, time.Now())
+
+		gotAllErrs := hc.AnnotateArchive(context.TODO(), test.hops, time.Now())
 
 		// Verify that we got the right errors, if any.
 		failed := false
@@ -79,17 +87,42 @@ func TestAnnotateArchive(t *testing.T) {
 			}
 		}
 		if failed {
-			t.Errorf("hc.AnnotateArchive() = %+v, want: %+v", gotAllErrs, test.wantAllErrs)
+			t.Errorf("i=%d hc.AnnotateArchive() = %+v, want: %+v", i, gotAllErrs, test.wantAllErrs)
 		}
 
-		// Verify the number of annotate calls.
-		if ipServiceClient.annotateCalls != test.annotateCalls {
-			t.Errorf("got %d annotate calls, want %d", ipServiceClient.annotateCalls, test.annotateCalls)
+		// Verify the number of Annotate calls.
+		if fa.annotateCalls != test.annotateCalls {
+			t.Errorf("i=%d got %d Annotate calls, want %d", i, fa.annotateCalls, test.annotateCalls)
 		}
 
 		// Verify the number of WriteFile calls.
 		if fakeWriteFileCalls != test.writeFileCalls {
-			t.Errorf("got %d WriteFile calls, want %d", fakeWriteFileCalls, test.writeFileCalls)
+			t.Errorf("i=%d got %d WriteFile calls, want %d", i, fakeWriteFileCalls, test.writeFileCalls)
 		}
 	}
+
+	// Now cover the error paths that were not covered by the
+	// above tests.
+	hc = New(&fakeAnnotator{}, "/bad/path")
+	hc.AnnotateArchive(context.TODO(), []string{"1.1.1.1", "2.2.2.2"}, time.Now())
+}
+
+func TestArchiveAnnotation(t *testing.T) {
+	annotation := &annotator.ClientAnnotations{
+		Geo:     nil,
+		Network: nil,
+	}
+	gotErr := archiveAnnotation(context.TODO(), "1.2.3.4", annotation, "/bad/path", time.Now())
+	if gotErr == nil || !strings.HasPrefix(gotErr.Error(), errWriteMarshal) {
+		t.Errorf("archiveAnnotation() = %v, want %v", gotErr, errWriteMarshal)
+	}
+}
+
+// This is for covering the debug code path in setState().  When debug
+// code is removed, this function should also be removed.
+func TestSetState(t *testing.T) {
+	fa := &fakeAnnotator{}
+	hc := New(fa, "./testdata")
+	hc.setState("4.3.2.1", archived)
+	hc.setState("4.3.2.1", archived)
 }

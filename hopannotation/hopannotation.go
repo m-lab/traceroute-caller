@@ -29,13 +29,18 @@ import (
 //   annotated: after it's successfully annotated
 //   archived:  after it's successfully archived
 //   errored:   after encountering an error while archiving
-type state int
+type entryState int
 
 const (
-	inserted state = iota
+	inserted entryState = iota
 	annotated
 	archived
 	errored
+
+	errParseHopIP        = "failed to parse hop IP address"
+	errCreatePath        = "failed to create directory path"
+	errMarshalAnnotation = "failed to marshal annotation to json"
+	errWriteMarshal      = "failed to write marshaled annotation"
 )
 
 var (
@@ -53,10 +58,10 @@ type HopAnnotation1 struct {
 
 // HopCache implements the cache that handles new hop annotations.
 type HopCache struct {
-	hops       map[string]state // list of IP addresses already handled
-	mu         sync.Mutex       // lock protecting hops
-	annotator  ipservice.Client // function for getting hop annotations
-	outputPath string           // path to direcotry for writing archives
+	hops       map[string]entryState // list of IP addresses already handled
+	mu         sync.Mutex            // lock protecting hops
+	annotator  ipservice.Client      // function for getting hop annotations
+	outputPath string                // path to direcotry for writing archives
 }
 
 // init saves (caches) the host name for all future references because
@@ -71,7 +76,7 @@ func init() {
 // to obtain annotations.
 func New(annotator ipservice.Client, outputPath string) *HopCache {
 	return &HopCache{
-		hops:       make(map[string]state, 10000), // based on observation
+		hops:       make(map[string]entryState, 10000), // based on observation
 		annotator:  annotator,
 		outputPath: outputPath,
 	}
@@ -83,7 +88,7 @@ func New(annotator ipservice.Client, outputPath string) *HopCache {
 func (hc *HopCache) Clear() {
 	hc.mu.Lock()
 	defer hc.mu.Unlock()
-	hc.hops = make(map[string]state, len(hc.hops)+len(hc.hops)/4)
+	hc.hops = make(map[string]entryState, len(hc.hops)+len(hc.hops)/4)
 }
 
 // AnnotateArchive annotates and archives new hop IP addresses. In case
@@ -93,7 +98,7 @@ func (hc *HopCache) AnnotateArchive(ctx context.Context, hops []string, timestam
 	// Validate all hop IP addresses.
 	for _, hop := range hops {
 		if net.ParseIP(hop).String() == "<nil>" {
-			allErrs = append(allErrs, fmt.Errorf("failed to parse hop IP address: %v", hop))
+			allErrs = append(allErrs, fmt.Errorf("%s: %v", errParseHopIP, hop))
 		}
 	}
 	if len(allErrs) != 0 {
@@ -137,29 +142,32 @@ func (hc *HopCache) AnnotateArchive(ctx context.Context, hops []string, timestam
 
 // setState sets the state of the given hop to the given state while
 // holding the hop cache lock.
-func (hc *HopCache) setState(hop string, hopState state) {
+func (hc *HopCache) setState(hop string, hopState entryState) {
 	hc.mu.Lock()
 	defer hc.mu.Unlock()
 
-	// This sanity checks can be removed once debugging is done.
-	var wantState state
-	wantOk := true
-	gotState, gotOk := hc.hops[hop]
-	switch hopState {
-	case inserted:
-		wantOk = false
-	case annotated:
-		wantState = inserted
-	case archived:
-		wantState = annotated
-	case errored:
-		wantState = annotated
+	// This sanity checks below can/should be removed once debugging
+	// is done. When you remove this code, remove its corresponding
+	// test too.
+	state, ok := hc.hops[hop]
+	if !ok {
+		log.Printf("internal error: hop %v does not exist in cache", hop)
+		log.Printf("recovering by setting state for hop %v to %v", hop, hopState)
+	} else {
+		var wantState entryState
+		switch hopState {
+		case annotated:
+			wantState = inserted
+		case archived:
+			wantState = annotated
+		case errored:
+			wantState = annotated
+		}
+		if state != wantState {
+			log.Printf("internal error: hop %v has state %v, want %v", hop, state, wantState)
+			log.Printf("recovering by setting state for hop %v to %v", hop, hopState)
+		}
 	}
-	if gotOk != wantOk || gotState != wantState {
-		log.Printf("internal error for hop %v: got %v/%v, want %v/%v", hop, gotState, gotOk, wantState, wantOk)
-		log.Printf("setting state for hop %v to %v", hop, hopState)
-	}
-
 	hc.hops[hop] = hopState
 }
 
@@ -188,7 +196,7 @@ func generateAnnotationFilepath(hop, outPath string, timestamp time.Time) (strin
 	dirPath := outPath + "/" + timestamp.Format("2006/01/02")
 	if err := os.MkdirAll(dirPath, 0777); err != nil {
 		// TODO: Add a metric here.
-		return "", fmt.Errorf("failed to create directory path (error: %v)", err)
+		return "", fmt.Errorf("%s (error: %v)", errCreatePath, err)
 	}
 	datetime := timestamp.Format("20060102T150405Z")
 	return fmt.Sprintf("%s/%s_%s_%s.json", dirPath, datetime, hostname, hop), nil
@@ -204,10 +212,10 @@ func archiveAnnotation(ctx context.Context, hop string, annotation *annotator.Cl
 		Raw:  annotation},
 	)
 	if err != nil {
-		return fmt.Errorf("failed to marshal annotation to json (error: %v)", err)
+		return fmt.Errorf("%s (error: %v)", errMarshalAnnotation, err)
 	}
 	if err := WriteFile(filepath, b, 0444); err != nil {
-		return fmt.Errorf("failed to write marshaled annotation (error: %v)", err)
+		return fmt.Errorf("%s (error: %v)", errWriteMarshal, err)
 	}
 	return nil
 }

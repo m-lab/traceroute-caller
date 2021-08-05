@@ -10,10 +10,19 @@ package parser
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net"
 	"strings"
+)
+
+var (
+	errNumLines       = "test has wrong number of lines"
+	errCycleStart     = "invalid cycle-start"
+	errCycleStartType = "invalid cycle-start type"
+	errTracelb        = "invalid tracelb"
+	errTracelbType    = "invalid tracelb type"
+	errCycleStop      = "invalid cycle-stop"
+	errCycleStopType  = "invalid cycle-stop type"
 )
 
 // TODO: The above structs are almost identical to the structs
@@ -164,34 +173,34 @@ func ExtractTraceLB(data []byte) (*TracelbLine, error) {
 	jsonStrings := strings.Split(strings.TrimSpace(string(data)), "\n")
 	n := len(jsonStrings)
 	if n != lines {
-		return nil, fmt.Errorf("test has wrong number of lines")
+		return nil, fmt.Errorf(errNumLines)
 	}
 
 	// Validate the cycle-start line.
 	err := json.Unmarshal([]byte(jsonStrings[n-3]), &cycleStart)
 	if err != nil {
-		return nil, errors.New("invalid cycle-start")
+		return nil, fmt.Errorf(errCycleStart)
 	}
 	if cycleStart.Type != "cycle-start" {
-		return nil, fmt.Errorf("invalid cycleStart type: %v", cycleStart.Type)
+		return nil, fmt.Errorf("%v: %v", errCycleStartType, cycleStart.Type)
 	}
 
 	// Validate the tracelb line.
 	err = json.Unmarshal([]byte(jsonStrings[n-2]), &tracelb)
 	if err != nil {
-		return nil, fmt.Errorf("invalid tracelb")
+		return nil, fmt.Errorf(errTracelb)
 	}
 	if tracelb.Type != "tracelb" {
-		return nil, fmt.Errorf("invalid tracelb type: %v", tracelb.Type)
+		return nil, fmt.Errorf("%v: %v", errTracelbType, tracelb.Type)
 	}
 
 	// Validate the cycle-stop line.
 	err = json.Unmarshal([]byte(jsonStrings[n-1]), &cycleStop)
 	if err != nil {
-		return nil, errors.New("invalid cycle-stop")
+		return nil, fmt.Errorf(errCycleStop)
 	}
 	if cycleStop.Type != "cycle-stop" {
-		return nil, fmt.Errorf("invalid cycleStop type: %v", cycleStop.Type)
+		return nil, fmt.Errorf("%v: %v", errCycleStopType, cycleStop.Type)
 	}
 
 	return &tracelb, nil

@@ -1,0 +1,3 @@
+{"type":"cycle-start"}
+{"type":"tracelb"}
+{"type":"cycle-stop-invalid", "list_name":"/tmp/scamperctrl:51811", "id":1, "hostname":"ndt-plh7v", "stop_time":1566691298}
