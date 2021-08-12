@@ -7,6 +7,7 @@ package hopannotation
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -15,7 +16,6 @@ import (
 	"sync"
 	"time"
 
-	"cloud.google.com/go/civil"
 	"github.com/m-lab/go/rtx"
 
 	// TODO: These should both be in a common location containing API definitions.
@@ -36,11 +36,13 @@ const (
 	annotated
 	archived
 	errored
+)
 
-	errParseHopIP        = "failed to parse hop IP address"
-	errCreatePath        = "failed to create directory path"
-	errMarshalAnnotation = "failed to marshal annotation to json"
-	errWriteMarshal      = "failed to write marshaled annotation"
+var (
+	errParseHopIP        = errors.New("failed to parse hop IP address")
+	errCreatePath        = errors.New("failed to create directory path")
+	errMarshalAnnotation = errors.New("failed to marshal annotation to json")
+	errWriteMarshal      = errors.New("failed to write marshaled annotation")
 )
 
 var (
@@ -51,9 +53,9 @@ var (
 
 // HopAnnotation1 defines the schema for BigQuery hop annotations.
 type HopAnnotation1 struct {
-	ID   string                       `bigquery:"id"`
-	Date civil.Date                   `bigquery:"date"`
-	Raw  *annotator.ClientAnnotations `json:",omitempty" bigquery:"raw"`
+	ID   string
+	Date time.Time
+	Raw  *annotator.ClientAnnotations
 }
 
 // HopCache implements the cache that handles new hop annotations.
@@ -61,7 +63,7 @@ type HopCache struct {
 	hops       map[string]entryState // list of IP addresses already handled
 	mu         sync.Mutex            // lock protecting hops
 	annotator  ipservice.Client      // function for getting hop annotations
-	outputPath string                // path to direcotry for writing archives
+	outputPath string                // path to directory for writing archives
 }
 
 // init saves (caches) the host name for all future references because
@@ -93,12 +95,12 @@ func (hc *HopCache) Clear() {
 
 // AnnotateArchive annotates and archives new hop IP addresses. In case
 // of error, it aggregates the errors and returns all of them instead of
-// quiting after encountering the first error.
+// quitting after encountering the first error.
 func (hc *HopCache) AnnotateArchive(ctx context.Context, hops []string, timestamp time.Time) (allErrs []error) {
 	// Validate all hop IP addresses.
 	for _, hop := range hops {
 		if net.ParseIP(hop).String() == "<nil>" {
-			allErrs = append(allErrs, fmt.Errorf("%s: %v", errParseHopIP, hop))
+			allErrs = append(allErrs, fmt.Errorf("%w: %v", errParseHopIP, hop))
 		}
 	}
 	if len(allErrs) != 0 {
@@ -191,12 +193,12 @@ func (hc *HopCache) getNewHops(hops []string) []string {
 // generateAnnotationFilepath returns the full pathname of a hop
 // annotation file in the format "<timestamp>_<hostname>_<ip>.json"
 // TODO: This function should possibly be combined with functions in
-//       tracer/tracer.go and put in a packge to be used by both.
+//       tracer/tracer.go and put in a package to be used by both.
 func generateAnnotationFilepath(hop, outPath string, timestamp time.Time) (string, error) {
 	dirPath := outPath + "/" + timestamp.Format("2006/01/02")
 	if err := os.MkdirAll(dirPath, 0777); err != nil {
 		// TODO: Add a metric here.
-		return "", fmt.Errorf("%s (error: %v)", errCreatePath, err)
+		return "", fmt.Errorf("%w (error: %v)", errCreatePath, err)
 	}
 	datetime := timestamp.Format("20060102T150405Z")
 	return fmt.Sprintf("%s/%s_%s_%s.json", dirPath, datetime, hostname, hop), nil
@@ -208,14 +210,14 @@ func archiveAnnotation(ctx context.Context, hop string, annotation *annotator.Cl
 	yyyymmdd := timestamp.Format("20060102")
 	b, err := json.Marshal(HopAnnotation1{
 		ID:   fmt.Sprintf("%s_%s_%s", yyyymmdd, hostname, hop),
-		Date: civil.DateOf(timestamp),
+		Date: timestamp,
 		Raw:  annotation},
 	)
 	if err != nil {
-		return fmt.Errorf("%s (error: %v)", errMarshalAnnotation, err)
+		return fmt.Errorf("%w (error: %v)", errMarshalAnnotation, err)
 	}
 	if err := WriteFile(filepath, b, 0444); err != nil {
-		return fmt.Errorf("%s (error: %v)", errWriteMarshal, err)
+		return fmt.Errorf("%w (error: %v)", errWriteMarshal, err)
 	}
 	return nil
 }

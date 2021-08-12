@@ -10,19 +10,20 @@ package parser
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"strings"
 )
 
 var (
-	errNumLines       = "test has wrong number of lines"
-	errCycleStart     = "invalid cycle-start"
-	errCycleStartType = "invalid cycle-start type"
-	errTracelb        = "invalid tracelb"
-	errTracelbType    = "invalid tracelb type"
-	errCycleStop      = "invalid cycle-stop"
-	errCycleStopType  = "invalid cycle-stop type"
+	errNumLines       = errors.New("test has wrong number of lines")
+	errCycleStart     = errors.New("invalid cycle-start")
+	errCycleStartType = errors.New("invalid cycle-start type")
+	errTracelb        = errors.New("invalid tracelb")
+	errTracelbType    = errors.New("invalid tracelb type")
+	errCycleStop      = errors.New("invalid cycle-stop")
+	errCycleStopType  = errors.New("invalid cycle-stop type")
 )
 
 // TODO: The above structs are almost identical to the structs
@@ -173,34 +174,34 @@ func ExtractTraceLB(data []byte) (*TracelbLine, error) {
 	jsonStrings := strings.Split(strings.TrimSpace(string(data)), "\n")
 	n := len(jsonStrings)
 	if n != lines {
-		return nil, fmt.Errorf(errNumLines)
+		return nil, errNumLines
 	}
 
 	// Validate the cycle-start line.
 	err := json.Unmarshal([]byte(jsonStrings[n-3]), &cycleStart)
 	if err != nil {
-		return nil, fmt.Errorf(errCycleStart)
+		return nil, errCycleStart
 	}
 	if cycleStart.Type != "cycle-start" {
-		return nil, fmt.Errorf("%v: %v", errCycleStartType, cycleStart.Type)
+		return nil, fmt.Errorf("%w: %v", errCycleStartType, cycleStart.Type)
 	}
 
 	// Validate the tracelb line.
 	err = json.Unmarshal([]byte(jsonStrings[n-2]), &tracelb)
 	if err != nil {
-		return nil, fmt.Errorf(errTracelb)
+		return nil, errTracelb
 	}
 	if tracelb.Type != "tracelb" {
-		return nil, fmt.Errorf("%v: %v", errTracelbType, tracelb.Type)
+		return nil, fmt.Errorf("%w: %v", errTracelbType, tracelb.Type)
 	}
 
 	// Validate the cycle-stop line.
 	err = json.Unmarshal([]byte(jsonStrings[n-1]), &cycleStop)
 	if err != nil {
-		return nil, fmt.Errorf(errCycleStop)
+		return nil, errCycleStop
 	}
 	if cycleStop.Type != "cycle-stop" {
-		return nil, fmt.Errorf("%v: %v", errCycleStopType, cycleStop.Type)
+		return nil, fmt.Errorf("%w: %v", errCycleStopType, cycleStop.Type)
 	}
 
 	return &tracelb, nil

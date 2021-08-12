@@ -116,7 +116,7 @@ func (s *Scamper) trace(conn connection.Connection, t time.Time) ([]byte, error)
 		shx.Exec(s.Binary, "-I", iVal, "-o-", "-O", "json"),
 	)
 
-	return traceAndWrite(ctx, "scamper", filename, cmd, conn, t)
+	return traceAndWrite(ctx, "scamper", filename, cmd, conn)
 }
 
 // ScamperDaemon contains a single instance of a scamper process. Once the ScamperDaemon has
@@ -225,10 +225,10 @@ func (d *ScamperDaemon) trace(conn connection.Connection, t time.Time) ([]byte, 
 		shx.Exec(d.Warts2JSONBinary),
 	)
 
-	return traceAndWrite(ctx, "scamper-daemon", filename, cmd, conn, t)
+	return traceAndWrite(ctx, "scamper-daemon", filename, cmd, conn)
 }
 
-func traceAndWrite(ctx context.Context, label string, fn string, cmd shx.Job, conn connection.Connection, t time.Time) ([]byte, error) {
+func traceAndWrite(ctx context.Context, label string, filename string, cmd shx.Job, conn connection.Connection) ([]byte, error) {
 	data, err := runTrace(ctx, label, cmd, conn)
 	if err != nil {
 		// XXX - TestTraceTimeout() expects nil, so
@@ -238,7 +238,7 @@ func traceAndWrite(ctx context.Context, label string, fn string, cmd shx.Job, co
 	}
 	// TODO - consider whether we should just return the trace without the metadata,
 	// or not return the data at all.
-	return writeTraceFile(data, fn, conn, t)
+	return writeTraceFile(data, filename, conn)
 }
 
 // runTrace executes a trace command and returns the data.
@@ -278,10 +278,10 @@ func runTrace(ctx context.Context, label string, cmd shx.Job, conn connection.Co
 }
 
 // TODO - this should take an io.Writer?
-func writeTraceFile(data []byte, fn string, conn connection.Connection, t time.Time) ([]byte, error) {
+func writeTraceFile(data []byte, filename string, conn connection.Connection) ([]byte, error) {
 	buff := bytes.Buffer{}
-	// buff.Write err is alway nil, but it may OOM
+	// buff.Write err is always nil, but it may OOM
 	_, _ = buff.Write(GetMetaline(conn, false, ""))
 	_, _ = buff.Write(data)
-	return buff.Bytes(), ioutil.WriteFile(fn, buff.Bytes(), 0666)
+	return buff.Bytes(), ioutil.WriteFile(filename, buff.Bytes(), 0666)
 }

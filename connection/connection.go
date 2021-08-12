@@ -29,7 +29,7 @@ type Connection struct {
 
 // UUID returns uuid from cookie parsed from "ss -e" output.
 func (c *Connection) UUID() (string, error) {
-	// cookie is a hexdecimal string
+	// cookie is a hexadecimal string
 	result, err := strconv.ParseUint(c.Cookie, 16, 64)
 	return uuid.FromCookie(result), err
 }

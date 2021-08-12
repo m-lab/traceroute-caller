@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"io/fs"
-	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -113,7 +112,7 @@ func TestArchiveAnnotation(t *testing.T) {
 		Network: nil,
 	}
 	gotErr := archiveAnnotation(context.TODO(), "1.2.3.4", annotation, "/bad/path", time.Now())
-	if gotErr == nil || !strings.HasPrefix(gotErr.Error(), errWriteMarshal) {
+	if gotErr == nil || !errors.Is(gotErr, errWriteMarshal) {
 		t.Errorf("archiveAnnotation() = %v, want %v", gotErr, errWriteMarshal)
 	}
 }

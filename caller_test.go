@@ -87,7 +87,11 @@ func TestMainWithConnectionListener(t *testing.T) {
 	tracerType.Value = "scamper"
 
 	ctx, cancel = context.WithCancel(context.Background())
-	go srv.Serve(ctx)
+	go func(t *testing.T) {
+		if err := srv.Serve(ctx); err != nil {
+			t.Logf("failed to start eventsocket server (error: %v)", err)
+		}
+	}(t)
 	go func() {
 		time.Sleep(1 * time.Second)
 		cancel()
@@ -111,7 +115,11 @@ func TestMainWithBackupScamper(t *testing.T) {
 	tracerType.Value = "scamper-daemon-with-scamper-backup"
 
 	ctx, cancel = context.WithCancel(context.Background())
-	go srv.Serve(ctx)
+	go func(t *testing.T) {
+		if err := srv.Serve(ctx); err != nil {
+			t.Logf("failed to start eventsocket server (error: %v)", err)
+		}
+	}(t)
 	go func() {
 		time.Sleep(1 * time.Second)
 		cancel()

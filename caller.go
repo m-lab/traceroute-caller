@@ -86,7 +86,11 @@ func main() {
 	wg := sync.WaitGroup{}
 
 	promSrv := prometheusx.MustServeMetrics()
-	defer promSrv.Shutdown(ctx)
+	defer func() {
+		if err := promSrv.Shutdown(ctx); err != nil {
+			log.Printf("failed to shutdown Prometheus (error: %v)\n", err)
+		}
+	}()
 
 	scamper := &tracer.Scamper{
 		Binary:           *scamperBin,
