@@ -1,19 +1,37 @@
 // Package parser handles parsing of scamper JSONL.
-// The format of JSON can be found at
-// https://www.caida.org/tools/measurement/scamper/.
-// NB: It is not clear where at that URL the format can be found.
-// The structs here may just be derived from the actual scamper json files.
-// scamper-cvs-20191102 trace/scamper_trace.h contains C structs that
-// may be helpful for understanding this, though the structures are different
-// from the JSON structure.
+//
+// Refer to scamper source code files scamper/scamper_list.h and
+// scamper/tracelb/scamper_tracelb.h for the definitions of cycle_start,
+// tracelb, and cycle_stop lines.
 package parser
 
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net"
 	"strings"
+	"time"
 )
+
+var (
+	errNumLines       = errors.New("test has wrong number of lines")
+	errCycleStart     = errors.New("invalid cycle-start")
+	errCycleStartType = errors.New("invalid cycle-start type")
+	errTracelb        = errors.New("invalid tracelb")
+	errTracelbType    = errors.New("invalid tracelb type")
+	errCycleStop      = errors.New("invalid cycle-stop")
+	errCycleStopType  = errors.New("invalid cycle-stop type")
+)
+
+// TODO: The following structs are almost identical to the structs
+//       etl/parser/pt.go and should be defined in one place to be used
+//       by both.
+
+// TODO: None of the float64 struct fields in this file are defined
+//       as float in scamper source code so it's not clear at all
+//       why there are defined float64.  Look into this and change
+//       them to the proper unit{8,16,32} types.
 
 // TS contains a unix epoch timestamp.
 type TS struct {
@@ -67,24 +85,23 @@ type ScamperNode struct {
 
 // CyclestartLine contains the information about the scamper "cyclestart"
 type CyclestartLine struct {
-	Type      string  `json:"type"`      // "cycle-start"
-	ListName  string  `json:"list_name"` // e.g. "/tmp/scamperctrl:58"
-	ID        float64 `json:"id"`        // XXX Integer?
+	Type      string  `json:"type"`
+	ListName  string  `json:"list_name"`
+	ID        float64 `json:"id"`
 	Hostname  string  `json:"hostname"`
-	StartTime float64 `json:"start_time"` // XXX Integer? This is a unix epoch time.
+	StartTime float64 `json:"start_time"`
 }
 
 // TracelbLine contains the actual scamper trace details.
 // Not clear why so many fields are floats.  Fields in scamper code are uint16_t and uint8_t
 type TracelbLine struct {
-	Type    string  `json:"type"`
-	Version string  `json:"version"`
-	Userid  float64 `json:"userid"` // TODO change to int?
-	Method  string  `json:"method"`
-	Src     string  `json:"src"`
-	Dst     string  `json:"dst"`
-	Start   TS      `json:"start"`
-	// TODO - None of these seem to be actual floats - change to int?
+	Type        string        `json:"type"`
+	Version     string        `json:"version"`
+	Userid      float64       `json:"userid"`
+	Method      string        `json:"method"`
+	Src         string        `json:"src"`
+	Dst         string        `json:"dst"`
+	Start       TS            `json:"start"`
 	ProbeSize   float64       `json:"probe_size"`
 	Firsthop    float64       `json:"firsthop"`
 	Attempts    float64       `json:"attempts"`
@@ -103,22 +120,87 @@ type TracelbLine struct {
 // CyclestopLine contains the ending details from the scamper tool.  ID,
 // ListName, hostname seem to match CyclestartLine
 type CyclestopLine struct {
-	Type     string  `json:"type"` // "cycle-stop"
+	Type     string  `json:"type"`
 	ListName string  `json:"list_name"`
-	ID       float64 `json:"id"` // TODO - change to int?
+	ID       float64 `json:"id"`
 	Hostname string  `json:"hostname"`
-	StopTime float64 `json:"stop_time"` // This is a unix epoch time.
+	StopTime float64 `json:"stop_time"`
 }
 
-// XXX ^^^^^^ Everything above here is almost identical to the structs and
-// ParseJSONL code in etl/parser/pt.go
+// ExtractStartTime extracts the "start_time" field of the "cycle-start"
+// line from scamper JSONL output.
+func ExtractStartTime(data []byte) (time.Time, error) {
+	var cycleStart CyclestartLine
+	var epoch int64
+
+	jsonStrings := strings.Split(strings.TrimSpace(string(data)), "\n")
+	if len(jsonStrings) != 4 {
+		return time.Unix(epoch, 0), errNumLines
+	}
+
+	// Validate the cycle-start line.
+	err := json.Unmarshal([]byte(jsonStrings[1]), &cycleStart)
+	if err != nil {
+		return time.Unix(epoch, 0), errCycleStart
+	}
+	if cycleStart.Type != "cycle-start" {
+		return time.Unix(epoch, 0), fmt.Errorf("%w: %v", errCycleStartType, cycleStart.Type)
+	}
+	return time.Unix(int64(cycleStart.StartTime), 0), nil
+}
+
+// ExtractTraceLB extracts the tracelb line from scamper JSONL output,
+// passed as data.
+//
+// As noted earlier, there are 4 lines in the output:
+//   {"UUID":...}
+//   {"type":"cycle-start"...}
+//   {"type":"tracelb"...}
+//   {"type":"cycle-stop"...}
+func ExtractTraceLB(data []byte) (*TracelbLine, error) {
+	var cycleStart CyclestartLine
+	var tracelb TracelbLine
+	var cycleStop CyclestopLine
+
+	jsonStrings := strings.Split(strings.TrimSpace(string(data)), "\n")
+	if len(jsonStrings) != 4 {
+		return nil, errNumLines
+	}
+
+	// Validate the cycle-start line.
+	err := json.Unmarshal([]byte(jsonStrings[1]), &cycleStart)
+	if err != nil {
+		return nil, errCycleStart
+	}
+	if cycleStart.Type != "cycle-start" {
+		return nil, fmt.Errorf("%w: %v", errCycleStartType, cycleStart.Type)
+	}
+
+	// Validate the tracelb line.
+	err = json.Unmarshal([]byte(jsonStrings[2]), &tracelb)
+	if err != nil {
+		return nil, errTracelb
+	}
+	if tracelb.Type != "tracelb" {
+		return nil, fmt.Errorf("%w: %v", errTracelbType, tracelb.Type)
+	}
+
+	// Validate the cycle-stop line.
+	err = json.Unmarshal([]byte(jsonStrings[3]), &cycleStop)
+	if err != nil {
+		return nil, errCycleStop
+	}
+	if cycleStop.Type != "cycle-stop" {
+		return nil, fmt.Errorf("%w: %v", errCycleStopType, cycleStop.Type)
+	}
+
+	return &tracelb, nil
+}
 
 // ExtractHops parses tracelb and extracts all hop addresses.
-func ExtractHops(tracelb *TracelbLine) ([]string, error) {
-	// Unfortunately, net.IP cannot be used as map key.
+func ExtractHops(tracelb *TracelbLine) []string {
+	// We cannot use net.IP as key because it is a slice.
 	hops := make(map[string]struct{}, 100)
-
-	// Parse the json into struct
 	for i := range tracelb.Nodes {
 		node := &tracelb.Nodes[i]
 		hops[node.Addr] = struct{}{}
@@ -128,7 +210,7 @@ func ExtractHops(tracelb *TracelbLine) ([]string, error) {
 				link := &links[k]
 				// Parse the IP string, to avoid formatting variations.
 				ip := net.ParseIP(link.Addr)
-				if ip.String() != "" {
+				if ip.String() != "<nil>" {
 					hops[ip.String()] = struct{}{}
 				}
 			}
@@ -138,36 +220,5 @@ func ExtractHops(tracelb *TracelbLine) ([]string, error) {
 	for h := range hops {
 		hopStrings = append(hopStrings, h)
 	}
-	return hopStrings, nil
-}
-
-// ExtractTraceLB extracts the traceLB line from scamper JSONL.
-// Not currently used, but expected to be used soon for hop annotations.
-func ExtractTraceLB(data []byte) (*TracelbLine, error) {
-	var cycleStart CyclestartLine
-	var cycleStop CyclestopLine
-
-	jsonStrings := strings.Split(string(data), "\n")
-	if len(jsonStrings) != 3 && (len(jsonStrings) != 4 || strings.TrimSpace(jsonStrings[3]) != "") {
-		return nil, errors.New("test has wrong number of lines")
-	}
-
-	// TODO These (cycleStart/Stop checking) are not strictly necessary.  We'll keep them for a while for
-	// debugging, but will likely remove them soon, as they provide little value.
-	err := json.Unmarshal([]byte(jsonStrings[0]), &cycleStart)
-	if err != nil {
-		return nil, errors.New("invalid cycle-start")
-	}
-
-	err = json.Unmarshal([]byte(jsonStrings[2]), &cycleStop)
-	if err != nil {
-		return nil, errors.New("invalid cycle-stop")
-	}
-
-	var tracelb TracelbLine
-	err = json.Unmarshal([]byte(jsonStrings[1]), &tracelb)
-	if err != nil {
-		return nil, errors.New("invalid tracelb")
-	}
-	return &tracelb, nil
+	return hopStrings
 }
