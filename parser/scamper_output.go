@@ -79,12 +79,12 @@ type ScamperNode struct {
 // There are 4 lines in the traceroute test .jsonl file.
 // The first line is defined in Metadata
 // The next three lines are the standard scamper JSONL output containing:
-//   CyclestartLine
+//   cyclestartLine
 //   TracelbLine
-//   CyclestopLine
+//   cyclestopLine
 
-// CyclestartLine contains the information about the scamper "cyclestart"
-type CyclestartLine struct {
+// cyclestartLine contains the information about the scamper "cyclestart"
+type cyclestartLine struct {
 	Type      string  `json:"type"`
 	ListName  string  `json:"list_name"`
 	ID        float64 `json:"id"`
@@ -117,9 +117,9 @@ type TracelbLine struct {
 	Nodes       []ScamperNode `json:"nodes"`
 }
 
-// CyclestopLine contains the ending details from the scamper tool.  ID,
-// ListName, hostname seem to match CyclestartLine
-type CyclestopLine struct {
+// cyclestopLine contains the ending details from the scamper tool.  ID,
+// ListName, hostname seem to match cyclestartLine
+type cyclestopLine struct {
 	Type     string  `json:"type"`
 	ListName string  `json:"list_name"`
 	ID       float64 `json:"id"`
@@ -130,7 +130,7 @@ type CyclestopLine struct {
 // ExtractStartTime extracts the "start_time" field of the "cycle-start"
 // line from scamper JSONL output.
 func ExtractStartTime(data []byte) (time.Time, error) {
-	var cycleStart CyclestartLine
+	var cycleStart cyclestartLine
 	var epoch int64
 
 	jsonStrings := strings.Split(strings.TrimSpace(string(data)), "\n")
@@ -158,9 +158,9 @@ func ExtractStartTime(data []byte) (time.Time, error) {
 //   {"type":"tracelb"...}
 //   {"type":"cycle-stop"...}
 func ExtractTraceLB(data []byte) (*TracelbLine, error) {
-	var cycleStart CyclestartLine
+	var cycleStart cyclestartLine
 	var tracelb TracelbLine
-	var cycleStop CyclestopLine
+	var cycleStop cyclestopLine
 
 	jsonStrings := strings.Split(strings.TrimSpace(string(data)), "\n")
 	if len(jsonStrings) != 4 {
