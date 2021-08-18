@@ -49,9 +49,9 @@ var (
 
 // HopAnnotation1 defines the schema for BigQuery hop annotations.
 type HopAnnotation1 struct {
-	ID   string
-	Date time.Time
-	Raw  *annotator.ClientAnnotations
+	ID          string
+	Timestamp   time.Time
+	Annotations *annotator.ClientAnnotations
 }
 
 // HopCache implements the cache that handles new hop annotations.
@@ -244,9 +244,9 @@ func generateAnnotationFilepath(hop, outPath string, timestamp time.Time) (strin
 func archiveAnnotation(ctx context.Context, hop string, annotation *annotator.ClientAnnotations, filepath string, traceStartTime time.Time) error {
 	yyyymmdd := traceStartTime.Format("20060102")
 	b, err := json.Marshal(HopAnnotation1{
-		ID:   fmt.Sprintf("%s_%s_%s", yyyymmdd, hostname, hop),
-		Date: traceStartTime,
-		Raw:  annotation,
+		ID:          fmt.Sprintf("%s_%s_%s", yyyymmdd, hostname, hop),
+		Timestamp:   traceStartTime,
+		Annotations: annotation,
 	})
 	if err != nil {
 		return fmt.Errorf("%w (error: %v)", errMarshalAnnotation, err)
