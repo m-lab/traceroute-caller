@@ -118,7 +118,7 @@ func TestListener(t *testing.T) {
 	// Create a new hop cache.
 	localIP := net.ParseIP("10.0.0.1")
 	localIPs := connection.NewFakeLocalIPs([]*net.IP{&localIP})
-	hopAnnotator := hopannotation.New(&fakeAnnotator{}, "./testdata")
+	hopAnnotator := hopannotation.New(context.TODO(), &fakeAnnotator{}, "./testdata")
 
 	// Create a new connectionlistener with our fake tracer and hop
 	// cache, connect the connectionlistener to the server and give

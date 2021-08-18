@@ -128,7 +128,6 @@ func New(ctx context.Context, trace Tracer, ipCacheTimeout, ipCacheUpdatePeriod 
 			}
 			m.mu.Unlock()
 		}
-
 	}()
 	return m
 }

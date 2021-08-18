@@ -1,6 +1,7 @@
 // Package parser handles parsing of scamper JSONL.
+//
 // The format of JSON can be found at
-// https://www.caida.org/tools/measurement/scamper/.
+// https://www.caida.org/tools/measurement/scamper.
 // NB: It is not clear where at that URL the format can be found.
 // The structs here may just be derived from the actual scamper json files.
 // scamper-cvs-20191102 trace/scamper_trace.h contains C structs that
@@ -14,6 +15,7 @@ import (
 	"fmt"
 	"net"
 	"strings"
+	"time"
 )
 
 var (
@@ -125,6 +127,76 @@ type CyclestopLine struct {
 	StopTime float64 `json:"stop_time"` // This is a unix epoch time.
 }
 
+// ExtractStartTime extracts the "start_time" field of the "cycle-start"
+// line from scamper JSONL output.
+func ExtractStartTime(data []byte) (time.Time, error) {
+	var cycleStart CyclestartLine
+	var epoch int64
+
+	jsonStrings := strings.Split(strings.TrimSpace(string(data)), "\n")
+	if len(jsonStrings) != 4 {
+		return time.Unix(epoch, 0), errNumLines
+	}
+
+	// Validate the cycle-start line.
+	err := json.Unmarshal([]byte(jsonStrings[1]), &cycleStart)
+	if err != nil {
+		return time.Unix(epoch, 0), errCycleStart
+	}
+	if cycleStart.Type != "cycle-start" {
+		return time.Unix(epoch, 0), fmt.Errorf("%w: %v", errCycleStartType, cycleStart.Type)
+	}
+	return time.Unix(int64(cycleStart.StartTime), 0), nil
+}
+
+// ExtractTraceLB extracts the tracelb line from scamper JSONL output,
+// passed as data.
+//
+// As noted earlier, there are 4 lines in the output:
+//   {"UUID":...}
+//   {"type":"cycle-start"...}
+//   {"type":"tracelb"...}
+//   {"type":"cycle-stop"...}
+func ExtractTraceLB(data []byte) (*TracelbLine, error) {
+	var cycleStart CyclestartLine
+	var tracelb TracelbLine
+	var cycleStop CyclestopLine
+
+	jsonStrings := strings.Split(strings.TrimSpace(string(data)), "\n")
+	if len(jsonStrings) != 4 {
+		return nil, errNumLines
+	}
+
+	// Validate the cycle-start line.
+	err := json.Unmarshal([]byte(jsonStrings[1]), &cycleStart)
+	if err != nil {
+		return nil, errCycleStart
+	}
+	if cycleStart.Type != "cycle-start" {
+		return nil, fmt.Errorf("%w: %v", errCycleStartType, cycleStart.Type)
+	}
+
+	// Validate the tracelb line.
+	err = json.Unmarshal([]byte(jsonStrings[2]), &tracelb)
+	if err != nil {
+		return nil, errTracelb
+	}
+	if tracelb.Type != "tracelb" {
+		return nil, fmt.Errorf("%w: %v", errTracelbType, tracelb.Type)
+	}
+
+	// Validate the cycle-stop line.
+	err = json.Unmarshal([]byte(jsonStrings[3]), &cycleStop)
+	if err != nil {
+		return nil, errCycleStop
+	}
+	if cycleStop.Type != "cycle-stop" {
+		return nil, fmt.Errorf("%w: %v", errCycleStopType, cycleStop.Type)
+	}
+
+	return &tracelb, nil
+}
+
 // ExtractHops parses tracelb and extracts all hop addresses.
 func ExtractHops(tracelb *TracelbLine) []string {
 	// We cannot use net.IP as key because it is a slice.
@@ -149,60 +221,4 @@ func ExtractHops(tracelb *TracelbLine) []string {
 		hopStrings = append(hopStrings, h)
 	}
 	return hopStrings
-}
-
-// ExtractTraceLB extracts the tracelb line from scamper JSONL output,
-// passed as data.
-//
-// XXX As noted earlier, there are 4 lines in the output:
-//   {"UUID":...}
-//   {"type":"cycle-start"...}
-//   {"type":"tracelb"...}
-//   {"type":"cycle-stop"...}
-// The package testing code, however, does not provide the first line,
-// so account for it here for now but we should fix the package testing
-// code.
-func ExtractTraceLB(data []byte) (*TracelbLine, error) {
-	var cycleStart CyclestartLine
-	var tracelb TracelbLine
-	var cycleStop CyclestopLine
-
-	lines := 4
-	if !strings.HasPrefix(string(data), "{\"UUID\":") {
-		lines = 3
-	}
-	jsonStrings := strings.Split(strings.TrimSpace(string(data)), "\n")
-	n := len(jsonStrings)
-	if n != lines {
-		return nil, errNumLines
-	}
-
-	// Validate the cycle-start line.
-	err := json.Unmarshal([]byte(jsonStrings[n-3]), &cycleStart)
-	if err != nil {
-		return nil, errCycleStart
-	}
-	if cycleStart.Type != "cycle-start" {
-		return nil, fmt.Errorf("%w: %v", errCycleStartType, cycleStart.Type)
-	}
-
-	// Validate the tracelb line.
-	err = json.Unmarshal([]byte(jsonStrings[n-2]), &tracelb)
-	if err != nil {
-		return nil, errTracelb
-	}
-	if tracelb.Type != "tracelb" {
-		return nil, fmt.Errorf("%w: %v", errTracelbType, tracelb.Type)
-	}
-
-	// Validate the cycle-stop line.
-	err = json.Unmarshal([]byte(jsonStrings[n-1]), &cycleStop)
-	if err != nil {
-		return nil, errCycleStop
-	}
-	if cycleStop.Type != "cycle-stop" {
-		return nil, fmt.Errorf("%w: %v", errCycleStopType, cycleStop.Type)
-	}
-
-	return &tracelb, nil
 }

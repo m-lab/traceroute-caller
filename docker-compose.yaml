@@ -60,7 +60,8 @@ services:
         delay: 5s
     command:
       - -prometheusx.listen-address=:9992
-      - -outputPath=/local/traceroute
+      - -traceroute-output=/local/traceroute
+      - -annotation-output=/local/hopannotation1
       - -poll=false
       - -tcpinfo.eventsocket=/local/tcpevents.sock
       - -ipservice.sock=/local/uuid-annotator.sock

@@ -36,7 +36,8 @@ func TestMain(t *testing.T) {
 	*prometheusx.ListenAddress = ":0"
 	*scamperCtrlSocket = dir + "/scamper.sock"
 	*waitTime = time.Nanosecond // Run through the loop a few times.
-	*outputPath = dir
+	*tracerouteOutput = dir
+	*hopAnnotationOutput = dir
 	*poll = true
 	*scamperBin = "scamper"
 	tracerType.Value = "scamper-daemon"
@@ -61,7 +62,8 @@ func TestScamper(t *testing.T) {
 	*prometheusx.ListenAddress = ":0"
 	*scamperCtrlSocket = ""
 	*waitTime = time.Nanosecond // Run through the loop a few times.
-	*outputPath = dir
+	*tracerouteOutput = dir
+	*hopAnnotationOutput = dir
 	*poll = true
 	*scamperBin = "scamper"
 	tracerType.Value = "scamper"
@@ -82,7 +84,8 @@ func TestMainWithConnectionListener(t *testing.T) {
 
 	*prometheusx.ListenAddress = ":0"
 	*eventsocket.Filename = dir + "/events.sock"
-	*outputPath = dir
+	*tracerouteOutput = dir
+	*hopAnnotationOutput = dir
 	*poll = false
 	tracerType.Value = "scamper"
 
@@ -108,7 +111,8 @@ func TestMainWithBackupScamper(t *testing.T) {
 
 	*prometheusx.ListenAddress = ":0"
 	*eventsocket.Filename = dir + "/events.sock"
-	*outputPath = dir
+	*tracerouteOutput = dir
+	*hopAnnotationOutput = dir
 	*poll = false
 	*scamperCtrlSocket = dir + "/scamper.sock"
 	*scamperBin = "false"
@@ -130,7 +134,8 @@ func TestMainWithBackupScamper(t *testing.T) {
 func TestMainWithBadArgs(t *testing.T) {
 	tracerType.Value = "scamper"
 	*eventsocket.Filename = ""
-	*outputPath = "/tmp/"
+	*tracerouteOutput = "/tmp/"
+	*hopAnnotationOutput = "/tmp/"
 	*poll = false
 
 	logFatal = func(_ ...interface{}) {

@@ -33,11 +33,11 @@ type connectionListener struct {
 }
 
 // Open is called when a network connection is opened.
-// XXX This function ignores timestamp.
+// XXX This function doesn't need timestamp.
 func (cl *connectionListener) Open(ctx context.Context, timestamp time.Time, uuid string, sockID *inetdiag.SockID) {
 	if sockID == nil {
 		// XXX Test code passes nil which makes this function
-		//     effectively a no-op.  Can sockID be nil in
+		//     effectively a no-op. Can sockID ever be nil in
 		//     production? Add a metric here.
 		log.Printf("sockID is nil")
 		return
@@ -50,17 +50,23 @@ func (cl *connectionListener) Open(ctx context.Context, timestamp time.Time, uui
 		log.Printf("failed to create connection from SockID %+v\n", *sockID)
 		return
 	}
-	cl.conns[uuid] = conn // XXX Are we guaranteed uuid is never empty (i.e., "")?
+	if uuid == "" {
+		// TODO Add a metric here.
+		log.Printf("warning: uuid for SockID %+v is nil\n", *sockID)
+	}
+	cl.conns[uuid] = conn
 }
 
 // Close is called when a network connection is closed.
+// XXX This function doesn't need timestamp.
 func (cl *connectionListener) Close(ctx context.Context, timestamp time.Time, uuid string) {
 	cl.connsLock.Lock()
 	conn, ok := cl.conns[uuid]
 	if ok {
 		delete(cl.conns, uuid)
 		cl.connsLock.Unlock()
-		go cl.traceAnnotateArchive(ctx, conn, timestamp)
+		// The following goroutine exits after hop annotation is archived.
+		go cl.traceAnnotateArchive(ctx, conn)
 	} else {
 		cl.connsLock.Unlock()
 		log.Printf("failed to find connection for UUID %v", uuid)
@@ -69,11 +75,18 @@ func (cl *connectionListener) Close(ctx context.Context, timestamp time.Time, uu
 
 // traceAnnotateArchive runs a traceroute, takes its output, extracts all tracelb's hop
 // IP addresses, annotates the IPs, and writes the annotations to one or more files.
-func (cl *connectionListener) traceAnnotateArchive(ctx context.Context, conn connection.Connection, timestamp time.Time) {
+func (cl *connectionListener) traceAnnotateArchive(ctx context.Context, conn connection.Connection) {
 	// First, run a traceroute.
 	traceOutput, err := cl.ipCache.Trace(conn) // ipcache/ipcachge.go
 	if err != nil {
 		log.Printf("failed to trace %v (error: %v)", conn.RemoteIP, err)
+		return
+	}
+
+	// Extract the start time of the traceroute to pass it down.
+	startTime, err := parser.ExtractStartTime(traceOutput)
+	if err != nil {
+		log.Printf("failed to extract start time from trace output (error: %v)", err)
 		return
 	}
 
@@ -93,9 +106,9 @@ func (cl *connectionListener) traceAnnotateArchive(ctx context.Context, conn con
 	}
 
 	// Finally annotate the new hops and archive.
-	allErrs := cl.hopAnnotator.AnnotateArchive(ctx, hops, timestamp)
+	allErrs := cl.hopAnnotator.AnnotateArchive(ctx, hops, startTime)
 	if len(allErrs) != 0 {
-		log.Printf("failed to annotate and archive %+v\n", allErrs)
+		log.Printf("failed to annotate and archive (errors: %+v)\n", allErrs)
 	}
 }
 

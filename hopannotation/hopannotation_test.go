@@ -12,10 +12,8 @@ import (
 )
 
 var (
-	invalidIP    = "failed to parse hop IP address: 1.2.3"
-	errInvalidIP = errors.New(invalidIP)
-	forcedError  = "forced annotate failure"
-	errForced    = errors.New(forcedError)
+	errInvalidIP = errors.New("failed to parse hop IP address: 1.2.3")
+	errForced    = errors.New("forced annotate failure")
 	errorOnIP    = "0.0.0.0"
 
 	fakeWriteFileCalls int32
@@ -65,7 +63,7 @@ func TestAnnotateArchive(t *testing.T) {
 		{[]string{"1.2.3"}, []error{errInvalidIP}, 4, 5},           // should return error
 	}
 	fa := &fakeAnnotator{}
-	hc := New(fa, "./testdata")
+	hc := New(context.TODO(), fa, "./testdata")
 	for i, test := range tests {
 		if test.hops[0] == "clear-cache" {
 			hc.Clear()
@@ -86,23 +84,23 @@ func TestAnnotateArchive(t *testing.T) {
 			}
 		}
 		if failed {
-			t.Errorf("i=%d hc.AnnotateArchive() = %+v, want: %+v", i, gotAllErrs, test.wantAllErrs)
+			t.Fatalf("i=%d hc.AnnotateArchive() = %+v, want: %+v", i, gotAllErrs, test.wantAllErrs)
 		}
 
 		// Verify the number of Annotate calls.
 		if fa.annotateCalls != test.annotateCalls {
-			t.Errorf("i=%d got %d Annotate calls, want %d", i, fa.annotateCalls, test.annotateCalls)
+			t.Fatalf("i=%d got %d Annotate calls, want %d", i, fa.annotateCalls, test.annotateCalls)
 		}
 
 		// Verify the number of WriteFile calls.
 		if fakeWriteFileCalls != test.writeFileCalls {
-			t.Errorf("i=%d got %d WriteFile calls, want %d", i, fakeWriteFileCalls, test.writeFileCalls)
+			t.Fatalf("i=%d got %d WriteFile calls, want %d", i, fakeWriteFileCalls, test.writeFileCalls)
 		}
 	}
 
 	// Now cover the error paths that were not covered by the
 	// above tests.
-	hc = New(&fakeAnnotator{}, "/bad/path")
+	hc = New(context.TODO(), &fakeAnnotator{}, "/bad/path")
 	hc.AnnotateArchive(context.TODO(), []string{"1.1.1.1", "2.2.2.2"}, time.Now())
 }
 
@@ -121,7 +119,7 @@ func TestArchiveAnnotation(t *testing.T) {
 // code is removed, this function should also be removed.
 func TestSetState(t *testing.T) {
 	fa := &fakeAnnotator{}
-	hc := New(fa, "./testdata")
-	hc.setState("4.3.2.1", archived)
-	hc.setState("4.3.2.1", archived)
+	hc := New(context.TODO(), fa, "./testdata")
+	hc.setState("4.3.2.1", archived) // force error: "does not exist in cache"
+	hc.setState("4.3.2.1", archived) // force error: "has state 2, want 1"
 }

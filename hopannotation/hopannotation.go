@@ -1,7 +1,5 @@
 // Package hopannotation handles hop annotation and archiving by
 // maintaining a daily cache of annotated and archived hop IP addresses.
-//
-// TODO: Need to purge the cache at midnight.
 package hopannotation
 
 import (
@@ -43,9 +41,7 @@ var (
 	errCreatePath        = errors.New("failed to create directory path")
 	errMarshalAnnotation = errors.New("failed to marshal annotation to json")
 	errWriteMarshal      = errors.New("failed to write marshaled annotation")
-)
 
-var (
 	// WriteFile is for mocking writing to the filesystem.
 	WriteFile = ioutil.WriteFile
 	hostname  string
@@ -60,8 +56,9 @@ type HopAnnotation1 struct {
 
 // HopCache implements the cache that handles new hop annotations.
 type HopCache struct {
-	hops       map[string]entryState // list of IP addresses already handled
-	mu         sync.Mutex            // lock protecting hops
+	hops       map[string]entryState // hop addresses being handled or already handled
+	oldHops    map[string]entryState // old (yesterday's) hops
+	hopsLock   sync.Mutex            // hop cache lock
 	annotator  ipservice.Client      // function for getting hop annotations
 	outputPath string                // path to directory for writing archives
 }
@@ -75,28 +72,55 @@ func init() {
 }
 
 // New returns a new HopCache that will use the provided ipservice.Client
-// to obtain annotations.
-func New(annotator ipservice.Client, outputPath string) *HopCache {
-	return &HopCache{
+// to obtain annotations. The HopCache will be cleared every day at midnight.
+func New(ctx context.Context, annotator ipservice.Client, outputPath string) *HopCache {
+	hc := &HopCache{
 		hops:       make(map[string]entryState, 10000), // based on observation
+		oldHops:    nil,
 		annotator:  annotator,
 		outputPath: outputPath,
 	}
+	go func() {
+		ticker := time.NewTicker(time.Second)
+		defer ticker.Stop()
+		prevHour := time.Now().Hour()
+		for now := range ticker.C {
+			if ctx.Err() != nil {
+				return
+			}
+			// Did we pass midnight?
+			if now.Hour() < prevHour {
+				hc.Clear()
+				prevHour = now.Hour()
+			}
+		}
+	}()
+	return hc
 }
 
 // Clear removes all entries from the hop cache and creates a new one
 // so that reoccurances trigger reprocessing. The new hop cache is a little
 // bigger than yesterday.
 func (hc *HopCache) Clear() {
-	hc.mu.Lock()
-	defer hc.mu.Unlock()
+	hc.hopsLock.Lock()
+	defer hc.hopsLock.Unlock()
+	oldHopsDone := true
+	for _, v := range hc.oldHops {
+		if v != archived && v != errored {
+			oldHopsDone = false
+			break
+		}
+	}
+	if oldHopsDone {
+		hc.oldHops = hc.hops
+	}
 	hc.hops = make(map[string]entryState, len(hc.hops)+len(hc.hops)/4)
 }
 
 // AnnotateArchive annotates and archives new hop IP addresses. In case
 // of error, it aggregates the errors and returns all of them instead of
 // quitting after encountering the first error.
-func (hc *HopCache) AnnotateArchive(ctx context.Context, hops []string, timestamp time.Time) (allErrs []error) {
+func (hc *HopCache) AnnotateArchive(ctx context.Context, hops []string, traceStartTime time.Time) (allErrs []error) {
 	// Validate all hop IP addresses.
 	for _, hop := range hops {
 		if net.ParseIP(hop).String() == "<nil>" {
@@ -125,14 +149,14 @@ func (hc *HopCache) AnnotateArchive(ctx context.Context, hops []string, timestam
 	// TODO: Do this in parallel for speed.
 	for hop, annotation := range annotations {
 		// Get a file path.
-		filepath, err := generateAnnotationFilepath(hop, hc.outputPath, timestamp)
+		filepath, err := generateAnnotationFilepath(hop, hc.outputPath, traceStartTime)
 		if err != nil {
 			allErrs = append(allErrs, err)
 			hc.setState(hop, errored)
 			continue
 		}
 		// Write to the file.
-		if err := archiveAnnotation(ctx, hop, annotation, filepath, timestamp); err != nil {
+		if err := archiveAnnotation(ctx, hop, annotation, filepath, traceStartTime); err != nil {
 			allErrs = append(allErrs, err)
 			hc.setState(hop, errored)
 		} else {
@@ -145,39 +169,50 @@ func (hc *HopCache) AnnotateArchive(ctx context.Context, hops []string, timestam
 // setState sets the state of the given hop to the given state while
 // holding the hop cache lock.
 func (hc *HopCache) setState(hop string, hopState entryState) {
-	hc.mu.Lock()
-	defer hc.mu.Unlock()
+	var wantState entryState
+	switch hopState {
+	case annotated:
+		wantState = inserted
+	case archived:
+		wantState = annotated
+	case errored:
+		wantState = annotated
+	}
 
-	// This sanity checks below can/should be removed once debugging
-	// is done. When you remove this code, remove its corresponding
-	// test too.
+	// Lock the hop cache.
+	hc.hopsLock.Lock()
+	defer hc.hopsLock.Unlock()
+
+	old := false
 	state, ok := hc.hops[hop]
 	if !ok {
-		log.Printf("internal error: hop %v does not exist in cache", hop)
-		log.Printf("recovering by setting state for hop %v to %v", hop, hopState)
-	} else {
-		var wantState entryState
-		switch hopState {
-		case annotated:
-			wantState = inserted
-		case archived:
-			wantState = annotated
-		case errored:
-			wantState = annotated
-		}
-		if state != wantState {
-			log.Printf("internal error: hop %v has state %v, want %v", hop, state, wantState)
-			log.Printf("recovering by setting state for hop %v to %v", hop, hopState)
+		// Check the old list.
+		state, ok = hc.oldHops[hop]
+		if !ok {
+			log.Printf("internal error: hop %v does not exist in cache", hop)
+			state = wantState
+		} else {
+			old = true
 		}
 	}
-	hc.hops[hop] = hopState
+	// Sanity check.
+	if state != wantState {
+		log.Printf("internal error: hop %v has state %v, want %v", hop, state, wantState)
+		log.Printf("recovering by setting state for hop %v to %v", hop, hopState)
+	}
+
+	if old {
+		hc.oldHops[hop] = hopState
+	} else {
+		hc.hops[hop] = hopState
+	}
 }
 
 // getNewHops returns the list of new hops that should be annotated
 // and archived.
 func (hc *HopCache) getNewHops(hops []string) []string {
-	hc.mu.Lock()
-	defer hc.mu.Unlock()
+	hc.hopsLock.Lock()
+	defer hc.hopsLock.Unlock()
 
 	// Add new hops to the annotated map and the newHops slice.
 	var newHops []string
@@ -206,13 +241,13 @@ func generateAnnotationFilepath(hop, outPath string, timestamp time.Time) (strin
 
 // archiveAnnotation writes the given hop annotation to a file specified
 // by filepath.
-func archiveAnnotation(ctx context.Context, hop string, annotation *annotator.ClientAnnotations, filepath string, timestamp time.Time) error {
-	yyyymmdd := timestamp.Format("20060102")
+func archiveAnnotation(ctx context.Context, hop string, annotation *annotator.ClientAnnotations, filepath string, traceStartTime time.Time) error {
+	yyyymmdd := traceStartTime.Format("20060102")
 	b, err := json.Marshal(HopAnnotation1{
 		ID:   fmt.Sprintf("%s_%s_%s", yyyymmdd, hostname, hop),
-		Date: timestamp,
-		Raw:  annotation},
-	)
+		Date: traceStartTime,
+		Raw:  annotation,
+	})
 	if err != nil {
 		return fmt.Errorf("%w (error: %v)", errMarshalAnnotation, err)
 	}

@@ -40,9 +40,11 @@ func TestParser(t *testing.T) {
 			"2600:803:150f::4a"},
 		},
 	}
-	for _, test := range tests {
+	for i, test := range tests {
 		// First extract the tracelb line.
-		content, err := ioutil.ReadFile(filepath.Join("./testdata", test.file))
+		f := filepath.Join("./testdata", test.file)
+		t.Logf("Test %v: file: %v", i, f)
+		content, err := ioutil.ReadFile(f)
 		if err != nil {
 			t.Fatalf(err.Error())
 		}
@@ -70,18 +72,29 @@ func TestParser(t *testing.T) {
 		if test.wantHops == nil {
 			continue
 		}
-
-		for _, wantHop := range test.wantHops {
-			found := false
-			for _, gotHop := range gotHops {
-				if wantHop == gotHop {
-					found = true
-					break
-				}
-			}
-			if !found {
-				t.Fatalf("want hop %v", wantHop)
-			}
+		if !isEqual(gotHops, test.wantHops) {
+			t.Fatalf("got %v, want %v", gotHops, test.wantHops)
 		}
 	}
+}
+
+// isEqual returns true if all of the elements in s1 exist in s2.
+func isEqual(s1, s2 []string) bool {
+	if len(s1) != len(s2) {
+		return false
+	}
+	diff := make(map[string]int, len(s1))
+	for _, s := range s1 {
+		diff[s]++
+	}
+	for _, s := range s2 {
+		if _, ok := diff[s]; !ok {
+			return false
+		}
+		diff[s]--
+		if diff[s] == 0 {
+			delete(diff, s)
+		}
+	}
+	return len(diff) == 0
 }
