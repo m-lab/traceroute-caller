@@ -45,6 +45,10 @@ func (cl *connectionListener) Close(ctx context.Context, timestamp time.Time, uu
 	cl.mutex.Unlock()
 
 	if ok {
+		// Spawn a goroutine to run a traceroute, annotate
+		// the hops in the traceroute output, and archive the
+		// annotations. This goroutine will live for a few minutes
+		// and terminate after all hop annotations are archived.
 		go func() {
 			data, err := cl.cache.Trace(conn)
 			if err != nil {
@@ -53,7 +57,7 @@ func (cl *connectionListener) Close(ctx context.Context, timestamp time.Time, uu
 				if _, err := parser.ParseTraceroute(data); err != nil {
 					log.Printf("failed to parse traceroute output (error: %v)\n", err)
 				} else {
-					// TODO: Remove this line when done debugging.
+					// TODO(SaiedKazemi): Remove this line when done debugging.
 					log.Printf("successfully parsed traceroute output\n")
 				}
 			}
