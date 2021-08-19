@@ -252,9 +252,6 @@ func TestTraceTimeout(t *testing.T) {
 	if !errors.Is(err, context.DeadlineExceeded) {
 		t.Error("Should return TimeOut err, not ", err)
 	}
-	if data != nil {
-		t.Error("Should return empty string when TimeOut")
-	}
 }
 
 func TestCreateCacheTest(t *testing.T) {

@@ -6,16 +6,19 @@
 package parser
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
-	"strings"
-	"time"
+
+	"github.com/m-lab/traceroute-caller/tracer"
 )
 
 var (
-	errNumLines       = errors.New("test has wrong number of lines")
+	errTraceroute     = errors.New("invalid traceroute file")
+	errMetadata       = errors.New("invalid metadata")
+	errMetadataUUID   = errors.New("invalid UUID (empty)")
 	errCycleStart     = errors.New("invalid cycle-start")
 	errCycleStartType = errors.New("invalid cycle-start type")
 	errTracelb        = errors.New("invalid tracelb")
@@ -76,15 +79,20 @@ type ScamperNode struct {
 	Links [][]ScamperLink `json:"links"`
 }
 
-// There are 4 lines in the traceroute test .jsonl file.
-// The first line is defined in Metadata
-// The next three lines are the standard scamper JSONL output containing:
-//   cyclestartLine
-//   TracelbLine
-//   cyclestopLine
+// ScamperOutput encapsulates the four lines of a traceroute:
+//   {"UUID":...}
+//   {"type":"cycle-start"...}
+//   {"type":"tracelb"...}
+//   {"type":"cycle-stop"...}
+type ScamperOutput struct {
+	Metadata   tracer.Metadata
+	CycleStart CyclestartLine
+	Tracelb    TracelbLine
+	CycleStop  CyclestopLine
+}
 
-// cyclestartLine contains the information about the scamper "cyclestart"
-type cyclestartLine struct {
+// CyclestartLine contains the information about the scamper "cyclestart"
+type CyclestartLine struct {
 	Type      string  `json:"type"`
 	ListName  string  `json:"list_name"`
 	ID        float64 `json:"id"`
@@ -117,9 +125,9 @@ type TracelbLine struct {
 	Nodes       []ScamperNode `json:"nodes"`
 }
 
-// cyclestopLine contains the ending details from the scamper tool.  ID,
-// ListName, hostname seem to match cyclestartLine
-type cyclestopLine struct {
+// CyclestopLine contains the ending details from the scamper tool.  ID,
+// ListName, hostname seem to match CyclestartLine
+type CyclestopLine struct {
 	Type     string  `json:"type"`
 	ListName string  `json:"list_name"`
 	ID       float64 `json:"id"`
@@ -127,74 +135,55 @@ type cyclestopLine struct {
 	StopTime float64 `json:"stop_time"`
 }
 
-// ExtractStartTime extracts the "start_time" field of the "cycle-start"
-// line from scamper JSONL output.
-func ExtractStartTime(data []byte) (time.Time, error) {
-	var cycleStart cyclestartLine
-	var epoch int64
+// ParseTraceroute parses scamper output in JSONL format and returns it.
+func ParseTraceroute(data []byte) (*ScamperOutput, error) {
+	var scamperOutput ScamperOutput
+	var err error
 
-	jsonStrings := strings.Split(strings.TrimSpace(string(data)), "\n")
-	if len(jsonStrings) != 4 {
-		return time.Unix(epoch, 0), errNumLines
+	// We account for the last newline because it's a lot faster than
+	// stripping it and creating a new slice.  We just validate that
+	// the last line is empty.
+	lines := bytes.Split(data, []byte("\n"))
+	if len(lines) != 5 {
+		return nil, errTraceroute
+	}
+	if len(lines[4]) != 0 {
+		return nil, errTraceroute
 	}
 
-	// Validate the cycle-start line.
-	err := json.Unmarshal([]byte(jsonStrings[1]), &cycleStart)
-	if err != nil {
-		return time.Unix(epoch, 0), errCycleStart
+	// Parse and validate the metadata line.
+	if err := json.Unmarshal(lines[0], &scamperOutput.Metadata); err != nil {
+		return nil, errMetadata
 	}
-	if cycleStart.Type != "cycle-start" {
-		return time.Unix(epoch, 0), fmt.Errorf("%w: %v", errCycleStartType, cycleStart.Type)
-	}
-	return time.Unix(int64(cycleStart.StartTime), 0), nil
-}
-
-// ExtractTraceLB extracts the tracelb line from scamper JSONL output,
-// passed as data.
-//
-// As noted earlier, there are 4 lines in the output:
-//   {"UUID":...}
-//   {"type":"cycle-start"...}
-//   {"type":"tracelb"...}
-//   {"type":"cycle-stop"...}
-func ExtractTraceLB(data []byte) (*TracelbLine, error) {
-	var cycleStart cyclestartLine
-	var tracelb TracelbLine
-	var cycleStop cyclestopLine
-
-	jsonStrings := strings.Split(strings.TrimSpace(string(data)), "\n")
-	if len(jsonStrings) != 4 {
-		return nil, errNumLines
+	if scamperOutput.Metadata.UUID == "" {
+		return nil, fmt.Errorf("%w: %v", errMetadataUUID, scamperOutput.Metadata.UUID)
 	}
 
-	// Validate the cycle-start line.
-	err := json.Unmarshal([]byte(jsonStrings[1]), &cycleStart)
-	if err != nil {
+	// Parse and validate the cycle-start line.
+	if err := json.Unmarshal(lines[1], &scamperOutput.CycleStart); err != nil {
 		return nil, errCycleStart
 	}
-	if cycleStart.Type != "cycle-start" {
-		return nil, fmt.Errorf("%w: %v", errCycleStartType, cycleStart.Type)
+	if scamperOutput.CycleStart.Type != "cycle-start" {
+		return nil, fmt.Errorf("%w: %v", errCycleStartType, scamperOutput.CycleStart.Type)
 	}
 
-	// Validate the tracelb line.
-	err = json.Unmarshal([]byte(jsonStrings[2]), &tracelb)
-	if err != nil {
+	// Parse and validate the tracelb line.
+	if err = json.Unmarshal(lines[2], &scamperOutput.Tracelb); err != nil {
 		return nil, errTracelb
 	}
-	if tracelb.Type != "tracelb" {
-		return nil, fmt.Errorf("%w: %v", errTracelbType, tracelb.Type)
+	if scamperOutput.Tracelb.Type != "tracelb" {
+		return nil, fmt.Errorf("%w: %v", errTracelbType, scamperOutput.Tracelb.Type)
 	}
 
-	// Validate the cycle-stop line.
-	err = json.Unmarshal([]byte(jsonStrings[3]), &cycleStop)
-	if err != nil {
+	// Parse and validate the cycle-stop line.
+	if err = json.Unmarshal(lines[3], &scamperOutput.CycleStop); err != nil {
 		return nil, errCycleStop
 	}
-	if cycleStop.Type != "cycle-stop" {
-		return nil, fmt.Errorf("%w: %v", errCycleStopType, cycleStop.Type)
+	if scamperOutput.CycleStop.Type != "cycle-stop" {
+		return nil, fmt.Errorf("%w: %v", errCycleStopType, scamperOutput.CycleStop.Type)
 	}
 
-	return &tracelb, nil
+	return &scamperOutput, nil
 }
 
 // ExtractHops parses tracelb and extracts all hop addresses.

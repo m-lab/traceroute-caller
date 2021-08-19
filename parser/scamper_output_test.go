@@ -15,24 +15,26 @@ func init() {
 
 func TestParser(t *testing.T) {
 	tests := []struct {
-		file             string
-		wantStartTimeErr error
-		wantTraceLBErr   error
-		wantHops         []string
+		file     string
+		wantErr  error
+		wantHops []string
 	}{
-		{"invalid-num-lines", errNumLines, errNumLines, nil},
-		{"invalid-cycle-start", errCycleStart, errCycleStart, nil},
-		{"invalid-cycle-start-type", errCycleStartType, errCycleStartType, nil},
-		{"invalid-tracelb", nil, errTracelb, nil},
-		{"invalid-tracelb-type", nil, errTracelbType, nil},
-		{"invalid-cycle-stop", nil, errCycleStop, nil},
-		{"invalid-cycle-stop-type", nil, errCycleStopType, nil},
+		{"invalid-num-lines", errTraceroute, nil},
+		{"invalid-last-line", errTraceroute, nil},
+		{"invalid-metadata", errMetadata, nil},
+		{"invalid-metadata-uuid", errMetadataUUID, nil},
+		{"invalid-cycle-start", errCycleStart, nil},
+		{"invalid-cycle-start-type", errCycleStartType, nil},
+		{"invalid-tracelb", errTracelb, nil},
+		{"invalid-tracelb-type", errTracelbType, nil},
+		{"invalid-cycle-stop", errCycleStop, nil},
+		{"invalid-cycle-stop-type", errCycleStopType, nil},
 		// XXX The original code expected no errors from parsing
-		//     this file although its comments read:
+		//     invalid-tracelb-links although its comments read:
 		//     Last object on the "type":"tracelb" line has "linkc":1 but no "links" set.
-		{"invalid-tracelb-links", nil, nil, nil},
-		{"valid-simple", nil, nil, []string{}},
-		{"valid-complex", nil, nil, []string{
+		{"invalid-tracelb-links", nil, nil},
+		{"valid-simple", nil, []string{}},
+		{"valid-complex", nil, []string{
 			"2001:4888:36:1002:3a2:1:0:1",
 			"2001:550:1b01:1::1",
 			"2001:550:3::1ca",
@@ -51,15 +53,9 @@ func TestParser(t *testing.T) {
 		}
 
 		// Extract the start_time from the cycle-start line.
-		_, gotErr := ExtractStartTime([]byte(content))
-		if badErr(gotErr, test.wantStartTimeErr) {
-			t.Fatalf("ExtractStartTime(): %v, want %v", gotErr, test.wantStartTimeErr)
-		}
-
-		// Extract the tracelb line.
-		tracelb, gotErr := ExtractTraceLB([]byte(content))
-		if badErr(gotErr, test.wantTraceLBErr) {
-			t.Fatalf("ExtraceTraceLB(): %v, want %v", gotErr, test.wantTraceLBErr)
+		scamperOutput, gotErr := ParseTraceroute(content)
+		if badErr(gotErr, test.wantErr) {
+			t.Fatalf("ParseTraceroute(): %v, want %v", gotErr, test.wantErr)
 		}
 
 		// If the test traceroute output file isn't valid,
@@ -69,7 +65,7 @@ func TestParser(t *testing.T) {
 		}
 
 		// Extract the hops.
-		gotHops := ExtractHops(tracelb)
+		gotHops := ExtractHops(&scamperOutput.Tracelb)
 		if !isEqual(gotHops, test.wantHops) {
 			t.Fatalf("got %+v, want %+v", gotHops, test.wantHops)
 		}
