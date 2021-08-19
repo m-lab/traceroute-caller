@@ -29,7 +29,7 @@ type Connection struct {
 
 // UUID returns uuid from cookie parsed from "ss -e" output.
 func (c *Connection) UUID() (string, error) {
-	// cookie is a hexdecimal string
+	// cookie is a hexadecimal string
 	result, err := strconv.ParseUint(c.Cookie, 16, 64)
 	return uuid.FromCookie(result), err
 }
@@ -79,9 +79,9 @@ type Creator interface {
 	FromSockID(sockid inetdiag.SockID) (Connection, error)
 }
 
-// NewCreator makes an object that can convert src and dst into local and remote
-// IPs.
-func NewCreator() (Creator, error) {
+// NewLocalIPs makes an object that can convert src and dst into local
+// and remote IPs.
+func NewLocalIPs() (Creator, error) {
 	c := &creator{
 		localIPs: make([]*net.IP, 0),
 	}
@@ -108,9 +108,9 @@ func NewCreator() (Creator, error) {
 	return c, err
 }
 
-// NewFakeCreator makes a fake creator with hardcoded local IPs to enable
-// testing in diverse network environments.
-func NewFakeCreator(localIPs []*net.IP) Creator {
+// NewFakeLocalIPs makes a fake creator with hardcoded local IPs to
+// enable testing in diverse network environments.
+func NewFakeLocalIPs(localIPs []*net.IP) Creator {
 	return &creator{
 		localIPs: localIPs,
 	}

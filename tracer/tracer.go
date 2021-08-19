@@ -84,7 +84,7 @@ var (
 func init() {
 	var err error
 	hostname, err = os.Hostname()
-	rtx.Must(err, "Could not call os.Hostname")
+	rtx.Must(err, "failed to call os.Hostname")
 }
 
 // Metadata is the first line of the traceroute .jsonl file.
@@ -104,7 +104,7 @@ func extractUUID(metaline []byte) string {
 	var metaResult Metadata
 	err := json.Unmarshal(metaline, &metaResult)
 	if err != nil {
-		log.Println("Could not parse cached results:", string(metaline))
+		log.Println("failed to parse cached results:", string(metaline))
 		return ""
 	}
 	return metaResult.UUID
@@ -122,7 +122,7 @@ func GetMetaline(conn connection.Connection, isCache bool, cachedUUID string) []
 	// decide to add more, then this quick-and-dirty approach should be converted
 	// into proper json.Marshal calls.
 	uuid, err := conn.UUID()
-	rtx.PanicOnError(err, "Could not parse UUID - this should never happen")
+	rtx.PanicOnError(err, "failed to parse UUID - this should never happen")
 
 	meta := Metadata{
 		UUID:                    uuid,
