@@ -230,18 +230,13 @@ func (d *ScamperDaemon) trace(conn connection.Connection, t time.Time) ([]byte, 
 func traceAndWrite(ctx context.Context, label string, fn string, cmd shx.Job, conn connection.Connection, t time.Time) ([]byte, error) {
 	data, err := runTrace(ctx, label, cmd, conn)
 	if err != nil {
-		// XXX - TestTraceTimeout() expects nil, so
-		// we return here but it's better to save partial data
-		// even in the case of a timeout.
 		return nil, err
 	}
-	// TODO - consider whether we should just return the trace without the metadata,
-	// or not return the data at all.
 	return writeTraceFile(data, fn, conn, t)
 }
 
 // runTrace executes a trace command and returns the data.
-func runTrace(ctx context.Context, label string, cmd shx.Job, conn connection.Connection) (result []byte, err error) {
+func runTrace(ctx context.Context, label string, cmd shx.Job, conn connection.Connection) ([]byte, error) {
 	var desc shx.Description
 	deadline, _ := ctx.Deadline()
 	timeout := time.Until(deadline)
@@ -253,7 +248,7 @@ func runTrace(ctx context.Context, label string, cmd shx.Job, conn connection.Co
 	fullCmd := shx.Pipe(cmd, shx.Write(&buff))
 
 	start := time.Now()
-	err = fullCmd.Run(ctx, shx.New())
+	err := fullCmd.Run(ctx, shx.New())
 	latency := time.Since(start).Seconds()
 	log.Printf("Trace returned in %v seconds", latency)
 	tracesPerformed.WithLabelValues(label).Inc()

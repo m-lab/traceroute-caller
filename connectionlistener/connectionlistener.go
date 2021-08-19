@@ -10,6 +10,7 @@ import (
 	"github.com/m-lab/tcp-info/inetdiag"
 	"github.com/m-lab/traceroute-caller/connection"
 	"github.com/m-lab/traceroute-caller/ipcache"
+	"github.com/m-lab/traceroute-caller/parser"
 )
 
 // connectionListener implements the eventsocket.Handler interface, allowing us
@@ -30,7 +31,7 @@ func (cl *connectionListener) Open(ctx context.Context, timestamp time.Time, uui
 		if err == nil {
 			cl.conns[uuid] = conn
 		} else {
-			log.Printf("Could not create connection from SockID %+v\n", *id)
+			log.Printf("failed to create connection from SockID %+v\n", *id)
 		}
 	}
 }
@@ -44,8 +45,22 @@ func (cl *connectionListener) Close(ctx context.Context, timestamp time.Time, uu
 	cl.mutex.Unlock()
 
 	if ok {
+		// Spawn a goroutine to run a traceroute, annotate
+		// the hops in the traceroute output, and archive the
+		// annotations. This goroutine will live for a few minutes
+		// and terminate after all hop annotations are archived.
 		go func() {
-			_, _ = cl.cache.Trace(conn)
+			data, err := cl.cache.Trace(conn)
+			if err != nil {
+				log.Printf("failed to run a trace for connection %v (error: %v)\n", conn, err)
+			} else {
+				if _, err := parser.ParseTraceroute(data); err != nil {
+					log.Printf("failed to parse traceroute output (error: %v)\n", err)
+				} else {
+					// TODO(SaiedKazemi): Remove this line when done debugging.
+					log.Printf("successfully parsed traceroute output\n")
+				}
+			}
 		}()
 	}
 }

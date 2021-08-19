@@ -248,12 +248,9 @@ func TestTraceTimeout(t *testing.T) {
 
 	faketime := time.Date(2019, time.April, 1, 3, 45, 51, 0, time.UTC)
 	prometheusx.GitShortCommit = "Fake Version"
-	data, err := d.Trace(c, faketime)
+	_, err = d.Trace(c, faketime)
 	if !errors.Is(err, context.DeadlineExceeded) {
 		t.Error("Should return TimeOut err, not ", err)
-	}
-	if data != nil {
-		t.Error("Should return empty string when TimeOut")
 	}
 }
 
