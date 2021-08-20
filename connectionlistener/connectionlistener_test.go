@@ -3,12 +3,12 @@ package connectionlistener_test
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io/ioutil"
 	"log"
 	"net"
 	"os"
 	"sort"
+	"strconv"
 	"sync"
 	"testing"
 	"time"
@@ -28,12 +28,21 @@ import (
 )
 
 var (
-	// We assign these to conn.Cookie to test different kinds of
-	// errors in our fake Trace().
+	// To test different kinds of errors for more coverage, the
+	// following conn.Cookie values are recognized in our fake Trace()
+	// to return different trace files with different errors.
 	traceFailed      = int64(0x1001)
 	traceNoTracelb   = int64(0x1002)
 	traceInvalidType = int64(0x1003)
 	traceNoNodes     = int64(0x1004)
+	traceGood        = int64(0x1005)
+	traceFiles       = map[int64]string{
+		traceFailed:      "trace-non-existent.jsonl",
+		traceNoTracelb:   "trace-no-tracelb.jsonl",
+		traceInvalidType: "trace-tracelb-invalid-type.jsonl",
+		traceNoNodes:     "trace-tracelb-no-nodes.jsonl",
+		traceGood:        "trace-good.jsonl",
+	}
 
 	sockIDGolden = inetdiag.SockID{
 		SPort:  2,
@@ -56,24 +65,21 @@ type fakeTracer struct {
 }
 
 func (ft *fakeTracer) Trace(conn connection.Connection, t time.Time) ([]byte, error) {
-	var traceFile string
-	switch conn.Cookie {
-	case fmt.Sprintf("%x", traceFailed):
-		traceFile = "testdata/trace-non-existent.jsonl"
-	case fmt.Sprintf("%x", traceNoTracelb):
-		traceFile = "testdata/trace-no-tracelb.jsonl"
-	case fmt.Sprintf("%x", traceInvalidType):
-		traceFile = "testdata/trace-tracelb-invalid-type.jsonl"
-	case fmt.Sprintf("%x", traceNoNodes):
-		traceFile = "testdata/trace-tracelb-no-nodes.jsonl"
-	default:
-		traceFile = "testdata/trace-good.jsonl"
+	key, err := strconv.ParseInt(conn.Cookie, 16, 64)
+	if err != nil {
+		panic(err)
 	}
+	val, ok := traceFiles[key]
+	if !ok {
+		panic("invalid cookie value")
+	}
+	traceFile := "testdata/" + val
 	ft.mutex.Lock() // Must have a lock to avoid race conditions around the append.
 	defer ft.mutex.Unlock()
 	log.Println("Tracing", conn)
 	ft.gotIPs = append(ft.gotIPs, conn.RemoteIP)
 	ft.wg.Done()
+	log.Println("Returning", traceFile)
 	return ioutil.ReadFile(traceFile)
 }
 
@@ -139,14 +145,14 @@ func runTests(t *testing.T, srv eventsocket.Server, ft *fakeTracer, cl eventsock
 
 	tests := []struct {
 		srcIP  string
-		cookie uint64
+		cookie int64
 	}{
-		{"invalidip", 0},                          // cannot create...
-		{"192.168.0.1", uint64(traceFailed)},      // should cause a trace but we force our fake Trace() to fail
-		{"192.168.0.2", uint64(traceNoTracelb)},   // failed to extract tracelb from trace output (error: %v)
-		{"192.168.0.3", uint64(traceInvalidType)}, // tracelb output has invalid type: %q
-		{"192.168.0.4", uint64(traceNoNodes)},     // tracelb output has no nodes
-		{"192.168.0.5", 0},                        // good trace
+		{"invalidip", 0},                  // cannot create...
+		{"192.168.0.1", traceFailed},      // should cause a trace but we force our fake Trace() to fail
+		{"192.168.0.2", traceNoTracelb},   // failed to extract tracelb from trace output (error: %v)
+		{"192.168.0.3", traceInvalidType}, // tracelb output has invalid type: %q
+		{"192.168.0.4", traceNoNodes},     // tracelb output has no nodes
+		{"192.168.0.5", traceGood},        // good trace
 	}
 	for i, test := range tests {
 		if test.srcIP != "invalidip" {
@@ -154,7 +160,7 @@ func runTests(t *testing.T, srv eventsocket.Server, ft *fakeTracer, cl eventsock
 		}
 		sockID := sockIDGolden
 		sockID.SrcIP = test.srcIP
-		sockID.Cookie = int64(test.cookie)
+		sockID.Cookie = test.cookie
 		srv.FlowCreated(time.Now(), uuid.FromCookie(uint64(i)+1), sockID)
 		srv.FlowDeleted(time.Now(), uuid.FromCookie(uint64(i)+1))
 		if test.srcIP != "invalidip" {

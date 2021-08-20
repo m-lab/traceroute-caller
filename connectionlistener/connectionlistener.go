@@ -20,9 +20,12 @@ import (
 	"github.com/m-lab/traceroute-caller/parser"
 )
 
-// connectionListener implements the eventsocket.Handler interface, allowing us
-// to build a simple client for that service using the libraries from the
-// service itself.
+// connectionListener implements the eventsocket.Handler interface, allowing
+// us to build a simple client for that service using the libraries from
+// the service itself.
+// To understand the lifecycle of ipCache, creator, and hopAnnotator see
+// ipcache.New(), connection.NewLocalRemoteIPs(), and hopannotation.New()
+// respectively.
 type connectionListener struct {
 	connsLock    sync.Mutex
 	conns        map[string]connection.Connection
@@ -42,6 +45,8 @@ func (cl *connectionListener) Open(ctx context.Context, timestamp time.Time, uui
 		return
 	}
 
+	// TODO(SaiedKazemi): Determine whether the lock can be moved
+	//     to right before accessing the map.
 	cl.connsLock.Lock()
 	defer cl.connsLock.Unlock()
 	conn, err := cl.creator.FromSockID(*sockID)
@@ -73,10 +78,10 @@ func (cl *connectionListener) Close(ctx context.Context, timestamp time.Time, uu
 	// in the traceroute output, and archive the annotations. This
 	// goroutine will live for a few minutes and terminate after all
 	// hop annotations are archived.
-	go cl.traceAnnotateArchive(ctx, conn)
+	go cl.traceAnnotateAndArchive(ctx, conn)
 }
 
-func (cl *connectionListener) traceAnnotateArchive(ctx context.Context, conn connection.Connection) {
+func (cl *connectionListener) traceAnnotateAndArchive(ctx context.Context, conn connection.Connection) {
 	data, err := cl.ipCache.Trace(conn)
 	if err != nil {
 		log.Printf("failed to run a trace for connection %v (error: %v)\n", conn, err)

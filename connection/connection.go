@@ -79,9 +79,9 @@ type Creator interface {
 	FromSockID(sockid inetdiag.SockID) (Connection, error)
 }
 
-// NewLocalIPs makes an object that can convert src and dst into local
+// NewLocalRemoteIPs makes an object that can convert src and dst into local
 // and remote IPs.
-func NewLocalIPs() (Creator, error) {
+func NewLocalRemoteIPs() (Creator, error) {
 	c := &creator{
 		localIPs: make([]*net.IP, 0),
 	}

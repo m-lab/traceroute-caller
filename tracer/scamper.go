@@ -39,9 +39,9 @@ func generateFilename(path string, cookie string, t time.Time) (string, error) {
 	}
 	c, err := strconv.ParseUint(cookie, 16, 64)
 	if err != nil {
-		// TODO(SaiedKazemi): Add metric here.
-		log.Println(err, "converting cookie", cookie)
-		return "", errors.New("error converting cookie")
+		log.Printf("failed to parse cookie %v (error: %v)\n", cookie, err)
+		tracerCacheErrors.WithLabelValues("scamper", "badcookie").Inc()
+		return "", errors.New("failed to parse cookie")
 	}
 	return dir + t.Format("20060102T150405Z") + "_" + uuid.FromCookie(c) + ".jsonl", nil
 }
@@ -50,7 +50,7 @@ func generateFilename(path string, cookie string, t time.Time) (string, error) {
 func (s *Scamper) TraceFromCachedTrace(conn connection.Connection, t time.Time, cachedTest []byte) error {
 	filename, err := generateFilename(s.OutputPath, conn.Cookie, t)
 	if err != nil {
-		log.Println(err)
+		log.Printf("failed to generate filename (error: %v)\n", err)
 		tracerCacheErrors.WithLabelValues("scamper", err.Error()).Inc()
 		return err
 	}
@@ -59,7 +59,7 @@ func (s *Scamper) TraceFromCachedTrace(conn connection.Connection, t time.Time, 
 	split := bytes.Index(cachedTest, []byte{'\n'})
 
 	if split <= 0 || split == len(cachedTest) {
-		log.Println("Invalid cached test")
+		log.Printf("failed to split cached test (split: %v)\n", split)
 		tracerCacheErrors.WithLabelValues("scamper", "badcache").Inc()
 		return errors.New("invalid cached test")
 	}

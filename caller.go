@@ -110,7 +110,7 @@ func main() {
 		}()
 	}
 
-	localIPs, err := connection.NewLocalIPs()
+	localIPs, err := connection.NewLocalRemoteIPs()
 	rtx.Must(err, "failed to discover local IPs")
 	ipserviceClient := ipservice.NewClient(*ipservice.SocketFilename)
 	hopAnnotator := hopannotation.New(ctx, ipserviceClient, *hopAnnotationOutput)
