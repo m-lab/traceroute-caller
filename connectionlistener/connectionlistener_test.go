@@ -2,25 +2,55 @@ package connectionlistener_test
 
 import (
 	"context"
+	"errors"
 	"io/ioutil"
 	"log"
 	"net"
 	"os"
 	"sort"
+	"strconv"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/go-test/deep"
-	"github.com/m-lab/tcp-info/inetdiag"
-	"github.com/m-lab/uuid"
 
 	"github.com/m-lab/traceroute-caller/connection"
 	"github.com/m-lab/traceroute-caller/connectionlistener"
+	"github.com/m-lab/traceroute-caller/hopannotation"
 	"github.com/m-lab/traceroute-caller/ipcache"
 
 	"github.com/m-lab/go/rtx"
 	"github.com/m-lab/tcp-info/eventsocket"
+	"github.com/m-lab/tcp-info/inetdiag"
+	"github.com/m-lab/uuid"
+	"github.com/m-lab/uuid-annotator/annotator"
+)
+
+var (
+	// To test different kinds of errors for more coverage, the
+	// following conn.Cookie values are recognized in our fake Trace()
+	// to return different trace files with different errors.
+	traceFailed      = int64(0x1001)
+	traceNoTracelb   = int64(0x1002)
+	traceInvalidType = int64(0x1003)
+	traceNoNodes     = int64(0x1004)
+	traceGood        = int64(0x1005)
+	traceFiles       = map[int64]string{
+		traceFailed:      "trace-non-existent.jsonl",
+		traceNoTracelb:   "trace-no-tracelb.jsonl",
+		traceInvalidType: "trace-tracelb-invalid-type.jsonl",
+		traceNoNodes:     "trace-tracelb-no-nodes.jsonl",
+		traceGood:        "trace-good.jsonl",
+	}
+
+	sockIDGolden = inetdiag.SockID{
+		SPort:  2,
+		DPort:  3,
+		SrcIP:  "",
+		DstIP:  "10.0.0.1",
+		Cookie: 0,
+	}
 )
 
 func init() {
@@ -28,18 +58,29 @@ func init() {
 }
 
 type fakeTracer struct {
-	ips   []string
-	mutex sync.Mutex
-	wg    sync.WaitGroup
+	gotIPs  []string
+	wantIPs []string
+	mutex   sync.Mutex
+	wg      sync.WaitGroup
 }
 
 func (ft *fakeTracer) Trace(conn connection.Connection, t time.Time) ([]byte, error) {
+	key, err := strconv.ParseInt(conn.Cookie, 16, 64)
+	if err != nil {
+		panic(err)
+	}
+	val, ok := traceFiles[key]
+	if !ok {
+		panic("invalid cookie value")
+	}
+	traceFile := "testdata/" + val
 	ft.mutex.Lock() // Must have a lock to avoid race conditions around the append.
 	defer ft.mutex.Unlock()
 	log.Println("Tracing", conn)
-	ft.ips = append(ft.ips, conn.RemoteIP)
+	ft.gotIPs = append(ft.gotIPs, conn.RemoteIP)
 	ft.wg.Done()
-	return []byte("Fake test result"), nil
+	log.Println("Returning", traceFile)
+	return ioutil.ReadFile(traceFile)
 }
 
 func (ft *fakeTracer) TraceFromCachedTrace(conn connection.Connection, t time.Time, cachedTest []byte) error {
@@ -49,81 +90,90 @@ func (ft *fakeTracer) TraceFromCachedTrace(conn connection.Connection, t time.Ti
 
 func (*fakeTracer) DontTrace(conn connection.Connection, err error) {}
 
+type fakeAnnotator struct {
+}
+
+func (fa *fakeAnnotator) Annotate(ctx context.Context, ips []string) (map[string]*annotator.ClientAnnotations, error) {
+	annotations := make(map[string]*annotator.ClientAnnotations, len(ips))
+	for _, ip := range ips {
+		annotations[ip] = &annotator.ClientAnnotations{}
+	}
+	return annotations, errors.New("forced annotation error")
+}
+
 func TestListener(t *testing.T) {
 	dir, err := ioutil.TempDir("", "TestEventSocketClient")
-	rtx.Must(err, "Could not create tempdir")
+	rtx.Must(err, "failed to create tempdir")
 	defer os.RemoveAll(dir)
 
-	// Start up a eventsocket server
+	// Start up an eventsocket server.
 	srv := eventsocket.New(dir + "/tcpevents.sock")
-	rtx.Must(srv.Listen(), "Could not listen")
+	rtx.Must(srv.Listen(), "failed to listen")
 	srvCtx, srvCancel := context.WithCancel(context.Background())
 	defer srvCancel()
 	go func() {
 		_ = srv.Serve(srvCtx)
 	}()
 
-	// Create a new connectionlistener with a fake tracer.
+	// Create a new IP cache.
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	ft := &fakeTracer{}
-	cache := ipcache.New(ctx, ft, 100*time.Second, time.Second)
+	ipCache := ipcache.New(ctx, ft, 100*time.Second, time.Second)
 
-	ft.wg.Add(2)
-
+	// Create a new hop cache.
 	localIP := net.ParseIP("10.0.0.1")
-	creator := connection.NewFakeCreator([]*net.IP{&localIP})
-	cl := connectionlistener.New(creator, cache)
-	cl.Open(ctx, time.Now(), "", nil) // Test that nil pointer to Open does not cause a crash.
+	localIPs := connection.NewFakeLocalIPs([]*net.IP{&localIP})
+	hopAnnotator := hopannotation.New(context.TODO(), &fakeAnnotator{}, "./testdata")
 
-	// Connect the connectionlistener to the server
+	// Create a new connectionlistener with our fake tracer and hop
+	// cache, connect the connectionlistener to the server and give
+	// the client some time to connect.
+	cl := connectionlistener.New(localIPs, ipCache, hopAnnotator)
 	go eventsocket.MustRun(ctx, dir+"/tcpevents.sock", cl)
-
-	// Give the client some time to connect
 	time.Sleep(100 * time.Millisecond)
 
-	// Send some events from the server
-	// This spurious UUID should not cause a trace to occur.
-	srv.FlowDeleted(time.Now(), uuid.FromCookie(10000))
+	runTests(t, srv, ft, cl)
+}
 
-	firstid := inetdiag.SockID{
-		SPort:  2,
-		DPort:  3,
-		SrcIP:  "192.168.0.1",
-		DstIP:  "10.0.0.1",
-		Cookie: 1,
+func runTests(t *testing.T, srv eventsocket.Server, ft *fakeTracer, cl eventsocket.Handler) {
+	// This event should not cause a trace because there was no
+	// FlowCreated call for this UUID.
+	srv.FlowDeleted(time.Now(), uuid.FromCookie(0))
+	// Make sure nil sockID does not crash Open().
+	cl.Open(context.Background(), time.Now(), "", nil)
+
+	tests := []struct {
+		srcIP  string
+		cookie int64
+	}{
+		{"invalidip", 0},                  // cannot create...
+		{"192.168.0.1", traceFailed},      // should cause a trace but we force our fake Trace() to fail
+		{"192.168.0.2", traceNoTracelb},   // failed to extract tracelb from trace output (error: %v)
+		{"192.168.0.3", traceInvalidType}, // tracelb output has invalid type: %q
+		{"192.168.0.4", traceNoNodes},     // tracelb output has no nodes
+		{"192.168.0.5", traceGood},        // good trace
 	}
-
-	srv.FlowCreated(time.Now(), uuid.FromCookie(1), firstid)
-	srv.FlowDeleted(time.Now(), uuid.FromCookie(1))
-	secondid := firstid
-	secondid.Cookie = 2
-	srv.FlowCreated(time.Now(), uuid.FromCookie(2), secondid)
-	srv.FlowDeleted(time.Now(), uuid.FromCookie(2))
-
-	thirdid := inetdiag.SockID{
-		SPort:  2,
-		DPort:  3,
-		DstIP:  "192.168.0.2",
-		SrcIP:  "10.0.0.1",
-		Cookie: 3,
+	for i, test := range tests {
+		if test.srcIP != "invalidip" {
+			ft.wg.Add(1)
+		}
+		sockID := sockIDGolden
+		sockID.SrcIP = test.srcIP
+		sockID.Cookie = test.cookie
+		srv.FlowCreated(time.Now(), uuid.FromCookie(uint64(i)+1), sockID)
+		srv.FlowDeleted(time.Now(), uuid.FromCookie(uint64(i)+1))
+		if test.srcIP != "invalidip" {
+			ft.wantIPs = append(ft.wantIPs, sockID.SrcIP)
+			ft.wg.Wait()
+		}
 	}
-	srv.FlowCreated(time.Now(), uuid.FromCookie(3), thirdid)
-	srv.FlowDeleted(time.Now(), uuid.FromCookie(3))
+	// Give traceAnnotateArchive() a chance to finish.
+	time.Sleep(1 * time.Second)
 
-	badid := inetdiag.SockID{
-		SPort:  2,
-		DPort:  3,
-		SrcIP:  "thisisnotanip",
-		DstIP:  "neitheristhis",
-		Cookie: 3,
-	}
-	srv.FlowCreated(time.Now(), uuid.FromCookie(4), badid)
-
-	// Verify that the right calls were made to the fake tracer.
-	ft.wg.Wait()
-	sort.StringSlice(ft.ips).Sort()
-	if diff := deep.Equal([]string{"192.168.0.1", "192.168.0.2"}, ft.ips); diff != nil {
-		t.Error("Bad ips:", diff)
+	// Check the results.
+	sort.StringSlice(ft.gotIPs).Sort()
+	if diff := deep.Equal(ft.gotIPs, ft.wantIPs); diff != nil {
+		t.Errorf("IPs: %+v, want: %v", ft.gotIPs, ft.wantIPs)
 	}
 }

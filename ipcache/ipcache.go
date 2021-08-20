@@ -11,13 +11,14 @@ import (
 )
 
 var (
-	// IPCacheTimeout sets a lower bound on the amount of time between subsequent traceroutes to a single IP address.
-	// Since traces typically take 5 to 10 minutes, this cache timeout should probably be adjusted to something
-	// more like 15 minutes, or perhaps even an hour.
-	IPCacheTimeout = flag.Duration("IPCacheTimeout", 120*time.Second, "Timeout duration in seconds for IPCache")
+	// IPCacheTimeout sets a lower bound on the amount of time
+	// between subsequent traceroutes to a single IP address.
+	// Traceroutes typically take 5 to 10 minutes.
+	IPCacheTimeout = flag.Duration("IPCacheTimeout", 10*time.Minute, "Timeout duration in seconds for IPCache")
 
-	// IPCacheUpdatePeriod determines how long to wait between cache-scrubbing attempts.
-	IPCacheUpdatePeriod = flag.Duration("IPCacheUpdatePeriod", 1*time.Second, "We run the cache eviction loop with this frequency")
+	// IPCacheUpdatePeriod determines how long to wait between
+	// cache-scrubbing attempts.
+	IPCacheUpdatePeriod = flag.Duration("IPCacheUpdatePeriod", 1*time.Minute, "We run the IP cache eviction loop with this frequency")
 )
 
 // Tracer is the generic interface for all things that can perform a traceroute.
@@ -127,7 +128,6 @@ func New(ctx context.Context, trace Tracer, ipCacheTimeout, ipCacheUpdatePeriod 
 			}
 			m.mu.Unlock()
 		}
-
 	}()
 	return m
 }

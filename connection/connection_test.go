@@ -33,9 +33,9 @@ func TestSrcDestSwap(t *testing.T) {
 		_, nw, err := net.ParseCIDR("127.0.0.1/8")
 		rtx.Must(err, "could not parse test nw")
 		ip1, err := net.ResolveIPAddr("ip6", "::1")
-		rtx.Must(err, "Could not resolve ::1")
+		rtx.Must(err, "failed to resolve ::1")
 		ip2, err := net.ResolveIPAddr("ip4", "1.2.3.4")
-		rtx.Must(err, "Could not resolve 1.2.3.4")
+		rtx.Must(err, "failed to resolve 1.2.3.4")
 		return []net.Addr{
 			nw,
 			ip1,
@@ -43,8 +43,8 @@ func TestSrcDestSwap(t *testing.T) {
 		}, nil
 	}
 
-	c, err := NewCreator()
-	rtx.Must(err, "Could not use fake netInterfaceAddrs")
+	c, err := NewLocalRemoteIPs()
+	rtx.Must(err, "failed to use fake netInterfaceAddrs")
 
 	tests := []struct {
 		name    string
@@ -133,7 +133,7 @@ func TestSrcDestSwap(t *testing.T) {
 		})
 	}
 
-	c = NewFakeCreator([]*net.IP{}) // Just call it to make sure it doesn't crash.
+	c = NewFakeLocalIPs([]*net.IP{}) // Just call it to make sure it doesn't crash.
 }
 
 type fakeIP struct{}
@@ -141,7 +141,7 @@ type fakeIP struct{}
 func (fakeIP) String() string  { return "" }
 func (fakeIP) Network() string { return "" }
 
-func TestNewCreatorWithBadInterfaceAddrs(t *testing.T) {
+func TestNewLocalRemoteIPs(t *testing.T) {
 	oldFunc := netInterfaceAddrs
 	defer func() { netInterfaceAddrs = oldFunc }()
 
@@ -149,7 +149,7 @@ func TestNewCreatorWithBadInterfaceAddrs(t *testing.T) {
 		return nil, errors.New("error for testing")
 	}
 
-	_, err := NewCreator()
+	_, err := NewLocalRemoteIPs()
 	if err == nil {
 		t.Error("Should have had an error but was nil")
 	}
@@ -158,7 +158,7 @@ func TestNewCreatorWithBadInterfaceAddrs(t *testing.T) {
 		return []net.Addr{fakeIP{}}, nil
 	}
 
-	_, err = NewCreator()
+	_, err = NewLocalRemoteIPs()
 	if err == nil {
 		t.Error("Should have had an error but was nil")
 	}

@@ -1,26 +1,15 @@
-// traceroute-caller is a wrapper around the
-// `scamper` commands and can be invoked in two different poll and
-// listen modes:
+// traceroute-caller is a wrapper around scamper, a tool that actively
+// probes the Internet in order to analyze topology and performance.
+// For details, visit https://www.caida.org/catalog/software/scamper.
 //
-//   - Poll mode uses the `connectionpoller` package to get a complete list
-//     of all connections by executing `/bin/ss -e -n` every 5 seconds
-//     and running a traceroute on all closed connections.  This mode is
-//     mostly for local test and debugging purposes as it doesn't require
-//     any services such as `tcp-info` or `uuid-annotator`.
-//
-//   - Listen mode uses the `tcp-info/eventsocket` package to listen for
-//     open and close connection events, and runs a traceroute measurement
-//     on closed connections.
-//
-// traceroute-caller on M-Lab servers always runs in the listen mode.
-// To see all available flags:
-//
-//   $ go build
-//   $ ./traceroute-caller --help
+// traceroute-caller uses the tcp-info/eventsocket package to listen for
+// open and close connection events, and runs a traceroute measurement
+// on closed connections.
 package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"log"
 	"os"
@@ -28,37 +17,36 @@ import (
 	"time"
 
 	"github.com/m-lab/traceroute-caller/connection"
+	"github.com/m-lab/traceroute-caller/connectionlistener"
+	"github.com/m-lab/traceroute-caller/hopannotation"
+	"github.com/m-lab/traceroute-caller/ipcache"
 	"github.com/m-lab/traceroute-caller/tracer"
 
 	"github.com/m-lab/go/flagx"
+	"github.com/m-lab/go/prometheusx"
 	"github.com/m-lab/go/rtx"
 	"github.com/m-lab/tcp-info/eventsocket"
-
-	"github.com/m-lab/go/prometheusx"
-	"github.com/m-lab/traceroute-caller/connectionlistener"
-	"github.com/m-lab/traceroute-caller/connectionpoller"
-	"github.com/m-lab/traceroute-caller/ipcache"
+	"github.com/m-lab/uuid-annotator/ipservice"
 )
 
 var (
-	// TODO: scamper and its commands (e.g., tracelb) support a
-	// relatively large number of flags.  Instead of adding these
-	// flags one by one to traceroute-caller flags, going forward
-	// it's much better to have traceroute-caller read a configuration
-	// file in textproto format that would support all scamper and
-	// its command flags.
-	scamperBin        = flag.String("scamper.bin", "scamper", "The path to the scamper binary.")
-	scattachBin       = flag.String("scamper.sc_attach", "sc_attach", "The path to the sc_attach binary.")
-	scwarts2jsonBin   = flag.String("scamper.sc_warts2json", "sc_warts2json", "The path to the sc_warts2json binary.")
-	scamperCtrlSocket = flag.String("scamper.unixsocket", "/tmp/scamperctrl", "The name of the UNIX-domain socket that the scamper daemon should listen on.")
-	scamperTimeout    = flag.Duration("scamper.timeout", 900*time.Second, "How long to wait to complete a scamper trace.")
-	scamperPTR        = flag.Bool("scamper.tracelb-ptr", true, "Look up DNS pointer records for IP addresses.")
-	scamperWaitProbe  = flag.Int("scamper.tracelb-W", 25, "How long to wait between probes in 1/100ths of seconds (min 15, max 200).")
-	outputPath        = flag.String("outputPath", "/var/spool/scamper", "The path of output.")
-	waitTime          = flag.Duration("waitTime", 5*time.Second, "How long to wait between subsequent listings of open connections.")
-	poll              = flag.Bool("poll", true, "Whether the polling method should be used to see new connections.")
-	tracerType        = flagx.Enum{
-		Options: []string{"scamper", "scamper-daemon", "scamper-daemon-with-scamper-backup"},
+	// TODO(SaiedKazemi): scamper and its commands (e.g., tracelb)
+	//     support a large number of flags.  Instead of adding
+	//     these flags one by one to traceroute-caller flags, it
+	//     will be much better to have traceroute-caller read a
+	//     configuration file in textproto format that would support
+	//     all scamper and its command flags.
+	scamperBin          = flag.String("scamper.bin", "scamper", "The path to the scamper binary.")
+	scattachBin         = flag.String("scamper.sc_attach", "sc_attach", "The path to the sc_attach binary.")
+	scwarts2jsonBin     = flag.String("scamper.sc_warts2json", "sc_warts2json", "The path to the sc_warts2json binary.")
+	scamperCtrlSocket   = flag.String("scamper.unixsocket", "/tmp/scamperctrl", "The name of the UNIX-domain socket that the scamper daemon should listen on.")
+	scamperTimeout      = flag.Duration("scamper.timeout", 900*time.Second, "How long to wait to complete a scamper trace.")
+	scamperPTR          = flag.Bool("scamper.tracelb-ptr", true, "Look up DNS pointer records for IP addresses.")
+	scamperWaitProbe    = flag.Int("scamper.tracelb-W", 25, "How long to wait between probes in 1/100ths of seconds (min 15, max 200).")
+	tracerouteOutput    = flag.String("traceroute-output", "/var/spool/scamper", "The path to store traceroute output.")
+	hopAnnotationOutput = flag.String("hopannotation-output", "/var/spool/hopannotation1", "The path to store hop annotations.")
+	tracerType          = flagx.Enum{
+		Options: []string{"scamper", "scamper-daemon"},
 		Value:   "scamper",
 	}
 
@@ -75,18 +63,26 @@ func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
 	flag.Parse()
-	rtx.Must(flagx.ArgsFromEnv(flag.CommandLine), "Could not get args from environment")
-	rtx.Must(os.MkdirAll(*outputPath, 0777), "Could not create data directory")
+	rtx.Must(flagx.ArgsFromEnv(flag.CommandLine), "failed to get args from environment")
+	if *eventsocket.Filename == "" {
+		logFatal("tcpinfo.eventsocket was set to \"\"")
+	}
+	rtx.Must(os.MkdirAll(*tracerouteOutput, 0777), "failed to create directory for traceroute results")
+	rtx.Must(os.MkdirAll(*hopAnnotationOutput, 0777), "failed to create directory for hop annotation results")
 
 	defer cancel()
 	wg := sync.WaitGroup{}
 
 	promSrv := prometheusx.MustServeMetrics()
-	defer promSrv.Shutdown(ctx)
+	defer func() {
+		if err := promSrv.Shutdown(ctx); err != nil && !errors.Is(err, context.Canceled) {
+			log.Printf("failed to shut down Prometheus server (error: %v)", err)
+		}
+	}()
 
 	scamper := &tracer.Scamper{
 		Binary:           *scamperBin,
-		OutputPath:       *outputPath,
+		OutputPath:       *tracerouteOutput,
 		ScamperTimeout:   *scamperTimeout,
 		TracelbPTR:       *scamperPTR,
 		TracelbWaitProbe: *scamperWaitProbe,
@@ -98,14 +94,13 @@ func main() {
 		ControlSocket:    *scamperCtrlSocket,
 	}
 
-	var cache *ipcache.RecentIPCache
-
-	// Set up the cache three different ways, depending on the trace method requested.
+	// Set up the ipCache depending on the trace method requested.
+	var ipCache *ipcache.RecentIPCache
 	switch tracerType.Value {
 	case "scamper":
-		cache = ipcache.New(ctx, scamper, *ipcache.IPCacheTimeout, *ipcache.IPCacheUpdatePeriod)
+		ipCache = ipcache.New(ctx, scamper, *ipcache.IPCacheTimeout, *ipcache.IPCacheUpdatePeriod)
 	case "scamper-daemon":
-		cache = ipcache.New(ctx, scamperDaemon, *ipcache.IPCacheTimeout, *ipcache.IPCacheUpdatePeriod)
+		ipCache = ipcache.New(ctx, scamperDaemon, *ipcache.IPCacheTimeout, *ipcache.IPCacheUpdatePeriod)
 		wg.Add(1)
 		go func() {
 			scamperDaemon.MustStart(ctx)
@@ -113,43 +108,14 @@ func main() {
 			cancel()
 			wg.Done()
 		}()
-	// These are hacks - the scamper daemon should not fail at all.
-	case "scamper-daemon-with-scamper-backup":
-		cache = ipcache.New(ctx, scamperDaemon, *ipcache.IPCacheTimeout, *ipcache.IPCacheUpdatePeriod)
-		wg.Add(1)
-		go func() {
-			scamperDaemon.MustStart(ctx)
-			// When the scamper daemon dies, switch to scamper
-			cache.UpdateTracer(scamper)
-			wg.Done()
-		}()
 	}
 
-	if *poll {
-		wg.Add(1)
-		go func(c *ipcache.RecentIPCache) {
-			connPoller := connectionpoller.New(c)
-			for ctx.Err() == nil {
-				connPoller.TraceClosedConnections()
-
-				select {
-				case <-time.After(*waitTime):
-				case <-ctx.Done():
-				}
-			}
-			wg.Done()
-		}(cache)
-	} else if *eventsocket.Filename != "" {
-		wg.Add(1)
-		go func() {
-			connCreator, err := connection.NewCreator()
-			rtx.Must(err, "Could not discover local IPs")
-			connListener := connectionlistener.New(connCreator, cache)
-			eventsocket.MustRun(ctx, *eventsocket.Filename, connListener)
-			wg.Done()
-		}()
-	} else {
-		logFatal("--poll was false but --tcpinfo.eventsocket was set to \"\". This is a nonsensical configuration.")
-	}
+	localIPs, err := connection.NewLocalRemoteIPs()
+	rtx.Must(err, "failed to discover local IPs")
+	ipserviceClient := ipservice.NewClient(*ipservice.SocketFilename)
+	hopAnnotator := hopannotation.New(ctx, ipserviceClient, *hopAnnotationOutput)
+	connListener := connectionlistener.New(localIPs, ipCache, hopAnnotator)
+	eventsocket.MustRun(ctx, *eventsocket.Filename, connListener)
+	cancel()
 	wg.Wait()
 }

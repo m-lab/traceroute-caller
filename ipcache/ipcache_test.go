@@ -99,7 +99,7 @@ func TestUpdateTracer(t *testing.T) {
 		LocalPort:  58790,
 		Cookie:     "10f3d"}
 	_, err := testCache.Trace(conn1)
-	rtx.Must(err, "Could not trace using tt")
+	rtx.Must(err, "failed to trace using tt")
 
 	testCache.UpdateTracer(&tt2)
 	conn2 := connection.Connection{
@@ -109,7 +109,7 @@ func TestUpdateTracer(t *testing.T) {
 		LocalPort:  58790,
 		Cookie:     "aaaa"}
 	_, err = testCache.Trace(conn2)
-	rtx.Must(err, "Could not trace using tt2")
+	rtx.Must(err, "failed to trace using tt2")
 
 	if tt.calls != 1 || tt2.calls != 1 {
 		t.Error("Each tracer should have been called once, not", tt.calls, tt2.calls)

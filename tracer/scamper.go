@@ -34,14 +34,14 @@ type Scamper struct {
 func generateFilename(path string, cookie string, t time.Time) (string, error) {
 	dir, err := createDatePath(path, t)
 	if err != nil {
-		// TODO add metric here
+		// TODO(SaiedKazemi): Add metric here.
 		return "", errors.New("could not create output directory")
 	}
 	c, err := strconv.ParseUint(cookie, 16, 64)
 	if err != nil {
-		// TODO add metric here
-		log.Println(err, "converting cookie", cookie)
-		return "", errors.New("error converting cookie")
+		log.Printf("failed to parse cookie %v (error: %v)\n", cookie, err)
+		tracerCacheErrors.WithLabelValues("scamper", "badcookie").Inc()
+		return "", errors.New("failed to parse cookie")
 	}
 	return dir + t.Format("20060102T150405Z") + "_" + uuid.FromCookie(c) + ".jsonl", nil
 }
@@ -50,7 +50,7 @@ func generateFilename(path string, cookie string, t time.Time) (string, error) {
 func (s *Scamper) TraceFromCachedTrace(conn connection.Connection, t time.Time, cachedTest []byte) error {
 	filename, err := generateFilename(s.OutputPath, conn.Cookie, t)
 	if err != nil {
-		log.Println(err)
+		log.Printf("failed to generate filename (error: %v)\n", err)
 		tracerCacheErrors.WithLabelValues("scamper", err.Error()).Inc()
 		return err
 	}
@@ -59,7 +59,7 @@ func (s *Scamper) TraceFromCachedTrace(conn connection.Connection, t time.Time, 
 	split := bytes.Index(cachedTest, []byte{'\n'})
 
 	if split <= 0 || split == len(cachedTest) {
-		log.Println("Invalid cached test")
+		log.Printf("failed to split cached test (split: %v)\n", split)
 		tracerCacheErrors.WithLabelValues("scamper", "badcache").Inc()
 		return errors.New("invalid cached test")
 	}
@@ -80,14 +80,6 @@ func (*Scamper) DontTrace(conn connection.Connection, err error) {
 // every node. This uses more resources per-traceroute, but segfaults in the
 // called binaries have a much smaller "blast radius".
 func (s *Scamper) Trace(conn connection.Connection, t time.Time) (out []byte, err error) {
-	// TODO Is this still useful?  Does shx.PipeJob we ever panic?
-	defer func() {
-		if r := recover(); r != nil {
-			log.Printf("Recovered (%v) a crashed trace for %v at %v\n", r, conn, t)
-			crashedTraces.WithLabelValues("scamper").Inc()
-			err = errors.New(fmt.Sprint(r))
-		}
-	}()
 	tracesInProgress.WithLabelValues("scamper").Inc()
 	defer tracesInProgress.WithLabelValues("scamper").Dec()
 	return s.trace(conn, t)
@@ -115,7 +107,7 @@ func (s *Scamper) trace(conn connection.Connection, t time.Time) ([]byte, error)
 		shx.Exec(s.Binary, "-I", iVal, "-o-", "-O", "json"),
 	)
 
-	return traceAndWrite(ctx, "scamper", filename, cmd, conn, t)
+	return traceAndWrite(ctx, "scamper", filename, cmd, conn)
 }
 
 // ScamperDaemon contains a single instance of a scamper process. Once the ScamperDaemon has
@@ -151,7 +143,7 @@ func (d *ScamperDaemon) MustStart(ctx context.Context) {
 	command := exec.Command(d.Binary, cmdFlags...)
 	// Start is non-blocking.
 	log.Printf("Starting scamper as a daemon: %s %s\n", d.Binary, strings.Join(cmdFlags, " "))
-	rtx.Must(command.Start(), "Could not start daemon")
+	rtx.Must(command.Start(), "failed to start daemon")
 
 	// Liveness guarantee: either the process will die and then the derived context
 	// will be canceled, or the context will be canceled and then the process will
@@ -159,7 +151,7 @@ func (d *ScamperDaemon) MustStart(ctx context.Context) {
 	// and a process that is either dead or processing SIGKILL.
 	go func() {
 		err := command.Wait()
-		log.Printf("Scamper exited with error: %v\n", err)
+		log.Printf("scamper exited with error: %v\n", err)
 		derivedCancel()
 	}()
 	<-derivedCtx.Done()
@@ -224,15 +216,22 @@ func (d *ScamperDaemon) trace(conn connection.Connection, t time.Time) ([]byte, 
 		shx.Exec(d.Warts2JSONBinary),
 	)
 
-	return traceAndWrite(ctx, "scamper-daemon", filename, cmd, conn, t)
+	return traceAndWrite(ctx, "scamper-daemon", filename, cmd, conn)
 }
 
-func traceAndWrite(ctx context.Context, label string, fn string, cmd shx.Job, conn connection.Connection, t time.Time) ([]byte, error) {
+func traceAndWrite(ctx context.Context, label string, filename string, cmd shx.Job, conn connection.Connection) ([]byte, error) {
 	data, err := runTrace(ctx, label, cmd, conn)
 	if err != nil {
 		return nil, err
 	}
-	return writeTraceFile(data, fn, conn, t)
+
+	buff := bytes.Buffer{}
+	// It's OK to ignore the return values because err is always nil. If
+	// the buffer becomes too large, Write() will panic with ErrTooLarge.
+	_, _ = buff.Write(GetMetaline(conn, false, ""))
+	_, _ = buff.Write(data)
+	// Make the file readable so it won't be overwritten.
+	return buff.Bytes(), ioutil.WriteFile(filename, buff.Bytes(), 0444)
 }
 
 // runTrace executes a trace command and returns the data.
@@ -269,13 +268,4 @@ func runTrace(ctx context.Context, label string, cmd shx.Job, conn connection.Co
 	log.Printf("Trace succeeded in context %p\n", ctx)
 	traceTimeHistogram.WithLabelValues("success").Observe(latency)
 	return buff.Bytes(), nil
-}
-
-// TODO - this should take an io.Writer?
-func writeTraceFile(data []byte, fn string, conn connection.Connection, t time.Time) ([]byte, error) {
-	buff := bytes.Buffer{}
-	// buff.Write err is alway nil, but it may OOM
-	_, _ = buff.Write(GetMetaline(conn, false, ""))
-	_, _ = buff.Write(data)
-	return buff.Bytes(), ioutil.WriteFile(fn, buff.Bytes(), 0666)
 }

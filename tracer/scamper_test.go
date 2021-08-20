@@ -26,7 +26,7 @@ func init() {
 
 func TestScamper(t *testing.T) {
 	dir, err := ioutil.TempDir("", "TestScamper")
-	rtx.Must(err, "Could not create tempdir")
+	rtx.Must(err, "failed to create tempdir")
 
 	s := &Scamper{
 		OutputPath:     dir,
@@ -52,7 +52,7 @@ func TestScamper(t *testing.T) {
 		t.Fatal(err)
 	}
 	uuid, err := conn.UUID()
-	rtx.Must(err, "Could not make uuid")
+	rtx.Must(err, "failed to make uuid")
 	expected := `{"UUID":"` + uuid + `","TracerouteCallerVersion":"` + prometheusx.GitShortCommit + `","CachedResult":false,"CachedUUID":""}
 -I tracelb -P icmp-echo -q 3 -W 0 -O ptr 10.1.1.1 -o- -O json
 `
@@ -60,7 +60,7 @@ func TestScamper(t *testing.T) {
 		t.Error("Bad output:", string(out))
 	}
 	contents, err := ioutil.ReadFile(dir + "/2003/11/09/20031109T155559Z_" + prefix.UnsafeString() + "_00000000000012AB.jsonl")
-	rtx.Must(err, "Could not read file")
+	rtx.Must(err, "failed to read file")
 	if string(contents) != string(out) {
 		t.Error("The contents of the file should equal the returned values from scraper")
 	}
@@ -84,7 +84,7 @@ func TestCancelStopsDaemon(t *testing.T) {
 		t.Skip("Skipping for non-linux environment", runtime.GOOS)
 	}
 	tempdir, err := ioutil.TempDir("", "CancelStopsDaemon")
-	rtx.Must(err, "Could not create tempdir")
+	rtx.Must(err, "failed to create tempdir")
 	defer os.RemoveAll(tempdir)
 	d := ScamperDaemon{
 		// Let the shell use the path to discover these.
@@ -141,9 +141,9 @@ func TestExistingFileStopsDaemonCreation(t *testing.T) {
 	}
 
 	tempdir, err := ioutil.TempDir("", "TestExistingFileStopsDaemonCreation")
-	rtx.Must(err, "Could not create tempdir")
+	rtx.Must(err, "failed to create tempdir")
 	defer os.RemoveAll(tempdir)
-	rtx.Must(ioutil.WriteFile(tempdir+"/ctrl", []byte("test"), 0666), "Could not create file")
+	rtx.Must(ioutil.WriteFile(tempdir+"/ctrl", []byte("test"), 0666), "failed to create file")
 	d := ScamperDaemon{
 		// Let the shell use the path to discover these.
 		Scamper: &Scamper{
@@ -168,7 +168,7 @@ func TestExistingFileStopsDaemonCreation(t *testing.T) {
 
 func TestTraceWritesMeta(t *testing.T) {
 	tempdir, err := ioutil.TempDir("", "TestTraceWritesUUID")
-	rtx.Must(err, "Could not create tempdir")
+	rtx.Must(err, "failed to create tempdir")
 	defer os.RemoveAll(tempdir)
 
 	// Temporarily set the hostname to a value for testing.
@@ -200,14 +200,14 @@ func TestTraceWritesMeta(t *testing.T) {
 	}
 	// Unmarshal the first line of the output file.
 	b, err := ioutil.ReadFile(tempdir + "/2019/04/01/20190401T034551Z_" + prefix.UnsafeString() + "_0000000000000001.jsonl")
-	rtx.Must(err, "Could not read file")
+	rtx.Must(err, "failed to read file")
 
 	m := Metadata{}
 	lines := strings.Split(string(b), "\n")
 	if len(lines) < 2 {
 		t.Error("Not enough lines in", lines)
 	}
-	rtx.Must(json.Unmarshal([]byte(lines[0]), &m), "Could not unmarshal")
+	rtx.Must(json.Unmarshal([]byte(lines[0]), &m), "failed to unmarshal")
 
 	uuidChunks := strings.Split(m.UUID, "_")
 
@@ -222,7 +222,7 @@ func TestTraceWritesMeta(t *testing.T) {
 
 func TestTraceTimeout(t *testing.T) {
 	tempdir, err := ioutil.TempDir("", "TestTimeoutTrace")
-	rtx.Must(err, "Could not create tempdir")
+	rtx.Must(err, "failed to create tempdir")
 	defer os.RemoveAll(tempdir)
 
 	d := ScamperDaemon{
@@ -256,7 +256,7 @@ func TestTraceTimeout(t *testing.T) {
 
 func TestCreateCacheTest(t *testing.T) {
 	tempdir, err := ioutil.TempDir("", "TestCachedTrace")
-	rtx.Must(err, "Could not create tempdir")
+	rtx.Must(err, "failed to create tempdir")
 	defer os.RemoveAll(tempdir)
 
 	// Temporarily set the hostname to a value for testing.
@@ -296,14 +296,14 @@ func TestCreateCacheTest(t *testing.T) {
 
 	// Unmarshal the first line of the output file.
 	b, err := ioutil.ReadFile(tempdir + "/2019/04/01/20190401T034551Z_" + prefix.UnsafeString() + "_0000000000000001.jsonl")
-	rtx.Must(err, "Could not read file")
+	rtx.Must(err, "failed to read file")
 
 	m := Metadata{}
 	lines := strings.Split(string(b), "\n")
 	if len(lines) < 2 {
 		t.Error("Not enough lines in", lines)
 	}
-	rtx.Must(json.Unmarshal([]byte(lines[0]), &m), "Could not unmarshal")
+	rtx.Must(json.Unmarshal([]byte(lines[0]), &m), "failed to unmarshal")
 
 	uuidChunks := strings.Split(m.UUID, "_")
 
@@ -332,7 +332,7 @@ func TestCreateCacheTest(t *testing.T) {
 
 func TestRecovery(t *testing.T) {
 	tempdir, err := ioutil.TempDir("", "TestRecovery")
-	rtx.Must(err, "Could not create tempdir")
+	rtx.Must(err, "failed to create tempdir")
 	defer os.RemoveAll(tempdir)
 
 	// Temporarily set the hostname to a value for testing.
