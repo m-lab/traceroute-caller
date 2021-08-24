@@ -63,6 +63,7 @@ services:
       - -traceroute-output=/local/traceroute
       - -hopannotation-output=/local/hopannotation1
       - -tcpinfo.eventsocket=/local/tcpevents.sock
+      - -ipservice.sock=/local/uuid-annotator.sock
       - -tracetool=scamper
       - -IPCacheTimeout=10m
       - -IPCacheUpdatePeriod=1m
