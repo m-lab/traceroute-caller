@@ -87,12 +87,25 @@ func (cl *connectionListener) traceAnnotateAndArchive(ctx context.Context, conn 
 		log.Printf("failed to run a trace for connection %v (error: %v)\n", conn, err)
 		return
 	}
-	if _, err := parser.ParseTraceroute(data); err != nil {
+	output, err := parser.ParseTraceroute(data)
+	if err != nil {
 		log.Printf("failed to parse traceroute output (error: %v)\n", err)
 		return
 	}
-	// TODO(SaiedKazemi): Remove this line when done debugging.
-	log.Printf("successfully parsed traceroute output\n")
+	hops := parser.ExtractHops(&output.Tracelb)
+	if len(hops) == 0 {
+		log.Printf("failed to extract hops from tracelb %+v\n", output.Tracelb)
+		return
+	}
+
+	traceStartTime := time.Unix(int64(output.CycleStart.StartTime), 0)
+	annotations, allErrs := cl.hopAnnotator.Annotate(ctx, hops, traceStartTime)
+	if allErrs != nil {
+		log.Printf("failed to annotate some or all hops (errors: %+v)\n", allErrs)
+	}
+	if annotations != nil && len(annotations) > 0 {
+		cl.hopAnnotator.WriteAnnotations(annotations, traceStartTime)
+	}
 }
 
 // New returns an eventsocket.Handler that will call the passed-in scamper
