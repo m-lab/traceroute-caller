@@ -28,7 +28,7 @@ var (
 		{[]string{errorOnIP, errorOnIP}, []error{errForced}, 1, 0}, // we force the first call to Annotate() to fail
 		{[]string{"1.2.3.4", "5.6.7.8"}, nil, 2, 2},                // should annotate and archive both
 		{[]string{"1.2.3.4", "5.6.7.8"}, nil, 2, 2},                // should not annotate and archive either
-		{[]string{"clear-cache", ""}, nil, 0, 0},                   // not a test, just clear the cache
+		{[]string{"reset-cache", ""}, nil, 0, 0},                   // not a test, just reset the cache
 		{[]string{"1.2.3.4", "5.6.7.8"}, nil, 3, 4},                // should annotate and archive both
 		{[]string{"5.6.7.8", "a:b:c:d::e"}, nil, 4, 5},             // should annotate and archive just one
 		{[]string{"1.2.3"}, []error{errInvalidIP}, 4, 5},           // should return error
@@ -63,11 +63,12 @@ func fakeWriteFile(filepath string, data []byte, perm fs.FileMode) error {
 
 func TestNew(t *testing.T) {
 	// Change ticker duration to 100ms to avoid waiting a long time for
-	// the clearer goroutine to notice passage of midnight or cancelled
+	// the resetter goroutine to notice passage of midnight or cancelled
 	// context.
-	saveTickerIntvl := atomic.SwapInt32(&tickerDuration, 100)
+	saveTickerIntvl := tickerDuration
+	tickerDuration = int64(100 * time.Millisecond)
 	defer func() {
-		atomic.StoreInt32(&tickerDuration, saveTickerIntvl)
+		tickerDuration = saveTickerIntvl
 	}()
 
 	// Create a new hop cache and insert an entry in it.
@@ -82,15 +83,15 @@ func TestNew(t *testing.T) {
 	fakeMidnight(hc)
 	hc.hopsLock.Lock()
 	if len(hc.hops) != 0 {
-		t.Fatal("failed to clear cache at midnight")
+		t.Fatal("failed to reset cache at midnight")
 	}
 	hc.hopsLock.Unlock()
 
-	// Cancel the context and verify the clearer goroutine has stopped.
+	// Cancel the context and verify the resetter goroutine has stopped.
 	cancel()
 	fakeMidnight(hc)
 	if atomic.LoadInt32(&hc.hour) != 24+1 {
-		t.Fatal("failed to stop the clearer goroutine")
+		t.Fatal("failed to stop the resetter goroutine")
 	}
 }
 
@@ -104,8 +105,8 @@ func TestAnnotate(t *testing.T) {
 	fa := &fakeAnnotator{}
 	hc := New(ctx, fa, "./testdata")
 	for i, test := range tests {
-		if test.hops[0] == "clear-cache" {
-			hc.Clear()
+		if test.hops[0] == "reset-cache" {
+			hc.Reset()
 			continue
 		}
 		_, gotAllErrs := hc.Annotate(ctx, test.hops)
@@ -149,8 +150,8 @@ func TestWriteAnnotations(t *testing.T) {
 	fa := &fakeAnnotator{}
 	hc := New(ctx, fa, "./testdata")
 	for i, test := range tests {
-		if test.hops[0] == "clear-cache" {
-			hc.Clear()
+		if test.hops[0] == "reset-cache" {
+			hc.Reset()
 			continue
 		}
 		annotations, _ := hc.Annotate(ctx, test.hops)

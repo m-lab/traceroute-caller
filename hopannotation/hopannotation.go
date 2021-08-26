@@ -7,12 +7,12 @@
 // and RouteViews databases.
 //
 // Hop annotations are cached for a maximum of one day because the
-// annotations can change.  Each hop cache has a cache clearer
-// goroutine that clears the cache every day at midnight.
+// annotations can change.  Each hop cache has a cache resetter
+// goroutine that resets the cache every day at midnight.
 //
 // This package has the following exported functions:
 //   New()
-//   (*HopCache) Clear()
+//   (*HopCache) Reset()
 //   (*HopCache) Annotate()
 //   (*HopCache) WriteAnnotations()
 package hopannotation
@@ -38,10 +38,14 @@ import (
 )
 
 var (
-	errParseHopIP        = errors.New("failed to parse hop IP address")
-	errCreatePath        = errors.New("failed to create directory path")
-	errMarshalAnnotation = errors.New("failed to marshal annotation to json")
-	errWriteMarshal      = errors.New("failed to write marshaled annotation")
+	// ErrParseHopIP means a hop IP address could not be parsed.
+	ErrParseHopIP = errors.New("failed to parse hop IP address")
+	// ErrCreatePath means a directory path for hop annotations could not be created.
+	ErrCreatePath = errors.New("failed to create directory path")
+	// ErrMarshalAnnotation means a hop annotation could not be marshaled.
+	ErrMarshalAnnotation = errors.New("failed to marshal annotation to json")
+	// ErrWriteMarshal means a hop annotation could not be written to file.
+	ErrWriteMarshal = errors.New("failed to write marshaled annotation")
 
 	hopAnnotationOps = promauto.NewCounterVec(
 		prometheus.CounterOpts{
@@ -61,7 +65,7 @@ var (
 	hostname string
 
 	// Package testing aid.
-	tickerDuration = int32(60 * 1000) // ticker duration in milliseconds for cache clearer
+	tickerDuration = int64(60 * 1000 * time.Millisecond) // ticker duration for cache resetter
 	writeFile      = ioutil.WriteFile
 )
 
@@ -78,7 +82,7 @@ type HopCache struct {
 	hopsLock   sync.Mutex       // hop cache lock
 	annotator  ipservice.Client // function for getting hop annotations
 	outputPath string           // path to directory for writing hop annotations
-	hour       int32            // the hour when cache clearer last checked time
+	hour       int32            // the hour when cache resetter last checked time
 }
 
 // init saves (caches) the host name for all future references because
@@ -93,7 +97,7 @@ func init() {
 
 // New returns a new HopCache that will use the provided ipservice.Client
 // to obtain annotations.  It also starts a goroutine that checks for the
-// passage of the midnight every minute to clear the cache.  The goroutine
+// passage of the midnight every minute to reset the cache.  The goroutine
 // will terminate when the ctx is cancelled.
 func New(ctx context.Context, annotator ipservice.Client, outputPath string) *HopCache {
 	hc := &HopCache{
@@ -101,12 +105,11 @@ func New(ctx context.Context, annotator ipservice.Client, outputPath string) *Ho
 		annotator:  annotator,
 		outputPath: outputPath,
 	}
-	// Start a cache clearer goroutine to clear the cache every day
+	// Start a cache resetter goroutine to reset the cache every day
 	// at midnight.  Read tickerDuration and hour atomically to avoid
 	// a race condition with package testing code.
-	go func() {
-		d := time.Duration(atomic.LoadInt32(&tickerDuration))
-		ticker := time.NewTicker(d * time.Millisecond)
+	go func(tickerDuration int64) {
+		ticker := time.NewTicker(time.Duration(tickerDuration))
 		defer ticker.Stop()
 		for now := range ticker.C {
 			if ctx.Err() != nil {
@@ -114,18 +117,18 @@ func New(ctx context.Context, annotator ipservice.Client, outputPath string) *Ho
 			}
 			hour := now.Hour()
 			if hour < int(atomic.LoadInt32(&hc.hour)) {
-				hc.Clear()
+				hc.Reset()
 			}
 			atomic.StoreInt32(&hc.hour, int32(hour))
 		}
-	}()
+	}(tickerDuration)
 	return hc
 }
 
-// Clear creates a new empty hop cache that is a little bigger (25%)
+// Reset creates a new empty hop cache that is a little bigger (25%)
 // than the current cache.  The current cache is retained as old cache
 // to allow for active annotations to finish.
-func (hc *HopCache) Clear() {
+func (hc *HopCache) Reset() {
 	hc.hopsLock.Lock()
 	defer hc.hopsLock.Unlock()
 	hc.hops = make(map[string]bool, len(hc.hops)+len(hc.hops)/4)
@@ -143,7 +146,7 @@ func (hc *HopCache) Annotate(ctx context.Context, hops []string) (map[string]*an
 	allErrs := []error{}
 	for _, hop := range hops {
 		if net.ParseIP(hop).String() == "<nil>" {
-			allErrs = append(allErrs, fmt.Errorf("%w: %v", errParseHopIP, hop))
+			allErrs = append(allErrs, fmt.Errorf("%w: %v", ErrParseHopIP, hop))
 		}
 	}
 	if len(allErrs) != 0 {
@@ -151,6 +154,10 @@ func (hc *HopCache) Annotate(ctx context.Context, hops []string) (map[string]*an
 	}
 
 	// Insert all of the new hops in the hop cache.
+	// If the cache is reset while iterating this loop, it means that
+	// midnight has passed and we have a new empty cache. Therefore,
+	// the remaining hops in the hops slice will be inserted in the new
+	// cache and added to newHops which is the behavior we want.
 	var newHops []string
 	for _, hop := range hops {
 		hc.hopsLock.Lock()
@@ -215,12 +222,12 @@ func (hc *HopCache) writeAnnotation(wg *sync.WaitGroup, hop string, annotation *
 	})
 	if err != nil {
 		hopAnnotationErrors.WithLabelValues("hopannotation", "marshal").Inc()
-		errChan <- fmt.Errorf("%w (error: %v)", errMarshalAnnotation, err)
+		errChan <- fmt.Errorf("%w (error: %v)", ErrMarshalAnnotation, err)
 		return
 	}
 	if err := writeFile(filepath, b, 0444); err != nil {
 		hopAnnotationErrors.WithLabelValues("hopannotation", "writefile").Inc()
-		errChan <- fmt.Errorf("%w (error: %v)", errWriteMarshal, err)
+		errChan <- fmt.Errorf("%w (error: %v)", ErrWriteMarshal, err)
 		return
 	}
 	hopAnnotationOps.WithLabelValues("hopannotation", "written").Inc()
@@ -232,7 +239,7 @@ func (hc *HopCache) generateAnnotationFilepath(hop string, timestamp time.Time) 
 	dirPath := hc.outputPath + "/" + timestamp.Format("2006/01/02")
 	if err := os.MkdirAll(dirPath, 0777); err != nil {
 		hopAnnotationErrors.WithLabelValues("hopannotation", "mkdirall").Inc()
-		return "", fmt.Errorf("%w (error: %v)", errCreatePath, err)
+		return "", fmt.Errorf("%w (error: %v)", ErrCreatePath, err)
 	}
 	datetime := timestamp.Format("20060102T150405Z")
 	return fmt.Sprintf("%s/%s_%s_%s.json", dirPath, datetime, hostname, hop), nil
