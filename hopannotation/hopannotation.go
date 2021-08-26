@@ -87,7 +87,7 @@ type HopCache struct {
 	hopsLock   sync.Mutex       // hop cache lock
 	annotator  ipservice.Client // function for getting hop annotations
 	outputPath string           // path to directory for writing hop annotations
-	hour       int32            // the hour when cache resetter last checked time
+	hour       int32            // the hour (between 0 and 23) when cache resetter last checked time
 }
 
 // init saves (caches) the host name for all future references because
@@ -111,22 +111,29 @@ func New(ctx context.Context, annotator ipservice.Client, outputPath string) *Ho
 		outputPath: outputPath,
 	}
 	// Start a cache resetter goroutine to reset the cache every day
-	// at midnight.  Read tickerDuration and hour atomically to avoid
-	// a race condition with package testing code.
-	go func(tickerDuration int64) {
-		ticker := time.NewTicker(time.Duration(tickerDuration))
+	// at midnight.  For now, we use atomic read/write operations for
+	// hour because package testing code modifies it to fake midnight.
+	// Otherwise "go test -race" complains about a race condition.
+	// TODO(SaiedKazemi): Use moneky patching to control the progression
+	//     of time and get rid of the atomic read.
+	go func(duration time.Duration) {
+		ticker := time.NewTicker(duration)
 		defer ticker.Stop()
 		for now := range ticker.C {
 			if ctx.Err() != nil {
 				return
 			}
 			hour := now.Hour()
+			// Each day, hour increases from 0 to 23.  So if
+			// the current hour is less than the previous hour,
+			// we must have passed midnight and its' time to
+			// reset the hop cache.
 			if hour < int(atomic.LoadInt32(&hc.hour)) {
 				hc.Reset()
 			}
 			atomic.StoreInt32(&hc.hour, int32(hour))
 		}
-	}(tickerDuration)
+	}(time.Duration(tickerDuration))
 	return hc
 }
 
@@ -165,15 +172,15 @@ func (hc *HopCache) Annotate(ctx context.Context, hops []string, traceStartTime 
 	// cache and added to newHops which is the behavior we want.
 	var newHops []string
 	yyyymmdd := traceStartTime.Format("-20060102")
+	hc.hopsLock.Lock()
 	for _, hop := range hops {
-		hc.hopsLock.Lock()
 		if !hc.hops[hop+yyyymmdd] {
 			hopAnnotationOps.WithLabelValues("hopcache", "inserted").Inc()
 			hc.hops[hop+yyyymmdd] = true
 			newHops = append(newHops, hop)
 		}
-		hc.hopsLock.Unlock()
 	}
+	hc.hopsLock.Unlock()
 	// Are there any new hops?
 	if len(newHops) == 0 {
 		return nil, nil

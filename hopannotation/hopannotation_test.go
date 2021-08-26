@@ -20,18 +20,18 @@ var (
 	fakeWriteFileCalls int32
 
 	tests = []struct {
-		hops           []string
+		resetCache     bool     // if true, reset the hop cache before test
+		hops           []string // hops to annotate
 		wantAllErrs    []error
 		annotateCalls  int32
 		writeFileCalls int32
 	}{
-		{[]string{errorOnIP, errorOnIP}, []error{errForced}, 1, 0}, // we force the first call to Annotate() to fail
-		{[]string{"1.2.3.4", "5.6.7.8"}, nil, 2, 2},                // should annotate and archive both
-		{[]string{"1.2.3.4", "5.6.7.8"}, nil, 2, 2},                // should not annotate and archive either
-		{[]string{"reset-cache", ""}, nil, 0, 0},                   // not a test, just reset the cache
-		{[]string{"1.2.3.4", "5.6.7.8"}, nil, 3, 4},                // should annotate and archive both
-		{[]string{"5.6.7.8", "a:b:c:d::e"}, nil, 4, 5},             // should annotate and archive just one
-		{[]string{"1.2.3"}, []error{errInvalidIP}, 4, 5},           // should return error
+		{false, []string{errorOnIP, errorOnIP}, []error{errForced}, 1, 0}, // we force the first call to Annotate() to fail
+		{false, []string{"1.2.3.4", "5.6.7.8"}, nil, 2, 2},                // should annotate and archive both
+		{false, []string{"1.2.3.4", "5.6.7.8"}, nil, 2, 2},                // should not annotate and archive either
+		{true, []string{"1.2.3.4", "5.6.7.8"}, nil, 3, 4},                 // should annotate and archive both
+		{false, []string{"5.6.7.8", "a:b:c:d::e"}, nil, 4, 5},             // should annotate and archive just one
+		{false, []string{"1.2.3"}, []error{errInvalidIP}, 4, 5},           // should return error
 	}
 )
 
@@ -122,9 +122,8 @@ func TestAnnotate(t *testing.T) {
 	hc := New(ctx, fa, "./testdata")
 	now := time.Now()
 	for i, test := range tests {
-		if test.hops[0] == "reset-cache" {
+		if test.resetCache {
 			hc.Reset()
-			continue
 		}
 		_, gotAllErrs := hc.Annotate(ctx, test.hops, now)
 		// Verify that we got the right errors, if any.
@@ -168,9 +167,8 @@ func TestWriteAnnotations(t *testing.T) {
 	hc := New(ctx, fa, "./testdata")
 	now := time.Now()
 	for i, test := range tests {
-		if test.hops[0] == "reset-cache" {
+		if test.resetCache {
 			hc.Reset()
-			continue
 		}
 		annotations, _ := hc.Annotate(ctx, test.hops, now)
 		if annotations != nil {
