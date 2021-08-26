@@ -10,6 +10,11 @@
 // annotations can change.  Each hop cache has a cache resetter
 // goroutine that resets the cache every day at midnight.
 //
+// A hop cache entry is an IP address plus the date in yyyymmdd format.
+// (e.g., 100.116.79.252-2021-08-26).  The purpose of the date suffix is
+// to make sure that hop annotations of a traceroute that ran right before
+// midnight do not prevent us from annotating the same hops today.
+//
 // This package has the following exported functions:
 //   New()
 //   (*HopCache) Reset()
@@ -137,7 +142,7 @@ func (hc *HopCache) Reset() {
 // Annotate annotates new hops found in the hops argument.  It aggregates
 // the errors and returns all of them instead of returning after encountering
 // the first error.
-func (hc *HopCache) Annotate(ctx context.Context, hops []string) (map[string]*annotator.ClientAnnotations, []error) {
+func (hc *HopCache) Annotate(ctx context.Context, hops []string, traceStartTime time.Time) (map[string]*annotator.ClientAnnotations, []error) {
 	if err := ctx.Err(); err != nil {
 		return nil, []error{err}
 	}
@@ -159,11 +164,12 @@ func (hc *HopCache) Annotate(ctx context.Context, hops []string) (map[string]*an
 	// the remaining hops in the hops slice will be inserted in the new
 	// cache and added to newHops which is the behavior we want.
 	var newHops []string
+	yyyymmdd := traceStartTime.Format("-20060102")
 	for _, hop := range hops {
 		hc.hopsLock.Lock()
-		if !hc.hops[hop] {
+		if !hc.hops[hop+yyyymmdd] {
 			hopAnnotationOps.WithLabelValues("hopcache", "inserted").Inc()
-			hc.hops[hop] = true
+			hc.hops[hop+yyyymmdd] = true
 			newHops = append(newHops, hop)
 		}
 		hc.hopsLock.Unlock()

@@ -73,9 +73,10 @@ func TestNew(t *testing.T) {
 
 	// Create a new hop cache and insert an entry in it.
 	ctx, cancel := context.WithCancel(context.Background())
-	hc := New(ctx, &fakeAnnotator{}, "./testdata")
+	fa := &fakeAnnotator{}
+	hc := New(ctx, fa, "./testdata")
 	hc.hopsLock.Lock()
-	hc.hops["1.2.3.4"] = true
+	hc.hops["1.2.3.4-20210826"] = true
 	hc.hopsLock.Unlock()
 
 	// Fake we've reached midnight and verify that our current cache
@@ -87,16 +88,31 @@ func TestNew(t *testing.T) {
 	}
 	hc.hopsLock.Unlock()
 
+	// Validate the following scenario:
+	//   1. traceroute to a new IP starts right before midnight at 23:59:59
+	//   2. traceroute output becomes available after midnight
+	//   3. hop annotations for yesterday's traceroute happen today
+	//   4. another traceroute to the same IP at starts at 1:00AM
+	//   5. traceroute output becomes available at 1:10AM
+	//   6. hop annotations should be done again for today's traceroute
+	traceStartTime, _ := time.Parse(time.RFC3339, "2021-08-26T23:59:59Z")
+	hc.Annotate(ctx, []string{"1.2.3.4"}, traceStartTime) // should annotate
+	traceStartTime, _ = time.Parse(time.RFC3339, "2021-08-27T01:10:00Z")
+	hc.Annotate(ctx, []string{"1.2.3.4"}, traceStartTime) // same IP, but should annotate again
+	if fa.annotateCalls != 2 {
+		t.Fatalf("got %d Annotate calls, want %d", fa.annotateCalls, 2)
+	}
+
 	// Cancel the context and verify the resetter goroutine has stopped.
 	cancel()
 	fakeMidnight(hc)
-	if atomic.LoadInt32(&hc.hour) != 24+1 {
+	if atomic.LoadInt32(&hc.hour) != 24 {
 		t.Fatal("failed to stop the resetter goroutine")
 	}
 }
 
 func fakeMidnight(hc *HopCache) {
-	atomic.StoreInt32(&hc.hour, 24+1)
+	atomic.StoreInt32(&hc.hour, 24)
 	time.Sleep(300 * time.Millisecond)
 }
 
@@ -104,12 +120,13 @@ func TestAnnotate(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	fa := &fakeAnnotator{}
 	hc := New(ctx, fa, "./testdata")
+	now := time.Now()
 	for i, test := range tests {
 		if test.hops[0] == "reset-cache" {
 			hc.Reset()
 			continue
 		}
-		_, gotAllErrs := hc.Annotate(ctx, test.hops)
+		_, gotAllErrs := hc.Annotate(ctx, test.hops, now)
 		// Verify that we got the right errors, if any.
 		failed := false
 		if len(gotAllErrs) != len(test.wantAllErrs) {
@@ -132,7 +149,7 @@ func TestAnnotate(t *testing.T) {
 	// Now cover the error paths that were not covered by the
 	// above tests.
 	cancel()
-	_, gotAllErrs := hc.Annotate(ctx, tests[0].hops)
+	_, gotAllErrs := hc.Annotate(ctx, tests[0].hops, now)
 	if len(gotAllErrs) != 1 || gotAllErrs[0] != context.Canceled {
 		t.Fatalf("got =%+v, want %v\n", gotAllErrs, context.Canceled)
 	}
@@ -149,14 +166,15 @@ func TestWriteAnnotations(t *testing.T) {
 	ctx := context.TODO()
 	fa := &fakeAnnotator{}
 	hc := New(ctx, fa, "./testdata")
+	now := time.Now()
 	for i, test := range tests {
 		if test.hops[0] == "reset-cache" {
 			hc.Reset()
 			continue
 		}
-		annotations, _ := hc.Annotate(ctx, test.hops)
+		annotations, _ := hc.Annotate(ctx, test.hops, now)
 		if annotations != nil {
-			hc.WriteAnnotations(annotations, time.Now())
+			hc.WriteAnnotations(annotations, now)
 		}
 		// Verify the number of writeFile calls.
 		if fakeWriteFileCalls != test.writeFileCalls {
@@ -166,6 +184,6 @@ func TestWriteAnnotations(t *testing.T) {
 	// Now cover the error paths that were not covered by the
 	// above tests.
 	hc = New(ctx, &fakeAnnotator{}, "/bad/path")
-	annotations, _ := hc.Annotate(ctx, []string{"1.1.1.1", "2.2.2.2"})
-	hc.WriteAnnotations(annotations, time.Now())
+	annotations, _ := hc.Annotate(ctx, []string{"1.1.1.1", "2.2.2.2"}, now)
+	hc.WriteAnnotations(annotations, now)
 }

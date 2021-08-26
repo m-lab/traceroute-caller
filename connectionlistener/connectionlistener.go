@@ -98,12 +98,13 @@ func (cl *connectionListener) traceAnnotateAndArchive(ctx context.Context, conn 
 		return
 	}
 
-	annotations, allErrs := cl.hopAnnotator.Annotate(ctx, hops)
+	traceStartTime := time.Unix(int64(output.CycleStart.StartTime), 0)
+	annotations, allErrs := cl.hopAnnotator.Annotate(ctx, hops, traceStartTime)
 	if allErrs != nil {
 		log.Printf("failed to annotate some or all hops (errors: %+v)\n", allErrs)
 	}
 	if annotations != nil && len(annotations) > 0 {
-		cl.hopAnnotator.WriteAnnotations(annotations, time.Unix(int64(output.CycleStart.StartTime), 0))
+		cl.hopAnnotator.WriteAnnotations(annotations, traceStartTime)
 	}
 }
 
