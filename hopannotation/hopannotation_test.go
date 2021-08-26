@@ -74,31 +74,15 @@ func TestNew(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	hc := New(ctx, &fakeAnnotator{}, "./testdata")
 	hc.hopsLock.Lock()
-	hc.hops["1.2.3.4"] = written
+	hc.hops["1.2.3.4"] = true
 	hc.hopsLock.Unlock()
 
 	// Fake we've reached midnight and verify that our current cache
 	// has become the old cache and the new cache is empty.
 	fakeMidnight(hc)
 	hc.hopsLock.Lock()
-	if _, ok := hc.oldHops["1.2.3.4"]; !ok {
-		t.Fatal("failed to retain the old cache at midnight")
-	}
 	if len(hc.hops) != 0 {
 		t.Fatal("failed to clear cache at midnight")
-	}
-	hc.hopsLock.Unlock()
-
-	// Fake we've reached another midnight and there is still an
-	// active annotation that hasn't finished.  This should generate
-	// a warning.
-	hc.hopsLock.Lock()
-	hc.oldHops["1.2.3.4"] = inserted
-	hc.hopsLock.Unlock()
-	fakeMidnight(hc)
-	hc.hopsLock.Lock()
-	if _, ok := hc.oldHops["1.2.3.4"]; ok {
-		t.Fatal("failed to clear cache at the second midnight")
 	}
 	hc.hopsLock.Unlock()
 
@@ -161,7 +145,7 @@ func TestWriteAnnotations(t *testing.T) {
 		writeFile = saveWriteFile
 	}()
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx := context.TODO()
 	fa := &fakeAnnotator{}
 	hc := New(ctx, fa, "./testdata")
 	for i, test := range tests {
@@ -171,7 +155,7 @@ func TestWriteAnnotations(t *testing.T) {
 		}
 		annotations, _ := hc.Annotate(ctx, test.hops)
 		if annotations != nil {
-			hc.WriteAnnotations(context.TODO(), annotations, time.Now())
+			hc.WriteAnnotations(annotations, time.Now())
 		}
 		// Verify the number of writeFile calls.
 		if fakeWriteFileCalls != test.writeFileCalls {
@@ -182,21 +166,5 @@ func TestWriteAnnotations(t *testing.T) {
 	// above tests.
 	hc = New(ctx, &fakeAnnotator{}, "/bad/path")
 	annotations, _ := hc.Annotate(ctx, []string{"1.1.1.1", "2.2.2.2"})
-	hc.WriteAnnotations(ctx, annotations, time.Now())
-	cancel()
-	gotAllErrs := hc.WriteAnnotations(ctx, nil, time.Now())
-	if len(gotAllErrs) != 1 || gotAllErrs[0] != context.Canceled {
-		t.Fatalf("got =%+v, want %v\n", gotAllErrs, context.Canceled)
-	}
-
-}
-
-func TestSetState(t *testing.T) {
-	// This is mostly for code coverage of error paths.
-	fa := &fakeAnnotator{}
-	hc := New(context.TODO(), fa, "./testdata")
-	hc.setState("4.3.2.1", written) // force error: "does not exist in cache"
-	hc.setState("4.3.2.1", written) // force error: "has state 2, want 1"
-	hc.Clear()                      // move to oldHops
-	hc.setState("4.3.2.1", written) // should find it in oldHops
+	hc.WriteAnnotations(annotations, time.Now())
 }

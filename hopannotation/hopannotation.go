@@ -33,21 +33,8 @@ import (
 	// TODO: These should both be in a common location containing API definitions.
 	"github.com/m-lab/uuid-annotator/annotator"
 	"github.com/m-lab/uuid-annotator/ipservice"
-)
-
-// Each hop in the hop cache can be in one of the following four states:
-//   inserted:  after it's inserted but before it is annotated
-//   annotated: after it's successfully annotated
-//   written:  after it's successfully written
-//   errored:   after encountering an error while archiving
-type entryState int
-
-const (
-	inserted entryState = iota
-	annotated
-	written
-	errored
-	numStates
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
 var (
@@ -55,6 +42,21 @@ var (
 	errCreatePath        = errors.New("failed to create directory path")
 	errMarshalAnnotation = errors.New("failed to marshal annotation to json")
 	errWriteMarshal      = errors.New("failed to write marshaled annotation")
+
+	hopAnnotationOps = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "hop_cache_operations_total",
+			Help: "The number of hop cache operations",
+		},
+		[]string{"type", "operation"},
+	)
+	hopAnnotationErrors = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "hop_annotation_errors_total",
+			Help: "The number of errors hop annotations errors",
+		},
+		[]string{"type", "error"},
+	)
 
 	hostname string
 
@@ -72,12 +74,11 @@ type HopAnnotation1 struct {
 
 // HopCache is the cache of hop annotations.
 type HopCache struct {
-	hops       map[string]entryState // hop addresses being handled or already handled
-	oldHops    map[string]entryState // old (yesterday's) hops
-	hopsLock   sync.Mutex            // hop cache lock
-	annotator  ipservice.Client      // function for getting hop annotations
-	outputPath string                // path to directory for writing hop annotations
-	hour       int32                 // the hour when cache clearer last checked time
+	hops       map[string]bool  // hop addresses being handled or already handled
+	hopsLock   sync.Mutex       // hop cache lock
+	annotator  ipservice.Client // function for getting hop annotations
+	outputPath string           // path to directory for writing hop annotations
+	hour       int32            // the hour when cache clearer last checked time
 }
 
 // init saves (caches) the host name for all future references because
@@ -96,8 +97,7 @@ func init() {
 // will terminate when the ctx is cancelled.
 func New(ctx context.Context, annotator ipservice.Client, outputPath string) *HopCache {
 	hc := &HopCache{
-		hops:       make(map[string]entryState, 10000), // based on observation
-		oldHops:    nil,
+		hops:       make(map[string]bool, 10000), // based on observation
 		annotator:  annotator,
 		outputPath: outputPath,
 	}
@@ -128,16 +128,7 @@ func New(ctx context.Context, annotator ipservice.Client, outputPath string) *Ho
 func (hc *HopCache) Clear() {
 	hc.hopsLock.Lock()
 	defer hc.hopsLock.Unlock()
-	// Verify that all hops in the old cache are written.
-	var hopStates [numStates]entryState
-	for _, hopState := range hc.oldHops {
-		hopStates[hopState]++
-	}
-	if hopStates[inserted] != 0 || hopStates[annotated] != 0 || hopStates[errored] != 0 {
-		log.Printf("warning: there were unwritten entries in the old cache (%+v)\n", hopStates)
-	}
-	hc.oldHops = hc.hops
-	hc.hops = make(map[string]entryState, len(hc.hops)+len(hc.hops)/4)
+	hc.hops = make(map[string]bool, len(hc.hops)+len(hc.hops)/4)
 }
 
 // Annotate annotates new hops found in the hops argument.  It aggregates
@@ -159,13 +150,13 @@ func (hc *HopCache) Annotate(ctx context.Context, hops []string) (map[string]*an
 		return nil, allErrs
 	}
 
-	// Insert all of the new hops in the hop cache and mark them
-	// as inserted.
+	// Insert all of the new hops in the hop cache.
 	var newHops []string
 	for _, hop := range hops {
 		hc.hopsLock.Lock()
-		if _, ok := hc.hops[hop]; !ok {
-			hc.hops[hop] = inserted
+		if !hc.hops[hop] {
+			hopAnnotationOps.WithLabelValues("hopcache", "inserted").Inc()
+			hc.hops[hop] = true
 			newHops = append(newHops, hop)
 		}
 		hc.hopsLock.Unlock()
@@ -175,25 +166,19 @@ func (hc *HopCache) Annotate(ctx context.Context, hops []string) (map[string]*an
 		return nil, nil
 	}
 
-	// Annotate the new hops and mark them as annotated.
+	// Annotate the new hops.
 	newAnnotations, err := hc.annotator.Annotate(ctx, newHops)
 	if err != nil {
 		return nil, []error{err}
 	}
-	for hop := range newAnnotations {
-		hc.setState(hop, annotated)
-	}
+	hopAnnotationOps.WithLabelValues("hopcache", "annotated").Add(float64(len(newAnnotations)))
 	return newAnnotations, nil
 }
 
 // WriteAnnotations writes out the annotations passed in.  It writes out the
 // annotations in parallel for speed.  It aggregates the errors and returns
 // all of them instead of returning after encountering the first error.
-func (hc *HopCache) WriteAnnotations(ctx context.Context, annotations map[string]*annotator.ClientAnnotations, traceStartTime time.Time) []error {
-	if err := ctx.Err(); err != nil {
-		return []error{err}
-	}
-
+func (hc *HopCache) WriteAnnotations(annotations map[string]*annotator.ClientAnnotations, traceStartTime time.Time) []error {
 	// Write the annotations in parallel.
 	var wg sync.WaitGroup
 	errChan := make(chan error, len(annotations))
@@ -217,7 +202,6 @@ func (hc *HopCache) writeAnnotation(wg *sync.WaitGroup, hop string, annotation *
 	// Get a file path.
 	filepath, err := hc.generateAnnotationFilepath(hop, traceStartTime)
 	if err != nil {
-		hc.setState(hop, errored)
 		errChan <- err
 		return
 	}
@@ -230,61 +214,16 @@ func (hc *HopCache) writeAnnotation(wg *sync.WaitGroup, hop string, annotation *
 		Annotations: annotation,
 	})
 	if err != nil {
-		hc.setState(hop, errored)
+		hopAnnotationErrors.WithLabelValues("hopannotation", "marshal").Inc()
 		errChan <- fmt.Errorf("%w (error: %v)", errMarshalAnnotation, err)
 		return
 	}
 	if err := writeFile(filepath, b, 0444); err != nil {
-		hc.setState(hop, errored)
+		hopAnnotationErrors.WithLabelValues("hopannotation", "writefile").Inc()
 		errChan <- fmt.Errorf("%w (error: %v)", errWriteMarshal, err)
 		return
 	}
-
-	// Mark the cache entry as written.
-	hc.setState(hop, written)
-}
-
-// setState sets the state of the given hop entry in the cache to the
-// given state while holding the hop cache lock.
-func (hc *HopCache) setState(hop string, hopState entryState) {
-	var wantState entryState
-	switch hopState {
-	case annotated:
-		wantState = inserted
-	case written:
-		wantState = annotated
-	case errored:
-		wantState = annotated
-	}
-
-	// Lock the hop cache.
-	hc.hopsLock.Lock()
-	defer hc.hopsLock.Unlock()
-
-	// Find the hop entry in the cache.
-	old := false
-	state, ok := hc.hops[hop]
-	if !ok {
-		// Check the old cache.
-		state, ok = hc.oldHops[hop]
-		if !ok {
-			log.Printf("internal error: hop %v does not exist in cache", hop)
-			state = wantState
-		} else {
-			old = true
-		}
-	}
-	// Do a sanity check.
-	if state != wantState {
-		log.Printf("internal error: hop %v has state %v, want %v (setting to %v)", hop, state, wantState, wantState)
-	}
-
-	// Set the state.
-	if old {
-		hc.oldHops[hop] = hopState
-	} else {
-		hc.hops[hop] = hopState
-	}
+	hopAnnotationOps.WithLabelValues("hopannotation", "written").Inc()
 }
 
 // generateAnnotationFilepath returns the full pathname of a hop
@@ -292,7 +231,7 @@ func (hc *HopCache) setState(hop string, hopState entryState) {
 func (hc *HopCache) generateAnnotationFilepath(hop string, timestamp time.Time) (string, error) {
 	dirPath := hc.outputPath + "/" + timestamp.Format("2006/01/02")
 	if err := os.MkdirAll(dirPath, 0777); err != nil {
-		// TODO(SaiedKazemi): Add a metric here.
+		hopAnnotationErrors.WithLabelValues("hopannotation", "mkdirall").Inc()
 		return "", fmt.Errorf("%w (error: %v)", errCreatePath, err)
 	}
 	datetime := timestamp.Format("20060102T150405Z")
