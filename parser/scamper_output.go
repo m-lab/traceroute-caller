@@ -47,10 +47,10 @@ type Reply struct {
 	Rx       TS      `json:"rx"`
 	TTL      int     `json:"ttl"`
 	RTT      float64 `json:"rtt"`
-	IcmpType int     `json:"icmp_type"`
-	IcmpCode int     `json:"icmp_code"`
-	IcmpQTos int     `json:"icmp_q_tos"`
-	IcmpQTTL int     `json:"icmp_q_ttl"`
+	IcmpType int     `json:"icmp_type" bigquery:"icmp_type"`
+	IcmpCode int     `json:"icmp_code" bigquer:"icmp_code"`
+	IcmpQTos int     `json:"icmp_q_tos" bigquery:"icmp_q_tos"`
+	IcmpQTTL int     `json:"icmp_q_ttl" bigquery:"icmp_q_ttl"`
 }
 
 // Probe describes a single probe message, and all the associated replies.
@@ -74,7 +74,7 @@ type ScamperLink struct {
 type ScamperNode struct {
 	Addr  string          `json:"addr"`
 	Name  string          `json:"name"`
-	QTTL  int             `json:"q_ttl"`
+	QTTL  int             `json:"q_ttl" bigquery:"q_ttl"`
 	Linkc int64           `json:"linkc"`
 	Links [][]ScamperLink `json:"links"`
 }
@@ -94,10 +94,10 @@ type ScamperOutput struct {
 // CyclestartLine contains the information about the scamper "cyclestart"
 type CyclestartLine struct {
 	Type      string  `json:"type"`
-	ListName  string  `json:"list_name"`
+	ListName  string  `json:"list_name" bigquery:"list_name"`
 	ID        float64 `json:"id"`
 	Hostname  string  `json:"hostname"`
-	StartTime float64 `json:"start_time"`
+	StartTime float64 `json:"start_time" bigquery:"start_time"`
 }
 
 // TracelbLine contains the actual scamper trace details.
@@ -110,16 +110,16 @@ type TracelbLine struct {
 	Src         string        `json:"src"`
 	Dst         string        `json:"dst"`
 	Start       TS            `json:"start"`
-	ProbeSize   float64       `json:"probe_size"`
+	ProbeSize   float64       `json:"probe_size" bigquery:"probe_size"`
 	Firsthop    float64       `json:"firsthop"`
 	Attempts    float64       `json:"attempts"`
 	Confidence  float64       `json:"confidence"`
 	Tos         float64       `json:"tos"`
 	Gaplint     float64       `json:"gaplint"`
-	WaitTimeout float64       `json:"wait_timeout"`
-	WaitProbe   float64       `json:"wait_probe"`
+	WaitTimeout float64       `json:"wait_timeout" bigquery:"wait_timeout"`
+	WaitProbe   float64       `json:"wait_probe" bigquery:"wait_probe"`
 	Probec      float64       `json:"probec"`
-	ProbecMax   float64       `json:"probec_max"`
+	ProbecMax   float64       `json:"probec_max" bigquery:"probec_max"`
 	Nodec       float64       `json:"nodec"`
 	Linkc       float64       `json:"linkc"`
 	Nodes       []ScamperNode `json:"nodes"`
@@ -129,10 +129,10 @@ type TracelbLine struct {
 // ListName, hostname seem to match CyclestartLine
 type CyclestopLine struct {
 	Type     string  `json:"type"`
-	ListName string  `json:"list_name"`
+	ListName string  `json:"list_name" bigquery:"list_name"`
 	ID       float64 `json:"id"`
 	Hostname string  `json:"hostname"`
-	StopTime float64 `json:"stop_time"`
+	StopTime float64 `json:"stop_time" bigquery:"stop_time"`
 }
 
 // ParseTraceroute parses scamper output in JSONL format and returns it.
