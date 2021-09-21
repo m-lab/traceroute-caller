@@ -48,7 +48,7 @@ type Reply struct {
 	TTL      int     `json:"ttl"`
 	RTT      float64 `json:"rtt"`
 	IcmpType int     `json:"icmp_type" bigquery:"icmp_type"`
-	IcmpCode int     `json:"icmp_code" bigquer:"icmp_code"`
+	IcmpCode int     `json:"icmp_code" bigquery:"icmp_code"`
 	IcmpQTos int     `json:"icmp_q_tos" bigquery:"icmp_q_tos"`
 	IcmpQTTL int     `json:"icmp_q_ttl" bigquery:"icmp_q_ttl"`
 }
