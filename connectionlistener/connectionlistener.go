@@ -108,8 +108,8 @@ func (cl *connectionListener) traceAnnotateAndArchive(ctx context.Context, conn 
 	}
 }
 
-// New returns an eventsocket.Handler that will call the passed-in scamper
-// daemon on every closed connection.
+// New returns an eventsocket.Handler that will use the passed-in argument
+// ipCache to run a trace to a connection when it is closed.
 func New(creator connection.Creator, ipCache *ipcache.RecentIPCache, hopAnnotator *hopannotation.HopCache) eventsocket.Handler {
 	return &connectionListener{
 		conns:        make(map[string]connection.Connection),

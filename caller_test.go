@@ -33,7 +33,6 @@ func TestMainWithConnectionListener(t *testing.T) {
 	*eventsocket.Filename = dir + "/events.sock"
 	*tracerouteOutput = dir
 	*hopAnnotationOutput = dir
-	tracerType.Value = "scamper"
 
 	ctx, cancel = context.WithCancel(context.Background())
 	go func(t *testing.T) {
@@ -49,7 +48,6 @@ func TestMainWithConnectionListener(t *testing.T) {
 }
 
 func TestMainWithBadArgs(t *testing.T) {
-	tracerType.Value = "scamper"
 	*eventsocket.Filename = ""
 	*tracerouteOutput = "/tmp/"
 	*hopAnnotationOutput = "/tmp/"

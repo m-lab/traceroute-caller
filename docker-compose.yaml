@@ -60,11 +60,10 @@ services:
         delay: 5s
     command:
       - -prometheusx.listen-address=:9992
-      - -traceroute-output=/local/traceroute
+      - -traceroute-output=/local/scamper1
       - -hopannotation-output=/local/hopannotation1
       - -tcpinfo.eventsocket=/local/tcpevents.sock
       - -ipservice.sock=/local/uuid-annotator.sock
-      - -tracetool=scamper
       - -IPCacheTimeout=10m
       - -IPCacheUpdatePeriod=1m
       - -scamper.timeout=30m
