@@ -8,9 +8,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
-	"runtime"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -79,93 +77,6 @@ func TestScamper(t *testing.T) {
 	}
 }
 
-func TestCancelStopsDaemon(t *testing.T) {
-	if runtime.GOOS != "linux" {
-		t.Skip("Skipping for non-linux environment", runtime.GOOS)
-	}
-	tempdir, err := ioutil.TempDir("", "CancelStopsDaemon")
-	rtx.Must(err, "failed to create tempdir")
-	defer os.RemoveAll(tempdir)
-	d := ScamperDaemon{
-		// Let the shell use the path to discover these.
-		Scamper: &Scamper{
-			Binary:         "scamper",
-			OutputPath:     tempdir,
-			ScamperTimeout: 1 * time.Minute,
-		},
-		AttachBinary:     "sc_attach",
-		Warts2JSONBinary: "sc_warts2json",
-		ControlSocket:    tempdir + "/ctrl",
-	}
-	d.DontTrace(connection.Connection{}, errors.New(""))
-	ctx, cancel := context.WithCancel(context.Background())
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-	done := false
-	go func() {
-		time.Sleep(time.Duration(100 * time.Millisecond))
-		log.Println("Starting the daemon")
-		d.MustStart(ctx)
-		done = true
-		wg.Done()
-	}()
-	log.Println("About to sleep")
-
-	time.Sleep(time.Duration(200 * time.Millisecond))
-	if done {
-		t.Error("The function should not be done yet.")
-	}
-	log.Println("About to cancel()")
-	cancel()
-	wg.Wait()
-	if !done {
-		t.Error("wg.Done() but done is still false")
-	}
-}
-
-func TestExistingFileStopsDaemonCreation(t *testing.T) {
-	// This test verifies that, when the indicated control socket already exists on
-	// the file system, the Daemon.MustStart function calls log.Fatal. The control
-	// socket needs to exist in a well-known location. If there is already a file
-	// in that well-known location, then that is an indication that something has
-	// gone wrong with the surrounding environment.
-	if runtime.GOOS != "linux" {
-		t.Skip("Skipping for non-linux environment", runtime.GOOS)
-	}
-
-	defer func() {
-		logFatal = log.Fatal
-	}()
-	logFatal = func(args ...interface{}) {
-		panic("An error for testing")
-	}
-
-	tempdir, err := ioutil.TempDir("", "TestExistingFileStopsDaemonCreation")
-	rtx.Must(err, "failed to create tempdir")
-	defer os.RemoveAll(tempdir)
-	rtx.Must(ioutil.WriteFile(tempdir+"/ctrl", []byte("test"), 0666), "failed to create file")
-	d := ScamperDaemon{
-		// Let the shell use the path to discover these.
-		Scamper: &Scamper{
-			Binary:         "scamper",
-			OutputPath:     tempdir,
-			ScamperTimeout: 1 * time.Minute,
-		},
-		AttachBinary:     "sc_attach",
-		Warts2JSONBinary: "sc_warts2json",
-		ControlSocket:    tempdir + "/ctrl",
-	}
-
-	defer func() {
-		r := recover()
-		if r == nil {
-			t.Error("This was supposed to cause a panic")
-		}
-	}()
-
-	d.MustStart(context.Background())
-}
-
 func TestTraceWritesMeta(t *testing.T) {
 	tempdir, err := ioutil.TempDir("", "TestTraceWritesUUID")
 	rtx.Must(err, "failed to create tempdir")
@@ -177,13 +88,10 @@ func TestTraceWritesMeta(t *testing.T) {
 	}(hostname)
 	hostname = "testhostname"
 
-	d := ScamperDaemon{
-		Scamper: &Scamper{
-			OutputPath:     tempdir,
-			ScamperTimeout: 1 * time.Minute,
-		},
-		AttachBinary:     "echo",
-		Warts2JSONBinary: "cat",
+	s := &Scamper{
+		Binary:         "echo",
+		OutputPath:     tempdir,
+		ScamperTimeout: 1 * time.Minute,
 	}
 
 	c := connection.Connection{
@@ -193,7 +101,7 @@ func TestTraceWritesMeta(t *testing.T) {
 
 	faketime := time.Date(2019, time.April, 1, 3, 45, 51, 0, time.UTC)
 	prometheusx.GitShortCommit = "Fake Version"
-	_, err = d.Trace(c, faketime)
+	_, err = s.Trace(c, faketime)
 
 	if err != nil {
 		t.Error("Trace not done correctly.")
@@ -225,13 +133,10 @@ func TestTraceTimeout(t *testing.T) {
 	rtx.Must(err, "failed to create tempdir")
 	defer os.RemoveAll(tempdir)
 
-	d := ScamperDaemon{
-		Scamper: &Scamper{
-			OutputPath:     tempdir,
-			ScamperTimeout: 1 * time.Nanosecond,
-		},
-		AttachBinary:     "yes",
-		Warts2JSONBinary: "cat",
+	s := &Scamper{
+		Binary:         "yes",
+		OutputPath:     tempdir,
+		ScamperTimeout: 1 * time.Nanosecond,
 	}
 
 	defer func() {
@@ -248,7 +153,7 @@ func TestTraceTimeout(t *testing.T) {
 
 	faketime := time.Date(2019, time.April, 1, 3, 45, 51, 0, time.UTC)
 	prometheusx.GitShortCommit = "Fake Version"
-	_, err = d.Trace(c, faketime)
+	_, err = s.Trace(c, faketime)
 	if !errors.Is(err, context.DeadlineExceeded) {
 		t.Error("Should return TimeOut err, not ", err)
 	}
@@ -265,13 +170,10 @@ func TestCreateCacheTest(t *testing.T) {
 	}(hostname)
 	hostname = "testhostname"
 
-	d := ScamperDaemon{
-		Scamper: &Scamper{
-			OutputPath:     tempdir,
-			ScamperTimeout: 1 * time.Minute,
-		},
-		AttachBinary:     "echo",
-		Warts2JSONBinary: "cat",
+	s := &Scamper{
+		Binary:         "echo",
+		OutputPath:     tempdir,
+		ScamperTimeout: 1 * time.Minute,
 	}
 
 	c := connection.Connection{
@@ -286,13 +188,13 @@ func TestCreateCacheTest(t *testing.T) {
 	{"type":"tracelb", "version":"0.1", "userid":0, "method":"icmp-echo", "src":"::ffff:180.87.97.101", "dst":"::ffff:1.47.236.62", "start":{"sec":1566691298, "usec":476221, "ftime":"2019-08-25 00:01:38"}, "probe_size":60, "firsthop":1, "attempts":3, "confidence":95, "tos":0, "gaplimit":3, "wait_timeout":5, "wait_probe":250, "probec":0, "probec_max":3000, "nodec":0, "linkc":0}
 	{"type":"cycle-stop", "list_name":"/tmp/scamperctrl:51811", "id":1, "hostname":"ndt-plh7v", "stop_time":1566691298}`)
 
-	_ = d.TraceFromCachedTrace(c, faketime, []byte("Broken cached test"))
+	_ = s.TraceFromCachedTrace(c, faketime, []byte("Broken cached test"))
 	_, errInvalidTest := ioutil.ReadFile(tempdir + "/2019/04/01/20190401T034551Z_" + prefix.UnsafeString() + "_0000000000000001.jsonl")
 	if errInvalidTest == nil {
 		t.Error("should fail to generate cached test")
 	}
 
-	_ = d.TraceFromCachedTrace(c, faketime, cachedTest)
+	_ = s.TraceFromCachedTrace(c, faketime, cachedTest)
 
 	// Unmarshal the first line of the output file.
 	b, err := ioutil.ReadFile(tempdir + "/2019/04/01/20190401T034551Z_" + prefix.UnsafeString() + "_0000000000000001.jsonl")
@@ -324,40 +226,10 @@ func TestCreateCacheTest(t *testing.T) {
 	}
 
 	// Now test an error condition.
-	d.OutputPath = "/dev/null"
-	if d.TraceFromCachedTrace(c, faketime, cachedTest) == nil {
+	s.OutputPath = "/dev/null"
+	if s.TraceFromCachedTrace(c, faketime, cachedTest) == nil {
 		t.Error("Should have had a test failure trying to write to /dev/null")
 	}
-}
-
-func TestRecovery(t *testing.T) {
-	tempdir, err := ioutil.TempDir("", "TestRecovery")
-	rtx.Must(err, "failed to create tempdir")
-	defer os.RemoveAll(tempdir)
-
-	// Temporarily set the hostname to a value for testing.
-	defer func(oldHn string) {
-		hostname = oldHn
-	}(hostname)
-	hostname = "testhostname"
-
-	d := ScamperDaemon{
-		Scamper: &Scamper{
-			OutputPath:     tempdir,
-			ScamperTimeout: 1 * time.Minute,
-		},
-		AttachBinary:     "echo",
-		Warts2JSONBinary: "cat",
-	}
-
-	c := connection.Connection{
-		Cookie: "not a number in base 16 at all",
-	}
-
-	// Run both trace methods.
-	d.TraceAll([]connection.Connection{c})
-	_, _ = d.Trace(c, time.Now())
-	// If this doesn't crash, then the recovery process works!
 }
 
 func TestExtractUUID(t *testing.T) {
@@ -384,5 +256,20 @@ func TestGetMetaline(t *testing.T) {
 	meta := GetMetaline(conn, true, "00EF")
 	if !bytes.Contains(meta, []byte("0000000000000ABC\",\"TracerouteCallerVersion\":\"Fake Version\",\"CachedResult\":true,\"CachedUUID\":\"00EF\"")) {
 		t.Error("Fail to generate meta ", meta)
+	}
+}
+
+func TestInvalidCookie(t *testing.T) {
+	s := &Scamper{
+		OutputPath: "/tmp",
+	}
+	c := connection.Connection{
+		Cookie: "an invalid cookie",
+	}
+	if _, err := s.trace(c, time.Now()); err == nil {
+		t.Error("Should have failed due to invalid cookie")
+	}
+	if err := s.TraceFromCachedTrace(c, time.Now(), nil); err == nil {
+		t.Error("Should have failed due to invalid cookie")
 	}
 }

@@ -39,25 +39,16 @@ var (
 	scamperBin          = flag.String("scamper.bin", "scamper", "The path to the scamper binary.")
 	scattachBin         = flag.String("scamper.sc_attach", "sc_attach", "The path to the sc_attach binary.")
 	scwarts2jsonBin     = flag.String("scamper.sc_warts2json", "sc_warts2json", "The path to the sc_warts2json binary.")
-	scamperCtrlSocket   = flag.String("scamper.unixsocket", "/tmp/scamperctrl", "The name of the UNIX-domain socket that the scamper daemon should listen on.")
 	scamperTimeout      = flag.Duration("scamper.timeout", 900*time.Second, "How long to wait to complete a scamper trace.")
 	scamperPTR          = flag.Bool("scamper.tracelb-ptr", true, "Look up DNS pointer records for IP addresses.")
 	scamperWaitProbe    = flag.Int("scamper.tracelb-W", 25, "How long to wait between probes in 1/100ths of seconds (min 15, max 200).")
 	tracerouteOutput    = flag.String("traceroute-output", "/var/spool/scamper", "The path to store traceroute output.")
 	hopAnnotationOutput = flag.String("hopannotation-output", "/var/spool/hopannotation1", "The path to store hop annotations.")
-	tracerType          = flagx.Enum{
-		Options: []string{"scamper", "scamper-daemon"},
-		Value:   "scamper",
-	}
 
 	// Variables to aid in testing of main()
 	ctx, cancel = context.WithCancel(context.Background())
 	logFatal    = log.Fatal
 )
-
-func init() {
-	flag.Var(&tracerType, "tracetool", "Choose whether scamper or scamper-daemon should be used.")
-}
 
 func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
@@ -87,29 +78,7 @@ func main() {
 		TracelbPTR:       *scamperPTR,
 		TracelbWaitProbe: *scamperWaitProbe,
 	}
-	scamperDaemon := &tracer.ScamperDaemon{
-		Scamper:          scamper,
-		AttachBinary:     *scattachBin,
-		Warts2JSONBinary: *scwarts2jsonBin,
-		ControlSocket:    *scamperCtrlSocket,
-	}
-
-	// Set up the ipCache depending on the trace method requested.
-	var ipCache *ipcache.RecentIPCache
-	switch tracerType.Value {
-	case "scamper":
-		ipCache = ipcache.New(ctx, scamper, *ipcache.IPCacheTimeout, *ipcache.IPCacheUpdatePeriod)
-	case "scamper-daemon":
-		ipCache = ipcache.New(ctx, scamperDaemon, *ipcache.IPCacheTimeout, *ipcache.IPCacheUpdatePeriod)
-		wg.Add(1)
-		go func() {
-			scamperDaemon.MustStart(ctx)
-			// When the scamper daemon dies, cancel main() and exit.
-			cancel()
-			wg.Done()
-		}()
-	}
-
+	ipCache := ipcache.New(ctx, scamper, *ipcache.IPCacheTimeout, *ipcache.IPCacheUpdatePeriod)
 	localIPs, err := connection.NewLocalRemoteIPs()
 	rtx.Must(err, "failed to discover local IPs")
 	ipserviceClient := ipservice.NewClient(*ipservice.SocketFilename)
