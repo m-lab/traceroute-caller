@@ -98,7 +98,7 @@ func (cl *connectionListener) traceAnnotateAndArchive(ctx context.Context, conn 
 		return
 	}
 
-	traceStartTime := time.Unix(int64(output.CycleStart.StartTime), 0)
+	traceStartTime := time.Unix(int64(output.CycleStart.StartTime), 0).UTC()
 	annotations, allErrs := cl.hopAnnotator.Annotate(ctx, hops, traceStartTime)
 	if allErrs != nil {
 		log.Printf("failed to annotate some or all hops (errors: %+v)\n", allErrs)
