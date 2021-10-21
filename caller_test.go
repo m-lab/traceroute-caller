@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"io/ioutil"
 	"log"
 	"os"
@@ -35,6 +36,7 @@ func TestMainFunc(t *testing.T) {
 	*tracer.TracerouteOutput = dir
 	*hopannotation.HopAnnotationOutput = dir
 
+	ctx, cancel = context.WithCancel(context.Background())
 	go func(t *testing.T) {
 		if err := srv.Serve(ctx); err != nil {
 			t.Logf("failed to start eventsocket server (error: %v)", err)
@@ -65,5 +67,6 @@ func TestMainWithBadArgs(t *testing.T) {
 		}
 	}()
 
+	ctx, cancel = context.WithCancel(context.Background())
 	main()
 }

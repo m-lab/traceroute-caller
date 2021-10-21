@@ -22,12 +22,12 @@ import (
 
 var (
 	// Variables to aid in testing of main().
-	ctx      context.Context
-	cancel   context.CancelFunc
-	logFatal = log.Fatal
+	ctx, cancel = context.WithCancel(context.Background())
+	logFatal    = log.Fatal
 )
 
 func main() {
+	defer cancel()
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	flag.Parse()
 	if err := flagx.ArgsFromEnv(flag.CommandLine); err != nil {
@@ -37,12 +37,6 @@ func main() {
 		logFatal("tcpinfo.eventsocket value was empty")
 	}
 
-	if ctx == nil {
-		ctx, cancel = context.WithCancel(context.Background())
-	}
-	if cancel != nil {
-		defer cancel()
-	}
 	promSrv := prometheusx.MustServeMetrics()
 	defer func() {
 		if err := promSrv.Shutdown(ctx); err != nil && !errors.Is(err, context.Canceled) {
