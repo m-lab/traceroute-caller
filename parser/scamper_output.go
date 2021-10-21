@@ -1,4 +1,4 @@
-// Package parser handles parsing of scamper JSONL.
+// Package parser handles parsing of scamper output in JSONL format.
 //
 // Refer to scamper source code files scamper/scamper_list.h and
 // scamper/tracelb/scamper_tracelb.h for the definitions of cycle_start,

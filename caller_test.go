@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"io/ioutil"
 	"log"
 	"os"
@@ -12,6 +11,8 @@ import (
 	"github.com/m-lab/go/prometheusx/promtest"
 	"github.com/m-lab/go/rtx"
 	"github.com/m-lab/tcp-info/eventsocket"
+	"github.com/m-lab/traceroute-caller/hopannotation"
+	"github.com/m-lab/traceroute-caller/tracer"
 )
 
 func init() {
@@ -22,8 +23,8 @@ func TestMetrics(t *testing.T) {
 	promtest.LintMetrics(t)
 }
 
-func TestMainWithConnectionListener(t *testing.T) {
-	dir, err := ioutil.TempDir("", "TestMainWithConnectionListener")
+func TestMainFunc(t *testing.T) {
+	dir, err := ioutil.TempDir("", "TestMainFunc")
 	rtx.Must(err, "failed to create temp dir")
 	defer os.RemoveAll(dir)
 	srv := eventsocket.New(dir + "/events.sock")
@@ -31,10 +32,9 @@ func TestMainWithConnectionListener(t *testing.T) {
 
 	*prometheusx.ListenAddress = ":0"
 	*eventsocket.Filename = dir + "/events.sock"
-	*tracerouteOutput = dir
-	*hopAnnotationOutput = dir
+	*tracer.TracerouteOutput = dir
+	*hopannotation.HopAnnotationOutput = dir
 
-	ctx, cancel = context.WithCancel(context.Background())
 	go func(t *testing.T) {
 		if err := srv.Serve(ctx); err != nil {
 			t.Logf("failed to start eventsocket server (error: %v)", err)
@@ -49,8 +49,8 @@ func TestMainWithConnectionListener(t *testing.T) {
 
 func TestMainWithBadArgs(t *testing.T) {
 	*eventsocket.Filename = ""
-	*tracerouteOutput = "/tmp/"
-	*hopAnnotationOutput = "/tmp/"
+	*tracer.TracerouteOutput = "/tmp/"
+	*hopannotation.HopAnnotationOutput = "/tmp/"
 
 	logFatal = func(_ ...interface{}) {
 		panic("testpanic")

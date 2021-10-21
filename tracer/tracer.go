@@ -1,3 +1,5 @@
+// Package tracer takes care of all interactions with the trace tools
+// (currently only scamper).
 package tracer
 
 import (
@@ -7,8 +9,6 @@ import (
 	"time"
 
 	"github.com/m-lab/go/prometheusx"
-	"github.com/m-lab/go/rtx"
-	"github.com/m-lab/traceroute-caller/connection"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
@@ -66,17 +66,7 @@ var (
 		},
 		[]string{"type", "error"},
 	)
-
-	// hostname of the current machine. Only call os.Hostname once, because the
-	// result should never change.
-	hostname string
 )
-
-func init() {
-	var err error
-	hostname, err = os.Hostname()
-	rtx.Must(err, "failed to call os.Hostname")
-}
 
 // Metadata is the first line of the traceroute .jsonl file.
 //
@@ -101,29 +91,18 @@ func extractUUID(metaline []byte) string {
 	return metaResult.UUID
 }
 
-// GetMetaline returns the what the first line of the output jsonl file should
+// createMetaline returns the what the first line of the output jsonl file should
 // be. Parameter isCache indicates whether this meta line is for an original
 // trace test or a cached test, and parameter cachedUUID is the original test if
 // isCache is 1.
-func GetMetaline(conn connection.Connection, isCache bool, cachedUUID string) []byte {
-	// Write the UUID as the first line of the file. If we want to add other
-	// metadata, this is the place to do it.
-	//
-	// TODO: decide what other metadata to add to the traceroute output. If we
-	// decide to add more, then this quick-and-dirty approach should be converted
-	// into proper json.Marshal calls.
-	uuid, err := conn.UUID()
-	rtx.PanicOnError(err, "failed to parse UUID - this should never happen")
-
+func createMetaline(uuid string, isCache bool, cachedUUID string) []byte {
 	meta := Metadata{
 		UUID:                    uuid,
 		TracerouteCallerVersion: prometheusx.GitShortCommit,
 		CachedResult:            isCache,
 		CachedUUID:              cachedUUID,
 	}
-
 	metaJSON, _ := json.Marshal(meta)
-
 	return append(metaJSON, byte('\n'))
 }
 

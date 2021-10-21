@@ -2,9 +2,9 @@
 // probes the Internet in order to analyze topology and performance.
 // For details, visit https://www.caida.org/catalog/software/scamper.
 //
-// traceroute-caller uses the tcp-info/eventsocket package to listen for
-// open and close connection events, and runs a traceroute measurement
-// on closed connections.
+// traceroute-caller uses the tcp-info/eventsocket package to be notified
+// of open and close connection events. A close connection event triggers
+// a traceroute run to that destination.
 package main
 
 import (
@@ -12,58 +12,37 @@ import (
 	"errors"
 	"flag"
 	"log"
-	"os"
-	"sync"
-	"time"
-
-	"github.com/m-lab/traceroute-caller/connection"
-	"github.com/m-lab/traceroute-caller/connectionlistener"
-	"github.com/m-lab/traceroute-caller/hopannotation"
-	"github.com/m-lab/traceroute-caller/ipcache"
-	"github.com/m-lab/traceroute-caller/tracer"
 
 	"github.com/m-lab/go/flagx"
 	"github.com/m-lab/go/prometheusx"
-	"github.com/m-lab/go/rtx"
 	"github.com/m-lab/tcp-info/eventsocket"
-	"github.com/m-lab/uuid-annotator/ipservice"
+	"github.com/m-lab/traceroute-caller/tracer"
+	"github.com/m-lab/traceroute-caller/triggertrace"
 )
 
 var (
-	// TODO(SaiedKazemi): scamper and its commands (e.g., tracelb)
-	//     support a large number of flags.  Instead of adding
-	//     these flags one by one to traceroute-caller flags, it
-	//     will be much better to have traceroute-caller read a
-	//     configuration file in textproto format that would support
-	//     all scamper and its command flags.
-	scamperBin          = flag.String("scamper.bin", "scamper", "The path to the scamper binary.")
-	scattachBin         = flag.String("scamper.sc_attach", "sc_attach", "The path to the sc_attach binary.")
-	scwarts2jsonBin     = flag.String("scamper.sc_warts2json", "sc_warts2json", "The path to the sc_warts2json binary.")
-	scamperTimeout      = flag.Duration("scamper.timeout", 900*time.Second, "How long to wait to complete a scamper trace.")
-	scamperPTR          = flag.Bool("scamper.tracelb-ptr", true, "Look up DNS pointer records for IP addresses.")
-	scamperWaitProbe    = flag.Int("scamper.tracelb-W", 25, "How long to wait between probes in 1/100ths of seconds (min 15, max 200).")
-	tracerouteOutput    = flag.String("traceroute-output", "/var/spool/scamper", "The path to store traceroute output.")
-	hopAnnotationOutput = flag.String("hopannotation-output", "/var/spool/hopannotation1", "The path to store hop annotations.")
-
-	// Variables to aid in testing of main()
-	ctx, cancel = context.WithCancel(context.Background())
-	logFatal    = log.Fatal
+	// Variables to aid in testing of main().
+	ctx      context.Context
+	cancel   context.CancelFunc
+	logFatal = log.Fatal
 )
 
 func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
-
 	flag.Parse()
-	rtx.Must(flagx.ArgsFromEnv(flag.CommandLine), "failed to get args from environment")
-	if *eventsocket.Filename == "" {
-		logFatal("tcpinfo.eventsocket was set to \"\"")
+	if err := flagx.ArgsFromEnv(flag.CommandLine); err != nil {
+		logFatal("failed to get args from environment (error: %v)", err)
 	}
-	rtx.Must(os.MkdirAll(*tracerouteOutput, 0777), "failed to create directory for traceroute results")
-	rtx.Must(os.MkdirAll(*hopAnnotationOutput, 0777), "failed to create directory for hop annotation results")
+	if *eventsocket.Filename == "" {
+		logFatal("tcpinfo.eventsocket value was empty")
+	}
 
-	defer cancel()
-	wg := sync.WaitGroup{}
-
+	if ctx == nil {
+		ctx, cancel = context.WithCancel(context.Background())
+	}
+	if cancel != nil {
+		defer cancel()
+	}
 	promSrv := prometheusx.MustServeMetrics()
 	defer func() {
 		if err := promSrv.Shutdown(ctx); err != nil && !errors.Is(err, context.Canceled) {
@@ -72,19 +51,15 @@ func main() {
 	}()
 
 	scamper := &tracer.Scamper{
-		Binary:           *scamperBin,
-		OutputPath:       *tracerouteOutput,
-		ScamperTimeout:   *scamperTimeout,
-		TracelbPTR:       *scamperPTR,
-		TracelbWaitProbe: *scamperWaitProbe,
+		Binary:           *tracer.ScamperBin,
+		OutputPath:       *tracer.TracerouteOutput,
+		ScamperTimeout:   *tracer.ScamperTimeout,
+		TracelbPTR:       *tracer.ScamperPTR,
+		TracelbWaitProbe: *tracer.ScamperWaitProbe,
 	}
-	ipCache := ipcache.New(ctx, scamper, *ipcache.IPCacheTimeout, *ipcache.IPCacheUpdatePeriod)
-	localIPs, err := connection.NewLocalRemoteIPs()
-	rtx.Must(err, "failed to discover local IPs")
-	ipserviceClient := ipservice.NewClient(*ipservice.SocketFilename)
-	hopAnnotator := hopannotation.New(ctx, ipserviceClient, *hopAnnotationOutput)
-	connListener := connectionlistener.New(localIPs, ipCache, hopAnnotator)
-	eventsocket.MustRun(ctx, *eventsocket.Filename, connListener)
-	cancel()
-	wg.Wait()
+	traceHandler, err := triggertrace.NewHandler(ctx, scamper)
+	if err != nil {
+		logFatal("failed to create a new triggertrace handler (error: %v)", err)
+	}
+	eventsocket.MustRun(ctx, *eventsocket.Filename, traceHandler)
 }

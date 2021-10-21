@@ -1,13 +1,16 @@
-// Package ipcache provides a time-based cache object to keep track of recently-seen IP addresses.
+// Package ipcache provides a time-based cache object that contains
+// the traceroute results of IP addresses that we have recently ran
+// a traceroute to.
 package ipcache
 
 import (
 	"context"
 	"flag"
+	"strconv"
 	"sync"
 	"time"
 
-	"github.com/m-lab/traceroute-caller/connection"
+	"github.com/m-lab/uuid"
 )
 
 var (
@@ -23,9 +26,9 @@ var (
 
 // Tracer is the generic interface for all things that can perform a traceroute.
 type Tracer interface {
-	Trace(conn connection.Connection, t time.Time) ([]byte, error)
-	TraceFromCachedTrace(conn connection.Connection, t time.Time, cachedTest []byte) error
-	DontTrace(conn connection.Connection, err error)
+	Trace(remoteIP, cookie, uuid string, t time.Time) ([]byte, error)
+	TraceFromCachedTrace(cookie, uuid string, t time.Time, cachedTest []byte) error
+	DontTrace()
 }
 
 // cachedTest is a single entry in the cache of traceroute results.
@@ -36,77 +39,27 @@ type cachedTest struct {
 	err       error
 }
 
-// RecentIPCache contains a list of all the IP addresses that we have traced to
+// IPCache contains a list of all the IP addresses that we have traced to
 // recently. We keep this list to ensure that we don't traceroute to the same
 // location repeatedly at a high frequency.
-type RecentIPCache struct {
-	cache map[string]*cachedTest
-	mu    sync.Mutex
-
-	tracer Tracer
+type IPCache struct {
+	cache     map[string]*cachedTest
+	cacheLock sync.Mutex
+	tracer    Tracer
 }
 
-func (rc *RecentIPCache) getEntry(ip string) (*cachedTest, bool) {
-	rc.mu.Lock()
-	defer rc.mu.Unlock()
-	_, existed := rc.cache[ip]
-	if !existed {
-		rc.cache[ip] = &cachedTest{
-			timeStamp: time.Now(),
-			dataReady: make(chan struct{}),
-		}
-	}
-	return rc.cache[ip], existed
-}
-
-func (rc *RecentIPCache) getTracer() Tracer {
-	rc.mu.Lock()
-	defer rc.mu.Unlock()
-	return rc.tracer
-}
-
-// Trace performs a trace and adds it to the cache. It calls the methods of the
-// tracer, so if those create files on disk, then files on disk will be created
-// as a side effect.
-func (rc *RecentIPCache) Trace(conn connection.Connection) ([]byte, error) {
-	c, cached := rc.getEntry(conn.RemoteIP)
-	t := rc.getTracer()
-	if cached {
-		<-c.dataReady
-		if c.err == nil {
-			_ = t.TraceFromCachedTrace(conn, time.Now(), c.data)
-			return c.data, nil
-		}
-		t.DontTrace(conn, c.err)
-		return nil, c.err
-	}
-	c.data, c.err = t.Trace(conn, c.timeStamp)
-	close(c.dataReady)
-	return c.data, c.err
-}
-
-// GetCacheLength returns the number of items currently in the cache. The
-// primary use of this is for testing, to ensure that something was put into or
-// removed from the cache.
-func (rc *RecentIPCache) GetCacheLength() int {
-	rc.mu.Lock()
-	defer rc.mu.Unlock()
-	return len(rc.cache)
-}
-
-// UpdateTracer switches the Tracer being used.
-func (rc *RecentIPCache) UpdateTracer(t Tracer) {
-	rc.mu.Lock()
-	defer rc.mu.Unlock()
-	rc.tracer = t
-}
-
-// New creates and returns a RecentIPCache. It also starts up a background
+// New creates and returns an IPCache. It also starts up a background
 // goroutine that scrubs the cache.
-func New(ctx context.Context, trace Tracer, ipCacheTimeout, ipCacheUpdatePeriod time.Duration) *RecentIPCache {
-	m := &RecentIPCache{
+func New(ctx context.Context, tracer Tracer, ipCacheTimeout, ipCacheUpdatePeriod time.Duration) *IPCache {
+	if ipCacheTimeout == 0 {
+		ipCacheTimeout = *IPCacheTimeout
+	}
+	if ipCacheUpdatePeriod == 0 {
+		ipCacheUpdatePeriod = *IPCacheUpdatePeriod
+	}
+	m := &IPCache{
 		cache:  make(map[string]*cachedTest),
-		tracer: trace,
+		tracer: tracer,
 	}
 	go func() {
 		ticker := time.NewTicker(ipCacheUpdatePeriod)
@@ -116,7 +69,7 @@ func New(ctx context.Context, trace Tracer, ipCacheTimeout, ipCacheUpdatePeriod 
 				return
 			}
 			// Must hold lock while performing GC.
-			m.mu.Lock()
+			m.cacheLock.Lock()
 			for k, v := range m.cache {
 				if now.Sub(v.timeStamp) > ipCacheTimeout {
 					// Note that if there is a trace in progress, the events
@@ -126,8 +79,51 @@ func New(ctx context.Context, trace Tracer, ipCacheTimeout, ipCacheUpdatePeriod 
 					delete(m.cache, k)
 				}
 			}
-			m.mu.Unlock()
+			m.cacheLock.Unlock()
 		}
 	}()
 	return m
+}
+
+// FetchTrace checks the IP cache to determine if a recent traceroute to
+// the remote IP exists or not. If a traceroute exists, it will be used.
+// Otherwise, it calls the tracer to run a new traceroute.
+func (ic *IPCache) FetchTrace(remoteIP, cookie string) ([]byte, error) {
+	// Get a globally unique identifier for the given cookie.
+	// For example, if cookie is "4418bb", we want something like:
+	// "fd73893d272d_1633013267_unsafe_00000000004418BB".
+	c, err := strconv.ParseUint(cookie, 16, 64)
+	if err != nil {
+		return nil, err
+	}
+	uuid := uuid.FromCookie(c)
+
+	cachedTest, existed := ic.getEntry(remoteIP)
+	if existed {
+		<-cachedTest.dataReady
+		if cachedTest.err != nil {
+			ic.tracer.DontTrace()
+			return nil, cachedTest.err
+		}
+		_ = ic.tracer.TraceFromCachedTrace(cookie, uuid, time.Now(), cachedTest.data)
+		return cachedTest.data, nil
+	}
+	cachedTest.data, cachedTest.err = ic.tracer.Trace(remoteIP, cookie, uuid, cachedTest.timeStamp)
+	close(cachedTest.dataReady)
+	return cachedTest.data, cachedTest.err
+}
+
+// getEntry returns the entry in the IP cache corresponding to the given
+// IP address. If the entry doesn't exist, a new one is created.
+func (ic *IPCache) getEntry(ip string) (*cachedTest, bool) {
+	ic.cacheLock.Lock()
+	defer ic.cacheLock.Unlock()
+	_, existed := ic.cache[ip]
+	if !existed {
+		ic.cache[ip] = &cachedTest{
+			timeStamp: time.Now(),
+			dataReady: make(chan struct{}),
+		}
+	}
+	return ic.cache[ip], existed
 }

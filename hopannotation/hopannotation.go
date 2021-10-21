@@ -14,18 +14,13 @@
 // (e.g., 100.116.79.252-2021-08-26).  The purpose of the date suffix is
 // to make sure that hop annotations of a traceroute that ran right before
 // midnight do not prevent us from annotating the same hops today.
-//
-// This package has the following exported functions:
-//   New()
-//   (*HopCache) Reset()
-//   (*HopCache) Annotate()
-//   (*HopCache) WriteAnnotations()
 package hopannotation
 
 import (
 	"context"
 	"encoding/json"
 	"errors"
+	"flag"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -43,6 +38,9 @@ import (
 )
 
 var (
+	// HopAnnotationOutput is the path to store hop annotation output.
+	HopAnnotationOutput = flag.String("hopannotation-output", "/var/spool/hopannotation1", "The path to store hop annotation output.")
+
 	// ErrParseHopIP means a hop IP address could not be parsed.
 	ErrParseHopIP = errors.New("failed to parse hop IP address")
 	// ErrCreatePath means a directory path for hop annotations could not be created.
@@ -105,6 +103,9 @@ func init() {
 // passage of the midnight every minute to reset the cache.  The goroutine
 // will terminate when the ctx is cancelled.
 func New(ctx context.Context, annotator ipservice.Client, outputPath string) *HopCache {
+	if outputPath == "" {
+		outputPath = *HopAnnotationOutput
+	}
 	hc := &HopCache{
 		hops:       make(map[string]bool, 10000), // based on observation
 		annotator:  annotator,
