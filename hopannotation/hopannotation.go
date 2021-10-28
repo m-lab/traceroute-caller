@@ -14,12 +14,6 @@
 // (e.g., 100.116.79.252-2021-08-26).  The purpose of the date suffix is
 // to make sure that hop annotations of a traceroute that ran right before
 // midnight do not prevent us from annotating the same hops today.
-//
-// This package has the following exported functions:
-//   New()
-//   (*HopCache) Reset()
-//   (*HopCache) Annotate()
-//   (*HopCache) WriteAnnotations()
 package hopannotation
 
 import (
@@ -81,6 +75,14 @@ type HopAnnotation1 struct {
 	Annotations *annotator.ClientAnnotations
 }
 
+// Config contains configuration parameters of a hop cache.
+// The parameters include the IP service to use and where to save the
+// annotations.
+type Config struct {
+	IPServiceSocket string
+	OutputPath      string
+}
+
 // HopCache is the cache of hop annotations.
 type HopCache struct {
 	hops       map[string]bool  // hop addresses being handled or already handled
@@ -104,11 +106,15 @@ func init() {
 // to obtain annotations.  It also starts a goroutine that checks for the
 // passage of the midnight every minute to reset the cache.  The goroutine
 // will terminate when the ctx is cancelled.
-func New(ctx context.Context, annotator ipservice.Client, outputPath string) *HopCache {
+func New(ctx context.Context, haCfg Config) (*HopCache, error) {
+	// Let ipservice.NewClient() validate IPServiceSocket.
+	if haCfg.OutputPath == "" {
+		return nil, fmt.Errorf("missing hop annotation output path")
+	}
 	hc := &HopCache{
 		hops:       make(map[string]bool, 10000), // based on observation
-		annotator:  annotator,
-		outputPath: outputPath,
+		annotator:  ipservice.NewClient(haCfg.IPServiceSocket),
+		outputPath: haCfg.OutputPath,
 	}
 	// Start a cache resetter goroutine to reset the cache every day
 	// at midnight.  For now, we use atomic read/write operations for
@@ -134,7 +140,7 @@ func New(ctx context.Context, annotator ipservice.Client, outputPath string) *Ho
 			atomic.StoreInt32(&hc.hour, int32(hour))
 		}
 	}(time.Duration(tickerDuration))
-	return hc
+	return hc, nil
 }
 
 // Reset creates a new empty hop cache that is a little bigger (25%)

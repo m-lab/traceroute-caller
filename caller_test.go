@@ -22,8 +22,8 @@ func TestMetrics(t *testing.T) {
 	promtest.LintMetrics(t)
 }
 
-func TestMainWithConnectionListener(t *testing.T) {
-	dir, err := ioutil.TempDir("", "TestMainWithConnectionListener")
+func TestMainFunc(t *testing.T) {
+	dir, err := ioutil.TempDir("", "TestMainFunc")
 	rtx.Must(err, "failed to create temp dir")
 	defer os.RemoveAll(dir)
 	srv := eventsocket.New(dir + "/events.sock")
@@ -52,11 +52,11 @@ func TestMainWithBadArgs(t *testing.T) {
 	*tracerouteOutput = "/tmp/"
 	*hopAnnotationOutput = "/tmp/"
 
-	logFatal = func(_ ...interface{}) {
+	logFatalf = func(string, ...interface{}) {
 		panic("testpanic")
 	}
 	defer func() {
-		logFatal = log.Fatal
+		logFatalf = log.Fatalf
 	}()
 	defer func() {
 		r := recover()
@@ -65,5 +65,6 @@ func TestMainWithBadArgs(t *testing.T) {
 		}
 	}()
 
+	ctx, cancel = context.WithCancel(context.Background())
 	main()
 }
