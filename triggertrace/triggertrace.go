@@ -18,11 +18,11 @@ import (
 	"github.com/m-lab/traceroute-caller/ipcache"
 	"github.com/m-lab/traceroute-caller/parser"
 	"github.com/m-lab/uuid-annotator/annotator"
-	"github.com/m-lab/uuid-annotator/ipservice"
 )
 
 var (
-	netInterfaceAddrs = net.InterfaceAddrs // for black-box testing
+	// Variables to aid in black-box testing.
+	netInterfaceAddrs = net.InterfaceAddrs
 )
 
 // Destination is the host to run a traceroute to.
@@ -55,13 +55,19 @@ type Handler struct {
 }
 
 // NewHandler returns a new instance of Handler.
-func NewHandler(ctx context.Context, tracer ipcache.Tracer) (*Handler, error) {
-	ipCache := ipcache.New(ctx, tracer, 0, 0)
+func NewHandler(ctx context.Context, tracer ipcache.Tracer, ipcCfg ipcache.Config, haCfg hopannotation.Config) (*Handler, error) {
+	ipCache, err := ipcache.New(ctx, tracer, ipcCfg)
+	if err != nil {
+		return nil, err
+	}
 	myIPs, err := localIPs()
 	if err != nil {
 		return nil, err
 	}
-	hopCache := hopannotation.New(ctx, ipservice.NewClient(*ipservice.SocketFilename), "")
+	hopCache, err := hopannotation.New(ctx, haCfg)
+	if err != nil {
+		return nil, err
+	}
 	return &Handler{
 		Destinations: make(map[string]Destination),
 		Traceroutes:  ipCache,
@@ -82,7 +88,7 @@ func (h *Handler) Open(ctx context.Context, timestamp time.Time, uuid string, so
 	//     to right before accessing the map.
 	h.DestinationsLock.Lock()
 	defer h.DestinationsLock.Unlock()
-	destination, err := h.findDestination(*sockID)
+	destination, err := h.findDestination(sockID)
 	if err != nil {
 		log.Printf("failed to create connection from SockID %+v\n", *sockID)
 		return
@@ -144,7 +150,7 @@ func (h *Handler) traceAnnotateAndArchive(ctx context.Context, dest Destination)
 // findDestination iterates through the local IPs to find which one of
 // the source and destination IPs specified in the given socket is indeed
 // the destination IP.
-func (h *Handler) findDestination(sockid inetdiag.SockID) (Destination, error) {
+func (h *Handler) findDestination(sockid *inetdiag.SockID) (Destination, error) {
 	srcIP := net.ParseIP(sockid.SrcIP)
 	if srcIP == nil {
 		return Destination{}, fmt.Errorf("failed to parse source IP %q", sockid.SrcIP)

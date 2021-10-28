@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"flag"
 	"io/ioutil"
 	"log"
 	"strconv"
@@ -13,21 +12,6 @@ import (
 
 	"github.com/m-lab/go/shx"
 	"github.com/m-lab/uuid"
-)
-
-var (
-	// ScamperBin is the path to the scamper binary.
-	ScamperBin = flag.String("scamper.bin", "scamper", "The path to the scamper binary.")
-	// ScattachBin is the path to the sc_attach binary.
-	ScattachBin = flag.String("scamper.sc_attach", "sc_attach", "The path to the sc_attach binary.")
-	// ScamperTimeout is how long to wait to complete a scamper trace.
-	ScamperTimeout = flag.Duration("scamper.timeout", 900*time.Second, "How long to wait to complete a scamper trace.")
-	// ScamperPTR specifies if DNS pointer records for IP addresses should be looked up.
-	ScamperPTR = flag.Bool("scamper.tracelb-ptr", true, "Look up DNS pointer records for IP addresses.")
-	// ScamperWaitProbe is how long to wait between probes in 1/100ths of seconds (min 15, max 200.
-	ScamperWaitProbe = flag.Int("scamper.tracelb-W", 25, "How long to wait between probes in 1/100ths of seconds (min 15, max 200).")
-	// TracerouteOutput is the path to store traceroute (scamper) output.
-	TracerouteOutput = flag.String("traceroute-output", "/var/spool/scamper1", "The path to store traceroute output.")
 )
 
 // Scamper invokes an instance of the scamper tool for each traceroute.

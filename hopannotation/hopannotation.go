@@ -20,7 +20,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"flag"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -38,9 +37,6 @@ import (
 )
 
 var (
-	// HopAnnotationOutput is the path to store hop annotation output.
-	HopAnnotationOutput = flag.String("hopannotation-output", "/var/spool/hopannotation1", "The path to store hop annotation output.")
-
 	// ErrParseHopIP means a hop IP address could not be parsed.
 	ErrParseHopIP = errors.New("failed to parse hop IP address")
 	// ErrCreatePath means a directory path for hop annotations could not be created.
@@ -79,6 +75,14 @@ type HopAnnotation1 struct {
 	Annotations *annotator.ClientAnnotations
 }
 
+// Config contains configuration parameters of a hop cache.
+// The parameters include the IP service to use and where to save the
+// annotations.
+type Config struct {
+	IPServiceSocket string
+	OutputPath      string
+}
+
 // HopCache is the cache of hop annotations.
 type HopCache struct {
 	hops       map[string]bool  // hop addresses being handled or already handled
@@ -102,14 +106,14 @@ func init() {
 // to obtain annotations.  It also starts a goroutine that checks for the
 // passage of the midnight every minute to reset the cache.  The goroutine
 // will terminate when the ctx is cancelled.
-func New(ctx context.Context, annotator ipservice.Client, outputPath string) *HopCache {
-	if outputPath == "" {
-		outputPath = *HopAnnotationOutput
+func New(ctx context.Context, haCfg Config) (*HopCache, error) {
+	if haCfg.IPServiceSocket == "" || haCfg.OutputPath == "" {
+		return nil, fmt.Errorf("invalid hop annotation configuration: %+v", haCfg)
 	}
 	hc := &HopCache{
 		hops:       make(map[string]bool, 10000), // based on observation
-		annotator:  annotator,
-		outputPath: outputPath,
+		annotator:  ipservice.NewClient(haCfg.IPServiceSocket),
+		outputPath: haCfg.OutputPath,
 	}
 	// Start a cache resetter goroutine to reset the cache every day
 	// at midnight.  For now, we use atomic read/write operations for
@@ -135,7 +139,7 @@ func New(ctx context.Context, annotator ipservice.Client, outputPath string) *Ho
 			atomic.StoreInt32(&hc.hour, int32(hour))
 		}
 	}(time.Duration(tickerDuration))
-	return hc
+	return hc, nil
 }
 
 // Reset creates a new empty hop cache that is a little bigger (25%)
