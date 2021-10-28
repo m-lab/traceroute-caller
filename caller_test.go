@@ -12,8 +12,6 @@ import (
 	"github.com/m-lab/go/prometheusx/promtest"
 	"github.com/m-lab/go/rtx"
 	"github.com/m-lab/tcp-info/eventsocket"
-	"github.com/m-lab/traceroute-caller/hopannotation"
-	"github.com/m-lab/traceroute-caller/tracer"
 )
 
 func init() {
@@ -33,8 +31,8 @@ func TestMainFunc(t *testing.T) {
 
 	*prometheusx.ListenAddress = ":0"
 	*eventsocket.Filename = dir + "/events.sock"
-	*tracer.TracerouteOutput = dir
-	*hopannotation.HopAnnotationOutput = dir
+	*tracerouteOutput = dir
+	*hopAnnotationOutput = dir
 
 	ctx, cancel = context.WithCancel(context.Background())
 	go func(t *testing.T) {
@@ -51,14 +49,14 @@ func TestMainFunc(t *testing.T) {
 
 func TestMainWithBadArgs(t *testing.T) {
 	*eventsocket.Filename = ""
-	*tracer.TracerouteOutput = "/tmp/"
-	*hopannotation.HopAnnotationOutput = "/tmp/"
+	*tracerouteOutput = "/tmp/"
+	*hopAnnotationOutput = "/tmp/"
 
-	logFatal = func(_ ...interface{}) {
+	logFatalf = func(string, ...interface{}) {
 		panic("testpanic")
 	}
 	defer func() {
-		logFatal = log.Fatal
+		logFatalf = log.Fatalf
 	}()
 	defer func() {
 		r := recover()

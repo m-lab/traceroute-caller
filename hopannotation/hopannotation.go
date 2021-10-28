@@ -107,8 +107,9 @@ func init() {
 // passage of the midnight every minute to reset the cache.  The goroutine
 // will terminate when the ctx is cancelled.
 func New(ctx context.Context, haCfg Config) (*HopCache, error) {
-	if haCfg.IPServiceSocket == "" || haCfg.OutputPath == "" {
-		return nil, fmt.Errorf("invalid hop annotation configuration: %+v", haCfg)
+	// Let ipservice.NewClient() validate IPServiceSocket.
+	if haCfg.OutputPath == "" {
+		return nil, fmt.Errorf("missing hop annotation output path")
 	}
 	hc := &HopCache{
 		hops:       make(map[string]bool, 10000), // based on observation
