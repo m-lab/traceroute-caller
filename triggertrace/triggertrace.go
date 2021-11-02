@@ -52,6 +52,8 @@ type Handler struct {
 	LocalIPs         []*net.IP
 	Traceroutes      FetchTracer
 	HopAnnotator     AnnotateAndArchiver
+	// For testing.
+	done chan struct{}
 }
 
 // NewHandler returns a new instance of Handler.
@@ -90,12 +92,12 @@ func (h *Handler) Open(ctx context.Context, timestamp time.Time, uuid string, so
 	defer h.DestinationsLock.Unlock()
 	destination, err := h.findDestination(sockID)
 	if err != nil {
-		log.Printf("failed to create connection from SockID %+v\n", *sockID)
+		log.Printf("failed to find destination from SockID %+v\n", *sockID)
 		return
 	}
 	if uuid == "" {
 		// TODO(SaiedKazemi): Add a metric here.
-		log.Printf("warning: uuid for SockID %+v is nil\n", *sockID)
+		log.Printf("warning: uuid for SockID %+v is empty\n", *sockID)
 	}
 	h.Destinations[uuid] = destination
 }
@@ -107,7 +109,7 @@ func (h *Handler) Close(ctx context.Context, timestamp time.Time, uuid string) {
 	destination, ok := h.Destinations[uuid]
 	if !ok {
 		h.DestinationsLock.Unlock()
-		log.Printf("failed to find connection for UUID %v", uuid)
+		log.Printf("failed to find destination for UUID %q", uuid)
 		return
 	}
 
@@ -121,9 +123,14 @@ func (h *Handler) Close(ctx context.Context, timestamp time.Time, uuid string) {
 // traceAnnotateAndArchive runs a traceroute, annotates the hops
 // in the traceroute output, and archives the annotations.
 func (h *Handler) traceAnnotateAndArchive(ctx context.Context, dest Destination) {
+	defer func() {
+		if h.done != nil {
+			close(h.done)
+		}
+	}()
 	data, err := h.Traceroutes.FetchTrace(dest.RemoteIP, dest.Cookie)
 	if err != nil {
-		log.Printf("failed to run a trace for connection %v (error: %v)\n", dest, err)
+		log.Printf("failed to run a traceroute to %q (error: %v)\n", dest, err)
 		return
 	}
 	output, err := parser.ParseTraceroute(data)
@@ -161,9 +168,9 @@ func (h *Handler) findDestination(sockid *inetdiag.SockID) (Destination, error) 
 	}
 	srcLocal := false
 	dstLocal := false
-	for _, local := range h.LocalIPs {
-		srcLocal = srcLocal || local.Equal(srcIP)
-		dstLocal = dstLocal || local.Equal(dstIP)
+	for _, localIP := range h.LocalIPs {
+		srcLocal = srcLocal || localIP.Equal(srcIP)
+		dstLocal = dstLocal || localIP.Equal(dstIP)
 	}
 	if srcLocal && !dstLocal {
 		return Destination{

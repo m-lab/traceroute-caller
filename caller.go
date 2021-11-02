@@ -36,8 +36,10 @@ var (
 	ipcScanPeriod   = flag.Duration("IPCacheUpdatePeriod", 1*time.Minute, "IP cache scanning period in seconds.")
 
 	// Variables to aid in testing of main().
-	ctx, cancel = context.WithCancel(context.Background())
-	logFatalf   = log.Fatalf
+	ctx, cancel    = context.WithCancel(context.Background())
+	logFatalf      = log.Fatalf
+	errEventSocket = "tcpinfo.eventsocket value was empty"
+	errNewHandler  = "failed to create handler"
 )
 
 func main() {
@@ -48,7 +50,7 @@ func main() {
 		logFatalf("failed to get args from environment (error: %v)", err)
 	}
 	if *eventsocket.Filename == "" {
-		logFatalf("tcpinfo.eventsocket value was empty")
+		logFatalf(errEventSocket)
 	}
 
 	promSrv := prometheusx.MustServeMetrics()
@@ -73,12 +75,12 @@ func main() {
 		ScanPeriod:   *ipcScanPeriod,
 	}
 	haCfg := hopannotation.Config{
-		IPServiceSocket: *ipservice.SocketFilename,
+		AnnotatorClient: ipservice.NewClient(*ipservice.SocketFilename),
 		OutputPath:      *hopAnnotationOutput,
 	}
 	traceHandler, err := triggertrace.NewHandler(ctx, scamper, ipcCfg, haCfg)
 	if err != nil {
-		logFatalf("failed to create a new triggertrace handler (error: %v)", err)
+		logFatalf("%v (error %v)", errNewHandler, err)
 	}
 	eventsocket.MustRun(ctx, *eventsocket.Filename, traceHandler)
 }

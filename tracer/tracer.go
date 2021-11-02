@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/m-lab/go/prometheusx"
+	"github.com/m-lab/go/rtx"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
@@ -66,6 +67,9 @@ var (
 		},
 		[]string{"type", "error"},
 	)
+	// hostname of the current machine. Only call os.Hostname once, because the
+	// result should never change.
+	hostname string
 )
 
 // Metadata is the first line of the traceroute .jsonl file.
@@ -76,6 +80,12 @@ type Metadata struct {
 	TracerouteCallerVersion string
 	CachedResult            bool
 	CachedUUID              string
+}
+
+func init() {
+	var err error
+	hostname, err = os.Hostname()
+	rtx.Must(err, "failed to call os.Hostname")
 }
 
 // extractUUID retrieves the UUID from a cached line.
