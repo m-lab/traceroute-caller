@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
@@ -22,12 +21,12 @@ func init() {
 // handler and establish a connection with the eventsocket server.
 func TestMainFunc(t *testing.T) {
 	saveOSArgs := os.Args
-	logFatalf = func(s string, args ...interface{}) { panic(s) }
+	logFatal = func(args ...interface{}) { panic(args[0]) }
 	defer func() {
 		if r := recover(); r != nil {
 			t.Errorf("main() = %v, want nil", r)
 		}
-		logFatalf = log.Fatalf
+		logFatal = log.Fatal
 		os.Args = saveOSArgs
 	}()
 
@@ -51,6 +50,7 @@ func TestMainFunc(t *testing.T) {
 		}
 		close(srvDone)
 	}(t)
+	// Cancel the server's context after one second.
 	go func() {
 		time.Sleep(1 * time.Second)
 		cancel()
@@ -70,7 +70,9 @@ func TestMainFunc(t *testing.T) {
 	main()
 	select {
 	case <-srvDone:
-	case <-time.After(1 * time.Second):
+	// Since the server's context was cancelled after one second,
+	// two seconds should be long enough for the server to have stopped.
+	case <-time.After(2 * time.Second):
 		t.Errorf("eventsocket server goroutine still running")
 	}
 }
@@ -78,12 +80,16 @@ func TestMainFunc(t *testing.T) {
 // TestMainFuncEventSocket tests that main() fails when a path to
 // tcp-info's event socket is not provided.
 func TestMainFuncEventSocket(t *testing.T) {
-	logFatalf = func(s string, a ...interface{}) { panic(fmt.Sprintf(s, a...)) }
+	logFatal = func(args ...interface{}) { panic(args[0]) }
 	defer func() {
-		if r := recover(); r == nil || !strings.HasPrefix(r.(string), errEventSocket) {
-			t.Errorf("main() = %v, want %v", r, errEventSocket)
+		r := recover()
+		if r == nil {
+			t.Errorf("main() = nil, want %v", errEventSocket)
 		}
-		logFatalf = log.Fatalf
+		if got := r.(error); got != errEventSocket {
+			t.Errorf("main() = %v, want %v", got, errEventSocket)
+		}
+		logFatal = log.Fatal
 	}()
 
 	ctx, cancel = context.WithCancel(context.Background())
@@ -103,12 +109,16 @@ func TestMainFuncEventSocket(t *testing.T) {
 // TestMainNewHandler tests that main() fails when hop annotation
 // configuration for creating a new handler is invalid.
 func TestMainNewHandler(t *testing.T) {
-	logFatalf = func(s string, a ...interface{}) { panic(fmt.Sprintf(s, a...)) }
+	logFatal = func(args ...interface{}) { panic(args[0]) }
 	defer func() {
-		if r := recover(); r == nil || !strings.HasPrefix(r.(string), errNewHandler) {
-			t.Errorf("main() = %v, want %v", r, errNewHandler)
+		r := recover()
+		if r == nil {
+			t.Errorf("main() = nil, want %v", errNewHandler)
 		}
-		logFatalf = log.Fatalf
+		if got := r.(error); !strings.Contains(got.Error(), errNewHandler.Error()) {
+			t.Errorf("main() = %v, want %v", got, errNewHandler)
+		}
+		logFatal = log.Fatal
 	}()
 
 	ctx, cancel = context.WithCancel(context.Background())

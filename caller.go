@@ -11,6 +11,7 @@ import (
 	"context"
 	"errors"
 	"flag"
+	"fmt"
 	"log"
 	"time"
 
@@ -37,9 +38,10 @@ var (
 
 	// Variables to aid in testing of main().
 	ctx, cancel    = context.WithCancel(context.Background())
-	logFatalf      = log.Fatalf
-	errEventSocket = "tcpinfo.eventsocket value was empty"
-	errNewHandler  = "failed to create handler"
+	logFatal       = log.Fatal
+	errEnvArgs     = errors.New("failed to get args from environment")
+	errEventSocket = errors.New("tcpinfo.eventsocket value was empty")
+	errNewHandler  = errors.New("failed to create a triggertrace handler")
 )
 
 func main() {
@@ -47,10 +49,10 @@ func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	flag.Parse()
 	if err := flagx.ArgsFromEnv(flag.CommandLine); err != nil {
-		logFatalf("failed to get args from environment (error: %v)", err)
+		logFatal(fmt.Errorf("%v: %w", errEnvArgs, err))
 	}
 	if *eventsocket.Filename == "" {
-		logFatalf(errEventSocket)
+		logFatal(errEventSocket)
 	}
 
 	promSrv := prometheusx.MustServeMetrics()
@@ -80,7 +82,7 @@ func main() {
 	}
 	traceHandler, err := triggertrace.NewHandler(ctx, scamper, ipcCfg, haCfg)
 	if err != nil {
-		logFatalf("%v (error %v)", errNewHandler, err)
+		logFatal(fmt.Errorf("%v: %w", errNewHandler, err))
 	}
 	eventsocket.MustRun(ctx, *eventsocket.Filename, traceHandler)
 }
