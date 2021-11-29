@@ -47,21 +47,21 @@ type cachedTest struct {
 type IPCache struct {
 	cache     map[string]*cachedTest
 	cacheLock sync.Mutex
-	tracer    Tracer
+	tracetool Tracer
 }
 
 // New creates and returns an IPCache. It also starts up a background
 // goroutine that scrubs the cache.
-func New(ctx context.Context, tracer Tracer, ipcCfg Config) (*IPCache, error) {
-	if tracer == nil {
-		return nil, fmt.Errorf("nil tracer")
+func New(ctx context.Context, tracetool Tracer, ipcCfg Config) (*IPCache, error) {
+	if ctx == nil || tracetool == nil {
+		return nil, fmt.Errorf("nil context or tracetool")
 	}
 	if ipcCfg.EntryTimeout == 0 || ipcCfg.ScanPeriod == 0 {
 		return nil, fmt.Errorf("invalid IP cache configuration: %+v", ipcCfg)
 	}
 	ipc := &IPCache{
-		cache:  make(map[string]*cachedTest),
-		tracer: tracer,
+		cache:     make(map[string]*cachedTest),
+		tracetool: tracetool,
 	}
 	go func() {
 		ticker := time.NewTicker(ipcCfg.ScanPeriod)
@@ -89,7 +89,7 @@ func New(ctx context.Context, tracer Tracer, ipcCfg Config) (*IPCache, error) {
 
 // FetchTrace checks the IP cache to determine if a recent traceroute to
 // the remote IP exists or not. If a traceroute exists, it will be used.
-// Otherwise, it calls the tracer to run a new traceroute.
+// Otherwise, it calls the tracetool to run a new traceroute.
 func (ic *IPCache) FetchTrace(remoteIP, cookie string) ([]byte, error) {
 	// Get a globally unique identifier for the given cookie.
 	// For example, if cookie is "4418bb", we want something like:
@@ -104,13 +104,13 @@ func (ic *IPCache) FetchTrace(remoteIP, cookie string) ([]byte, error) {
 	if existed {
 		<-cachedTest.dataReady
 		if cachedTest.err != nil {
-			ic.tracer.DontTrace()
+			ic.tracetool.DontTrace()
 			return nil, cachedTest.err
 		}
-		_ = ic.tracer.TraceFromCachedTrace(cookie, uuid, time.Now(), cachedTest.data)
+		_ = ic.tracetool.TraceFromCachedTrace(cookie, uuid, time.Now(), cachedTest.data)
 		return cachedTest.data, nil
 	}
-	cachedTest.data, cachedTest.err = ic.tracer.Trace(remoteIP, cookie, uuid, cachedTest.timeStamp)
+	cachedTest.data, cachedTest.err = ic.tracetool.Trace(remoteIP, cookie, uuid, cachedTest.timeStamp)
 	close(cachedTest.dataReady)
 	return cachedTest.data, cachedTest.err
 }
@@ -128,4 +128,12 @@ func (ic *IPCache) getEntry(ip string) (*cachedTest, bool) {
 		}
 	}
 	return ic.cache[ip], existed
+}
+
+// NumEntries returns the number of entries currently in the IP cache.
+// The primary use of this is for testing.
+func (ic *IPCache) NumEntries() int {
+	ic.cacheLock.Lock()
+	defer ic.cacheLock.Unlock()
+	return len(ic.cache)
 }

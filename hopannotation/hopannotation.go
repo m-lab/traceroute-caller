@@ -79,7 +79,7 @@ type HopAnnotation1 struct {
 // The parameters include the IP service to use and where to save the
 // annotations.
 type Config struct {
-	IPServiceSocket string
+	AnnotatorClient ipservice.Client
 	OutputPath      string
 }
 
@@ -107,13 +107,12 @@ func init() {
 // passage of the midnight every minute to reset the cache.  The goroutine
 // will terminate when the ctx is cancelled.
 func New(ctx context.Context, haCfg Config) (*HopCache, error) {
-	// Let ipservice.NewClient() validate IPServiceSocket.
-	if haCfg.OutputPath == "" {
-		return nil, fmt.Errorf("missing hop annotation output path")
+	if haCfg.AnnotatorClient == nil || haCfg.OutputPath == "" {
+		return nil, fmt.Errorf("invalid hop annotation configuration: %+v", haCfg)
 	}
 	hc := &HopCache{
 		hops:       make(map[string]bool, 10000), // based on observation
-		annotator:  ipservice.NewClient(haCfg.IPServiceSocket),
+		annotator:  haCfg.AnnotatorClient,
 		outputPath: haCfg.OutputPath,
 	}
 	// Start a cache resetter goroutine to reset the cache every day
