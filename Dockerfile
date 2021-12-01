@@ -26,9 +26,9 @@ RUN apt-get update && \
 RUN ls -l
 RUN mkdir /scamper-src
 ADD ./third_party/scamper/ /scamper-src
-RUN tar xvzf  /scamper-src/scamper-cvs-20191102a.tar.gz -C /scamper-src/
-RUN chmod +x /scamper-src/scamper-cvs-20191102a/configure
-WORKDIR /scamper-src/scamper-cvs-20191102a/
+RUN tar xvzf  /scamper-src/scamper-cvs-20211026.tar.gz -C /scamper-src/
+RUN chmod +x /scamper-src/scamper-cvs-20211026/configure
+WORKDIR /scamper-src/scamper-cvs-20211026/
 RUN ./configure --prefix=/scamper
 RUN make -j 8
 RUN make install
