@@ -2,7 +2,6 @@
 FROM golang:1.16 as build_caller
 ADD . /go/src/github.com/m-lab/traceroute-caller
 RUN rm /go/src/github.com/m-lab/traceroute-caller/Dockerfile
-ENV GOARCH amd64
 ENV CGO_ENABLED 0
 ENV GOOS linux
 WORKDIR /go/src/github.com/m-lab/traceroute-caller
