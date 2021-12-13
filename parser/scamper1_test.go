@@ -42,7 +42,7 @@ func TestParser(t *testing.T) {
 	}
 	for i, test := range tests {
 		// Read in the test traceroute output file.
-		f := filepath.Join("./testdata", test.file)
+		f := filepath.Join("./testdata/scamper1", test.file)
 		t.Logf("\nTest %v: file: %v", i, f)
 		content, err := ioutil.ReadFile(f)
 		if err != nil {
