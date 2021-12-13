@@ -1,30 +1,13 @@
-// Package parser handles parsing of scamper output in JSONL format.
-//
-// Refer to scamper source code files scamper/scamper_list.h and
-// scamper/tracelb/scamper_tracelb.h for the definitions of cycle_start,
-// tracelb, and cycle_stop lines.
 package parser
 
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net"
+	"time"
 
 	"github.com/m-lab/traceroute-caller/tracer"
-)
-
-var (
-	errTraceroute     = errors.New("invalid traceroute file")
-	errMetadata       = errors.New("invalid metadata")
-	errMetadataUUID   = errors.New("invalid UUID (empty)")
-	errCycleStart     = errors.New("invalid cycle-start")
-	errCycleStartType = errors.New("invalid cycle-start type")
-	errTracelb        = errors.New("invalid tracelb")
-	errTracelbType    = errors.New("invalid tracelb type")
-	errCycleStop      = errors.New("invalid cycle-stop")
-	errCycleStopType  = errors.New("invalid cycle-stop type")
 )
 
 // TODO: The following structs are almost identical to the structs
@@ -35,12 +18,6 @@ var (
 //       as float in scamper source code so it's not clear at all
 //       why there are defined float64.  Look into this and change
 //       them to the proper unit{8,16,32} types.
-
-// TS contains a unix epoch timestamp.
-type TS struct {
-	Sec  int64 `json:"sec"`
-	Usec int64 `json:"usec"`
-}
 
 // Reply describes a single reply message.
 type Reply struct {
@@ -63,7 +40,7 @@ type Probe struct {
 	Replies []Reply `json:"replies"` // There is usually just a single reply
 }
 
-// ScamperLink describes a single step in the trace.  The probes within a
+// ScamperLink describes a single step in the traceroute.  The probes within a
 // ScamperLink appear to have the same value of TTL, but different flow_ids.
 type ScamperLink struct {
 	Addr   string  `json:"addr"`
@@ -79,28 +56,22 @@ type ScamperNode struct {
 	Links [][]ScamperLink `json:"links"`
 }
 
-// ScamperOutput encapsulates the four lines of a traceroute:
+// Scamper1 encapsulates the four lines of a traceroute:
 //   {"UUID":...}
 //   {"type":"cycle-start"...}
 //   {"type":"tracelb"...}
 //   {"type":"cycle-stop"...}
-type ScamperOutput struct {
+// Refer to scamper source code files scamper/scamper_list.h and
+// scamper/tracelb/scamper_tracelb.h for the definitions of cycle_start,
+// tracelb, and cycle_stop lines.
+type Scamper1 struct {
 	Metadata   tracer.Metadata
 	CycleStart CyclestartLine
 	Tracelb    TracelbLine
 	CycleStop  CyclestopLine
 }
 
-// CyclestartLine contains the information about the scamper "cyclestart"
-type CyclestartLine struct {
-	Type      string  `json:"type"`
-	ListName  string  `json:"list_name" bigquery:"list_name"`
-	ID        float64 `json:"id"`
-	Hostname  string  `json:"hostname"`
-	StartTime float64 `json:"start_time" bigquery:"start_time"`
-}
-
-// TracelbLine contains the actual scamper trace details.
+// TracelbLine contains scamper MDA traceroute details.
 // Not clear why so many fields are floats.  Fields in scamper code are uint16_t and uint8_t
 type TracelbLine struct {
 	Type        string        `json:"type"`
@@ -125,69 +96,65 @@ type TracelbLine struct {
 	Nodes       []ScamperNode `json:"nodes"`
 }
 
-// CyclestopLine contains the ending details from the scamper tool.  ID,
-// ListName, hostname seem to match CyclestartLine
-type CyclestopLine struct {
-	Type     string  `json:"type"`
-	ListName string  `json:"list_name" bigquery:"list_name"`
-	ID       float64 `json:"id"`
-	Hostname string  `json:"hostname"`
-	StopTime float64 `json:"stop_time" bigquery:"stop_time"`
+type scamper1Parser struct {
 }
 
-// ParseTraceroute parses scamper output in JSONL format and returns it.
-func ParseTraceroute(data []byte) (*ScamperOutput, error) {
-	var scamperOutput ScamperOutput
+// ParseRawData parses scamper's MDA traceroute in JSONL format.
+func (s1 *scamper1Parser) ParseRawData(rawData []byte) (ParsedData, error) {
+	var scamper1 Scamper1
 	var err error
 
-	// We account for the last newline because it's a lot faster than
-	// stripping it and creating a new slice.  We just validate that
-	// the last line is empty.
-	lines := bytes.Split(data, []byte("\n"))
-	if len(lines) != 5 {
-		return nil, errTraceroute
-	}
-	if len(lines[4]) != 0 {
-		return nil, errTraceroute
+	// First validate the traceroute data.	We account for the last
+	// newline because it's a lot faster than stripping it and creating
+	// a new slice.  We just confirm that the last line is empty.
+	lines := bytes.Split(rawData, []byte("\n"))
+	if len(lines) != 5 || len(lines[4]) != 0 {
+		return nil, errTracerouteFile
 	}
 
 	// Parse and validate the metadata line.
-	if err := json.Unmarshal(lines[0], &scamperOutput.Metadata); err != nil {
+	if err := json.Unmarshal(lines[0], &scamper1.Metadata); err != nil {
 		return nil, errMetadata
 	}
-	if scamperOutput.Metadata.UUID == "" {
-		return nil, fmt.Errorf("%w: %v", errMetadataUUID, scamperOutput.Metadata.UUID)
+	if scamper1.Metadata.UUID == "" {
+		return nil, fmt.Errorf("%w: %v", errMetadataUUID, scamper1.Metadata.UUID)
 	}
 
 	// Parse and validate the cycle-start line.
-	if err := json.Unmarshal(lines[1], &scamperOutput.CycleStart); err != nil {
+	if err := json.Unmarshal(lines[1], &scamper1.CycleStart); err != nil {
 		return nil, errCycleStart
 	}
-	if scamperOutput.CycleStart.Type != "cycle-start" {
-		return nil, fmt.Errorf("%w: %v", errCycleStartType, scamperOutput.CycleStart.Type)
+	if scamper1.CycleStart.Type != "cycle-start" {
+		return nil, fmt.Errorf("%w: %v", errCycleStartType, scamper1.CycleStart.Type)
 	}
 
 	// Parse and validate the tracelb line.
-	if err = json.Unmarshal(lines[2], &scamperOutput.Tracelb); err != nil {
-		return nil, errTracelb
+	if err = json.Unmarshal(lines[2], &scamper1.Tracelb); err != nil {
+		return nil, errTracelbLine
 	}
-	if scamperOutput.Tracelb.Type != "tracelb" {
-		return nil, fmt.Errorf("%w: %v", errTracelbType, scamperOutput.Tracelb.Type)
+	if scamper1.Tracelb.Type != "tracelb" {
+		return nil, fmt.Errorf("%w: %v", errTraceType, scamper1.Tracelb.Type)
 	}
 
 	// Parse and validate the cycle-stop line.
-	if err = json.Unmarshal(lines[3], &scamperOutput.CycleStop); err != nil {
+	if err = json.Unmarshal(lines[3], &scamper1.CycleStop); err != nil {
 		return nil, errCycleStop
 	}
-	if scamperOutput.CycleStop.Type != "cycle-stop" {
-		return nil, fmt.Errorf("%w: %v", errCycleStopType, scamperOutput.CycleStop.Type)
+	if scamper1.CycleStop.Type != "cycle-stop" {
+		return nil, fmt.Errorf("%w: %v", errCycleStopType, scamper1.CycleStop.Type)
 	}
 
-	return &scamperOutput, nil
+	return scamper1, nil
+}
+
+// StartTime returns the start time of the traceroute.
+func (s1 Scamper1) StartTime() time.Time {
+	return time.Unix(int64(s1.CycleStart.StartTime), 0).UTC()
 }
 
 // ExtractHops parses tracelb and extracts all hop addresses.
-func ExtractHops(tracelb *TracelbLine) []string {
+func (s1 Scamper1) ExtractHops() []string {
+	tracelb := s1.Tracelb
 	// We cannot use net.IP as key because it is a slice.
 	hops := make(map[string]struct{}, 100)
 	for i := range tracelb.Nodes {
