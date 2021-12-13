@@ -1,4 +1,0 @@
-{"UUID":"ndt-v595x_1572645241_000000000000078A","TracerouteCallerVersion":"bc092be","CachedResult":true,"CachedUUID":"ndt-v595x_1572645241_000000000000077F"}
-{"type":"cycle-start", "list_name":"/tmp/scamperctrl:58", "id":1, "hostname":"ndt-v595x", "start_time":1572659496}
-{"type":"tracelb", "version":"0.1", "userid":0, "method":"icmp-echo", "src":"::ffff:4.15.35.178", "dst":"::ffff:35.225.75.192", "start":{"sec":1572659496, "usec":513368, "ftime":"2019-11-02 01:51:36"}, "probe_size":60, "firsthop":1, "attempts":3, "confidence":95, "tos":0, "gaplimit":3, "wait_timeout":5, "wait_probe":250, "probec":0, "probec_max":3000, "nodec":0, "linkc":0}
-{"type":"cycle-stop", "list_name":"/tmp/scamperctrl:58", "id":1, "hostname":"ndt-v595x", "stop_time":1572659496}
