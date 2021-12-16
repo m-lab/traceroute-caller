@@ -33,10 +33,11 @@ func (s *Scamper) Validate() error {
 	if err != nil {
 		return fmt.Errorf("failed to stat scamper binary (error: %v)", err)
 	}
-	if fileInfo.IsDir() {
-		return fmt.Errorf("scamper binary is a directory")
+	fileMode := fileInfo.Mode()
+	if !fileMode.IsRegular() {
+		return fmt.Errorf("scamper binary is not a regular file")
 	}
-	if fileInfo.Mode()&0100 == 0 {
+	if fileMode&0100 == 0 {
 		return fmt.Errorf("scamper binary is not executable by owner")
 	}
 

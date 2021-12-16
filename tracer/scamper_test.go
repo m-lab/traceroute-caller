@@ -28,7 +28,7 @@ func TestValidate(t *testing.T) {
 		want             string
 	}{
 		{"testdata/non-existent", "mda", 15, true, "failed to stat scamper binary"},
-		{"testdata", "mda", 15, true, "scamper binary is a directory"},
+		{"testdata", "mda", 15, true, "scamper binary is not a regular file"},
 		{"testdata/non-executable", "mda", 15, true, "scamper binary is not executable by owner"},
 		{"/bin/echo", "bad", 15, true, "invalid traceroute type"},
 		{"/bin/echo", "mda", 14, true, "invalid tracelb wait probe value"},
