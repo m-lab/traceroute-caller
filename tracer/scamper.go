@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -23,35 +24,39 @@ type Scamper struct {
 	TraceType        string
 	TracelbPTR       bool
 	TracelbWaitProbe int
-	noArgs           bool // used only for package testing
 }
 
-// Validate validates the traceroute type, returning nil for valid types
-// and error for invalid types.
+// Validate validates scamper configuration, returning nil for valid
+// and an error for invalid configurations.
 func (s *Scamper) Validate() error {
+	if fileInfo, err := os.Stat(s.Binary); err != nil {
+		return fmt.Errorf("failed to stat scamper binary (error: %v)", err)
+	} else if fileInfo.IsDir() {
+		return fmt.Errorf("scamper binary is a directory")
+	}
+
 	switch s.TraceType {
 	case "MDA":
 		s.TraceType = "mda"
 		fallthrough
-	case "mda":
+	case "mda": // uses paris-traceroute algorithm
 		if s.TracelbWaitProbe < 15 || s.TracelbWaitProbe > 200 {
-			return fmt.Errorf("%d: invalid tracelb wait probe", s.TracelbWaitProbe)
+			return fmt.Errorf("%d: invalid tracelb wait probe value", s.TracelbWaitProbe)
 		}
 		return nil
 	}
 	return fmt.Errorf("%s: invalid traceroute type", s.TraceType)
 }
 
-// Trace starts a new scamper process running the paris-traceroute algorithm to
-// every node. This uses more resources per-traceroute, but segfaults in the
-// called binaries have a much smaller "blast radius".
+// Trace starts a new scamper process to run a traceroute based on the
+// traceroute type (e.g., "mda") and saves it in a file.
 func (s *Scamper) Trace(remoteIP, cookie, uuid string, t time.Time) (out []byte, err error) {
 	tracesInProgress.WithLabelValues("scamper").Inc()
 	defer tracesInProgress.WithLabelValues("scamper").Dec()
 	return s.trace(remoteIP, cookie, uuid, t)
 }
 
-// CachedTrace creates a traceroute from the traceroute cache.
+// CachedTrace creates a traceroute from the traceroute cache and saves it in a file.
 func (s *Scamper) CachedTrace(uuid, cookie string, t time.Time, cachedTrace []byte) error {
 	filename, err := generateFilename(s.OutputPath, cookie, t)
 	if err != nil {
@@ -79,7 +84,9 @@ func (*Scamper) DontTrace() {
 	tracesNotPerformed.WithLabelValues("scamper").Inc()
 }
 
-// trace runs a traceroute using scamper as a standalone binary.
+// trace runs a traceroute using scamper as a standalone binary. The
+// command line to invoke scamper varies depending on the traceroute type
+// and its options.
 func (s *Scamper) trace(remoteIP, cookie, uuid string, t time.Time) ([]byte, error) {
 	// Make sure a directory path based on the current date exists,
 	// generate a filename to save in that directory, and create
@@ -107,12 +114,7 @@ func (s *Scamper) trace(remoteIP, cookie, uuid string, t time.Time) ([]byte, err
 	// command like echo, yes, and false is used which does not
 	// need the scamper command line arguments and can actually
 	// fail because of them.
-	var cmd []string
-	if s.noArgs {
-		cmd = []string{s.Binary}
-	} else {
-		cmd = []string{s.Binary, "-o-", "-O", "json", "-I", traceCmd}
-	}
+	cmd := []string{s.Binary, "-o-", "-O", "json", "-I", traceCmd}
 
 	// Create a context, run a traceroute, and write the output to file.
 	ctx, cancel := context.WithTimeout(context.Background(), s.Timeout)

@@ -1,0 +1,4 @@
+#!/bin/bash
+
+echo "forced failure"
+exit 1

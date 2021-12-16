@@ -2,15 +2,10 @@ package parser
 
 import (
 	"io/ioutil"
-	"log"
 	"path/filepath"
 	"strings"
 	"testing"
 )
-
-func init() {
-	log.SetFlags(log.LstdFlags | log.Lshortfile)
-}
 
 func TestScamper1Parser(t *testing.T) {
 	tests := []struct {

@@ -19,6 +19,38 @@ func init() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 }
 
+func TestValidate(t *testing.T) {
+	tests := []struct {
+		binary           string
+		traceType        string
+		tracelbWaitProbe int
+		shouldFail       bool
+		want             string
+	}{
+		{"/non-existent/path", "mda", 15, true, "failed to stat scamper binary"},
+		{"/", "mda", 15, true, "scamper binary is a directory"},
+		{"/bin/echo", "bad", 15, true, "invalid traceroute type"},
+		{"/bin/echo", "MDA", 14, true, "invalid tracelb wait probe value"},
+		{"/bin/echo", "mda", 201, true, "invalid tracelb wait probe value"},
+		{"/bin/echo", "mda", 25, false, ""},
+	}
+	for _, test := range tests {
+		scamper := &Scamper{
+			Binary:           test.binary,
+			TraceType:        test.traceType,
+			TracelbWaitProbe: test.tracelbWaitProbe,
+		}
+		err := scamper.Validate()
+		if err != nil {
+			if !test.shouldFail || !strings.Contains(err.Error(), test.want) {
+				t.Errorf("Validate() = %v, want %q", err, test.want)
+			}
+		} else if test.shouldFail {
+			t.Errorf("Validate() = nil, want %s", test.want)
+		}
+	}
+}
+
 func TestTrace(t *testing.T) {
 	dir, err := ioutil.TempDir("", "TestScamper")
 	if err != nil {
@@ -31,31 +63,33 @@ func TestTrace(t *testing.T) {
 	tests := []struct {
 		binary     string
 		traceType  string
-		noArgs     bool
+		tracelbPTR bool
 		shouldFail bool
 		want       string
 	}{
-		{"false", "mda", true, true, ""},
-		{"yes", "mda", true, true, ""},
-		{"echo", "mda", false, false, `{"UUID":"","TracerouteCallerVersion":"` + prometheusx.GitShortCommit + `","CachedTrace":false,"CachedUUID":""}
+		{"testdata/fail", "mda", true, true, "exit status 1: testdata/fail"},
+		{"testdata/loop", "mda", true, true, "signal: killed: testdata/loop"},
+
+		{"echo", "mda", true, false, `{"UUID":"","TracerouteCallerVersion":"` + prometheusx.GitShortCommit + `","CachedTrace":false,"CachedUUID":""}
 -o- -O json -I tracelb -P icmp-echo -q 3 -W 39 -O ptr 10.1.1.1`},
+		{"echo", "mda", false, false, `{"UUID":"","TracerouteCallerVersion":"` + prometheusx.GitShortCommit + `","CachedTrace":false,"CachedUUID":""}
+-o- -O json -I tracelb -P icmp-echo -q 3 -W 39  10.1.1.1`},
 	}
 	for _, test := range tests {
 		os.RemoveAll(path)
 		s := &Scamper{
 			OutputPath:       dir,
 			Timeout:          1 * time.Second,
-			TracelbPTR:       true,
 			TracelbWaitProbe: 39,
 		}
 		s.Binary = test.binary
 		s.TraceType = test.traceType
-		s.noArgs = test.noArgs
+		s.TracelbPTR = test.tracelbPTR
 		// Run a traceroute.
 		out, err := s.Trace("10.1.1.1", cookie, "", now)
 		if test.shouldFail {
-			if err == nil {
-				t.Error("Trace() = nil, want error")
+			if err == nil || !strings.Contains(err.Error(), test.want) {
+				t.Errorf("Trace() = %q, want %q", err, test.want)
 			}
 			continue
 		}

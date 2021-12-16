@@ -2,7 +2,6 @@
 package parser
 
 import (
-	//"bytes"
 	"errors"
 	"fmt"
 	"time"
@@ -27,22 +26,22 @@ type TS struct {
 	Usec int64 `json:"usec"`
 }
 
-// CyclestartLine contains the information about the scamper "cyclestart"
+// CyclestartLine contains the information about the scamper "cyclestart".
 type CyclestartLine struct {
-	Type      string  `json:"type"`
+	Type      string  `json:"type" bigquery:"type"`
 	ListName  string  `json:"list_name" bigquery:"list_name"`
-	ID        float64 `json:"id"`
-	Hostname  string  `json:"hostname"`
+	ID        float64 `json:"id" bigquery:"id"`
+	Hostname  string  `json:"hostname" bigquery:"hostname"`
 	StartTime float64 `json:"start_time" bigquery:"start_time"`
 }
 
-// CyclestopLine contains the ending details from the scamper tool.  ID,
-// ListName, hostname seem to match CyclestartLine
+// CyclestopLine contains the ending details from the scamper tool.
+// ListName, ID, and Hostname seem to match CyclestartLine.
 type CyclestopLine struct {
-	Type     string  `json:"type"`
+	Type     string  `json:"type" bigquery:"type"`
 	ListName string  `json:"list_name" bigquery:"list_name"`
-	ID       float64 `json:"id"`
-	Hostname string  `json:"hostname"`
+	ID       float64 `json:"id" bigquery:"id"`
+	Hostname string  `json:"hostname" bigquery:"hostname"`
 	StopTime float64 `json:"stop_time" bigquery:"stop_time"`
 }
 
@@ -63,5 +62,5 @@ func New(traceType string) (TracerouteParser, error) {
 	case "mda":
 		return &scamper1Parser{}, nil
 	}
-	return nil, fmt.Errorf("%s: %v", traceType, errTracerouteType)
+	return nil, fmt.Errorf("%q: %v", traceType, errTracerouteType)
 }

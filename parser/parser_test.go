@@ -1,17 +1,53 @@
 package parser
 
-import "errors"
+import (
+	"log"
+	"strings"
+	"testing"
+	"time"
+)
+
+func init() {
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+}
+
+func TestNew(t *testing.T) {
+	tests := []struct {
+		traceType string
+		wantErr   error
+	}{
+		{"mda", nil},
+		{"", errTracerouteType},
+		{"bad", errTracerouteType},
+	}
+	for _, test := range tests {
+		_, gotErr := New(test.traceType)
+		if badErr(gotErr, test.wantErr) {
+			t.Fatalf("New() = %v, want %v", gotErr, test.wantErr)
+		}
+	}
+}
+
+func TestStartTime(t *testing.T) {
+	s1 := Scamper1{
+		CycleStart: CyclestartLine{
+			StartTime: 1566691268,
+		},
+	}
+	want := time.Unix(1566691268, 0).UTC()
+	if got := s1.StartTime(); got != want {
+		t.Fatalf("StartTime() = %v, want %v", got, want)
+	}
+}
 
 func badErr(gotErr, wantErr error) bool {
-	bad := false
 	if gotErr == nil {
-		if wantErr != nil {
-			bad = true
-		}
-	} else if !errors.Is(gotErr, wantErr) {
-		bad = true
+		return wantErr != nil
 	}
-	return bad
+	if strings.Contains(gotErr.Error(), wantErr.Error()) {
+		return false
+	}
+	return true
 }
 
 // isEqual returns true if all of the elements in s1 exist in s2.
