@@ -29,16 +29,19 @@ type Scamper struct {
 // Validate validates scamper configuration, returning nil for valid
 // and an error for invalid configurations.
 func (s *Scamper) Validate() error {
-	if fileInfo, err := os.Stat(s.Binary); err != nil {
+	fileInfo, err := os.Stat(s.Binary)
+	if err != nil {
 		return fmt.Errorf("failed to stat scamper binary (error: %v)", err)
-	} else if fileInfo.IsDir() {
+	}
+	if fileInfo.IsDir() {
 		return fmt.Errorf("scamper binary is a directory")
 	}
+	if fileInfo.Mode()&0100 == 0 {
+		return fmt.Errorf("scamper binary is not executable by owner")
+	}
 
+	// Regular traceroutes will soon be added an another valid type.
 	switch s.TraceType {
-	case "MDA":
-		s.TraceType = "mda"
-		fallthrough
 	case "mda": // uses paris-traceroute algorithm
 		if s.TracelbWaitProbe < 15 || s.TracelbWaitProbe > 200 {
 			return fmt.Errorf("%d: invalid tracelb wait probe value", s.TracelbWaitProbe)
