@@ -38,7 +38,7 @@ type Scamper struct {
 // NewScamper validates the specified scamper configuration and, if successful,
 // returns a new Scamper instance.  Otherwise, it returns nil and an error.
 func NewScamper(cfg ScamperConfig) (*Scamper, error) {
-	// Validate that the cfg.Binary exists and is executable.
+	// Validate that the cfg.Binary exists and is an executable file.
 	if err := exec.Command("test", "-f", cfg.Binary, "-a", "-x", cfg.Binary).Run(); err != nil {
 		return nil, fmt.Errorf("%q: is not an executable file", cfg.Binary)
 	}
@@ -51,7 +51,7 @@ func NewScamper(cfg ScamperConfig) (*Scamper, error) {
 		return nil, fmt.Errorf("failed to create a directory inside %q (error: %v)", cfg.OutputPath, err)
 	}
 	defer os.RemoveAll(dir)
-	// Validate that timeout is at least one second.
+	// Validate that timeout is at least one second and at most an hour.
 	if cfg.Timeout < 1*time.Second || cfg.Timeout > 3600*time.Second {
 		return nil, fmt.Errorf("%v: invalid timeout value (min: 1s, max 3600s)", cfg.Timeout)
 	}

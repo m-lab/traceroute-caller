@@ -206,13 +206,13 @@ func TestCachedTrace(t *testing.T) {
 	{"type":"tracelb", "version":"0.1", "userid":0, "method":"icmp-echo", "src":"::ffff:180.87.97.101", "dst":"::ffff:1.47.236.62", "start":{"sec":1566691298, "usec":476221, "ftime":"2019-08-25 00:01:38"}, "probe_size":60, "firsthop":1, "attempts":3, "confidence":95, "tos":0, "gaplimit":3, "wait_timeout":5, "wait_probe":250, "probec":0, "probec_max":3000, "nodec":0, "linkc":0}
 	{"type":"cycle-stop", "list_name":"/tmp/scamperctrl:51811", "id":1, "hostname":"ndt-plh7v", "stop_time":1566691298}`)
 
-	_ = s.CachedTrace("ndt-plh7v_1566050090_000000000004D64D", "1", faketime, []byte("Broken cached traceroute"))
+	_ = s.CachedTrace("1", "ndt-plh7v_1566050090_000000000004D64D", faketime, []byte("Broken cached traceroute"))
 	_, errInvalidTest := ioutil.ReadFile(tempdir + "/2019/04/01/20190401T034551Z_" + prefix.UnsafeString() + "_0000000000000001.jsonl")
 	if errInvalidTest == nil {
 		t.Error("CachedTrace() = nil, want error")
 	}
 
-	_ = s.CachedTrace("ndt-plh7v_1566050090_000000000004D64D", "1", faketime, cachedTrace)
+	_ = s.CachedTrace("1", "ndt-plh7v_1566050090_000000000004D64D", faketime, cachedTrace)
 	// Unmarshal the first line of the output file.
 	b, err := ioutil.ReadFile(tempdir + "/2019/04/01/20190401T034551Z_" + prefix.UnsafeString() + "_0000000000000001.jsonl")
 	rtx.Must(err, "failed to read file")
@@ -293,7 +293,7 @@ func TestInvalidCookie(t *testing.T) {
 	if _, err := s.Trace("10.1.1.1", "an invalid cookie", "", time.Now()); err == nil {
 		t.Error("Trace() = nil, want error")
 	}
-	if err := s.CachedTrace("", "an invalid cookie", time.Now(), nil); err == nil {
+	if err := s.CachedTrace("an invalid cookie", "", time.Now(), nil); err == nil {
 		t.Error("CachedTrace() = nil, want error")
 	}
 }
