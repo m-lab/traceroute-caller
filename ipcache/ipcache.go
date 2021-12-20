@@ -16,7 +16,7 @@ import (
 // Tracer is the generic interface for all things that can perform a traceroute.
 type Tracer interface {
 	Trace(remoteIP, cookie, uuid string, t time.Time) ([]byte, error)
-	TraceFromCachedTrace(cookie, uuid string, t time.Time, cachedTest []byte) error
+	CachedTrace(cookie, uuid string, t time.Time, cachedTrace []byte) error
 	DontTrace()
 }
 
@@ -33,8 +33,8 @@ type Config struct {
 	ScanPeriod   time.Duration // IPCacheUpdatePeriod flag
 }
 
-// cachedTest is a single entry in the cache of traceroute results.
-type cachedTest struct {
+// cachedTrace is a single entry in the cache of traceroute results.
+type cachedTrace struct {
 	timeStamp time.Time
 	data      []byte
 	dataReady chan struct{}
@@ -45,7 +45,7 @@ type cachedTest struct {
 // recently. We keep this list to ensure that we don't traceroute to the same
 // location repeatedly at a high frequency.
 type IPCache struct {
-	cache     map[string]*cachedTest
+	cache     map[string]*cachedTrace
 	cacheLock sync.Mutex
 	tracetool Tracer
 }
@@ -60,7 +60,7 @@ func New(ctx context.Context, tracetool Tracer, ipcCfg Config) (*IPCache, error)
 		return nil, fmt.Errorf("invalid IP cache configuration: %+v", ipcCfg)
 	}
 	ipc := &IPCache{
-		cache:     make(map[string]*cachedTest),
+		cache:     make(map[string]*cachedTrace),
 		tracetool: tracetool,
 	}
 	go func() {
@@ -74,9 +74,9 @@ func New(ctx context.Context, tracetool Tracer, ipcCfg Config) (*IPCache, error)
 			ipc.cacheLock.Lock()
 			for k, v := range ipc.cache {
 				if now.Sub(v.timeStamp) > ipcCfg.EntryTimeout {
-					// Note that if there is a trace in progress, the events
+					// Note that if there is a traceroute in progress, the events
 					// waiting for it to complete will still get the result
-					// and save it.  But this allows a new trace to be started
+					// and save it.  But this allows a new traceroute to be started
 					// on the same IP address.
 					delete(ipc.cache, k)
 				}
@@ -100,29 +100,29 @@ func (ic *IPCache) FetchTrace(remoteIP, cookie string) ([]byte, error) {
 	}
 	uuid := uuid.FromCookie(c)
 
-	cachedTest, existed := ic.getEntry(remoteIP)
+	cachedTrace, existed := ic.getEntry(remoteIP)
 	if existed {
-		<-cachedTest.dataReady
-		if cachedTest.err != nil {
+		<-cachedTrace.dataReady
+		if cachedTrace.err != nil {
 			ic.tracetool.DontTrace()
-			return nil, cachedTest.err
+			return nil, cachedTrace.err
 		}
-		_ = ic.tracetool.TraceFromCachedTrace(cookie, uuid, time.Now(), cachedTest.data)
-		return cachedTest.data, nil
+		_ = ic.tracetool.CachedTrace(cookie, uuid, time.Now(), cachedTrace.data)
+		return cachedTrace.data, nil
 	}
-	cachedTest.data, cachedTest.err = ic.tracetool.Trace(remoteIP, cookie, uuid, cachedTest.timeStamp)
-	close(cachedTest.dataReady)
-	return cachedTest.data, cachedTest.err
+	cachedTrace.data, cachedTrace.err = ic.tracetool.Trace(remoteIP, cookie, uuid, cachedTrace.timeStamp)
+	close(cachedTrace.dataReady)
+	return cachedTrace.data, cachedTrace.err
 }
 
 // getEntry returns the entry in the IP cache corresponding to the given
 // IP address. If the entry doesn't exist, a new one is created.
-func (ic *IPCache) getEntry(ip string) (*cachedTest, bool) {
+func (ic *IPCache) getEntry(ip string) (*cachedTrace, bool) {
 	ic.cacheLock.Lock()
 	defer ic.cacheLock.Unlock()
 	_, existed := ic.cache[ip]
 	if !existed {
-		ic.cache[ip] = &cachedTest{
+		ic.cache[ip] = &cachedTrace{
 			timeStamp: time.Now(),
 			dataReady: make(chan struct{}),
 		}

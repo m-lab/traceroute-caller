@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"log"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -18,22 +20,48 @@ import (
 type Scamper struct {
 	Binary           string
 	OutputPath       string
-	ScamperTimeout   time.Duration
+	Timeout          time.Duration
+	TraceType        string
 	TracelbPTR       bool
 	TracelbWaitProbe int
 }
 
-// Trace starts a new scamper process running the paris-traceroute algorithm to
-// every node. This uses more resources per-traceroute, but segfaults in the
-// called binaries have a much smaller "blast radius".
+// Validate validates scamper configuration, returning nil for valid
+// and an error for invalid configurations.
+func (s *Scamper) Validate() error {
+	fileInfo, err := os.Stat(s.Binary)
+	if err != nil {
+		return fmt.Errorf("failed to stat scamper binary (error: %v)", err)
+	}
+	fileMode := fileInfo.Mode()
+	if !fileMode.IsRegular() {
+		return fmt.Errorf("scamper binary is not a regular file")
+	}
+	if fileMode&0100 == 0 {
+		return fmt.Errorf("scamper binary is not executable by owner")
+	}
+
+	// Regular traceroutes will soon be added an another valid type.
+	switch s.TraceType {
+	case "mda": // uses paris-traceroute algorithm
+		if s.TracelbWaitProbe < 15 || s.TracelbWaitProbe > 200 {
+			return fmt.Errorf("%d: invalid tracelb wait probe value", s.TracelbWaitProbe)
+		}
+		return nil
+	}
+	return fmt.Errorf("%s: invalid traceroute type", s.TraceType)
+}
+
+// Trace starts a new scamper process to run a traceroute based on the
+// traceroute type (e.g., "mda") and saves it in a file.
 func (s *Scamper) Trace(remoteIP, cookie, uuid string, t time.Time) (out []byte, err error) {
 	tracesInProgress.WithLabelValues("scamper").Inc()
 	defer tracesInProgress.WithLabelValues("scamper").Dec()
 	return s.trace(remoteIP, cookie, uuid, t)
 }
 
-// TraceFromCachedTrace creates test from cached trace.
-func (s *Scamper) TraceFromCachedTrace(uuid, cookie string, t time.Time, cachedTest []byte) error {
+// CachedTrace creates a traceroute from the traceroute cache and saves it in a file.
+func (s *Scamper) CachedTrace(uuid, cookie string, t time.Time, cachedTrace []byte) error {
 	filename, err := generateFilename(s.OutputPath, cookie, t)
 	if err != nil {
 		log.Printf("failed to generate filename (error: %v)\n", err)
@@ -41,26 +69,28 @@ func (s *Scamper) TraceFromCachedTrace(uuid, cookie string, t time.Time, cachedT
 		return err
 	}
 
-	// Remove the first line of cachedTest.
-	split := bytes.Index(cachedTest, []byte{'\n'})
-	if split <= 0 || split == len(cachedTest) {
-		log.Printf("failed to split cached test (split: %v)\n", split)
+	// Remove the first line of cachedTrace.
+	split := bytes.Index(cachedTrace, []byte{'\n'})
+	if split <= 0 || split == len(cachedTrace) {
+		log.Printf("failed to split cached traceroute (split: %v)\n", split)
 		tracerCacheErrors.WithLabelValues("scamper", "badcache").Inc()
-		return errors.New("invalid cached test")
+		return errors.New("invalid cached traceroute")
 	}
 
 	// Create and add the first line to the test results.
-	newTest := append(createMetaline(uuid, true, extractUUID(cachedTest[:split])), cachedTest[split+1:]...)
+	newTest := append(createMetaline(uuid, true, extractUUID(cachedTrace[:split])), cachedTrace[split+1:]...)
 	return ioutil.WriteFile(filename, []byte(newTest), 0666)
 }
 
-// DontTrace is called when a previous trace that we were waiting for
+// DontTrace is called when a previous traceroute that we were waiting for
 // fails. It increments a counter that tracks the number of these failures.
 func (*Scamper) DontTrace() {
 	tracesNotPerformed.WithLabelValues("scamper").Inc()
 }
 
-// trace a single connection using scamper as a standalone binary.
+// trace runs a traceroute using scamper as a standalone binary. The
+// command line to invoke scamper varies depending on the traceroute type
+// and its options.
 func (s *Scamper) trace(remoteIP, cookie, uuid string, t time.Time) ([]byte, error) {
 	// Make sure a directory path based on the current date exists,
 	// generate a filename to save in that directory, and create
@@ -69,21 +99,36 @@ func (s *Scamper) trace(remoteIP, cookie, uuid string, t time.Time) ([]byte, err
 	if err != nil {
 		return nil, err
 	}
-	// Create a context and initialize command execution variables.
-	ctx, cancel := context.WithTimeout(context.Background(), s.ScamperTimeout)
-	defer cancel()
-	tracelbCmd := []string{"tracelb", "-P", "icmp-echo", "-q", "3", "-W", strconv.Itoa(s.TracelbWaitProbe)}
-	if s.TracelbPTR {
-		tracelbCmd = append(tracelbCmd, []string{"-O", "ptr"}...)
+
+	// Initialize command execution variables.
+	var traceCmd string
+	switch s.TraceType {
+	case "mda":
+		var ptr string
+		if s.TracelbPTR {
+			ptr = "-O ptr"
+		} else {
+			ptr = ""
+		}
+		traceCmd = fmt.Sprintf("tracelb -P icmp-echo -q 3 -W %s %s %s", strconv.Itoa(s.TracelbWaitProbe), ptr, remoteIP)
+	default:
+		return nil, fmt.Errorf("%s: invalid traceroute type", s.TraceType)
 	}
-	tracelbCmd = append(tracelbCmd, remoteIP)
-	cmd := shx.Exec(s.Binary, "-I", strings.Join(tracelbCmd, " "), "-o-", "-O", "json")
+	// When testing this package, instead of scamper, a different
+	// command like echo, yes, and false is used which does not
+	// need the scamper command line arguments and can actually
+	// fail because of them.
+	cmd := []string{s.Binary, "-o-", "-O", "json", "-I", traceCmd}
+
+	// Create a context, run a traceroute, and write the output to file.
+	ctx, cancel := context.WithTimeout(context.Background(), s.Timeout)
+	defer cancel()
 	return traceAndWrite(ctx, "scamper", filename, cmd, uuid)
 }
 
-// traceAndWrite runs a traceroute and write the result.
-func traceAndWrite(ctx context.Context, label string, filename string, cmd shx.Job, uuid string) ([]byte, error) {
-	data, err := runTrace(ctx, label, cmd)
+// traceAndWrite runs a traceroute and writes the result.
+func traceAndWrite(ctx context.Context, label string, filename string, cmd []string, uuid string) ([]byte, error) {
+	data, err := runCmd(ctx, label, cmd)
 	if err != nil {
 		return nil, err
 	}
@@ -97,38 +142,34 @@ func traceAndWrite(ctx context.Context, label string, filename string, cmd shx.J
 	return buff.Bytes(), ioutil.WriteFile(filename, buff.Bytes(), 0444)
 }
 
-// runTrace executes a trace command and returns the data.
-func runTrace(ctx context.Context, label string, cmd shx.Job) ([]byte, error) {
-	var desc shx.Description
+// runCmd runs the given command and returns its output.
+func runCmd(ctx context.Context, label string, cmd []string) ([]byte, error) {
 	deadline, _ := ctx.Deadline()
 	timeout := time.Until(deadline)
-	cmd.Describe(&desc)
-	log.Printf("Trace started: %s\n", desc.String())
-
-	// Add buffer write at end of cmd.
+	job := shx.Exec(cmd[0], cmd[1:]...)
 	buff := bytes.Buffer{}
-	fullCmd := shx.Pipe(cmd, shx.Write(&buff))
+	fullCmd := shx.Pipe(job, shx.Write(&buff))
 
+	log.Printf("context %p: command %s started\n", ctx, strings.Join(cmd, " "))
 	start := time.Now()
 	err := fullCmd.Run(ctx, shx.New())
 	latency := time.Since(start).Seconds()
-	log.Printf("Trace returned in %v seconds", latency)
+	log.Printf("context %p: command finished in %v seconds", ctx, latency)
 	tracesPerformed.WithLabelValues(label).Inc()
 	if err != nil {
-		// TODO change to use a label within general trace counter.
+		// TODO change to use a label within general traceroute counter.
 		// possibly just use the latency histogram?
 		crashedTraces.WithLabelValues(label).Inc()
-
 		traceTimeHistogram.WithLabelValues("error").Observe(latency)
 		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-			log.Printf("Trace timed out after %v\n", timeout)
+			log.Printf("context %p: command timed out after %v\n", ctx, timeout)
 		} else {
-			log.Printf("Trace failed in context %p (error: %v)\n", ctx, err)
+			log.Printf("context %p: command failed (error: %v)\n", ctx, err)
 		}
 		return buff.Bytes(), err
 	}
 
-	log.Printf("Trace succeeded in context %p\n", ctx)
+	log.Printf("Command succeeded in context %p\n", ctx)
 	traceTimeHistogram.WithLabelValues("success").Observe(latency)
 	return buff.Bytes(), nil
 }
