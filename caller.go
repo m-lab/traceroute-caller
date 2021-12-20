@@ -28,7 +28,7 @@ import (
 
 var (
 	scamperBin       = flag.String("scamper.bin", "/usr/local/bin/scamper", "The path to the scamper binary.")
-	scamperTimeout   = flag.Duration("scamper.timeout", 900*time.Second, "How long to wait for scamper to complete a traceroute.")
+	scamperTimeout   = flag.Duration("scamper.timeout", 900*time.Second, "Timeout duration in seconds for scamper to run a traceroute (min: 1s, max: 3600s).")
 	scamperTraceType = flagx.Enum{
 		Options: []string{"mda"}, // "regular" will be added soon
 		Value:   "mda",
@@ -46,7 +46,7 @@ var (
 	logFatal       = log.Fatal
 	errEnvArgs     = errors.New("failed to get args from environment")
 	errEventSocket = errors.New("tcpinfo.eventsocket value was empty")
-	errScamper     = errors.New("failed to configure scamper")
+	errScamper     = errors.New("failed to create a new scamper instance")
 	errNewHandler  = errors.New("failed to create a triggertrace handler")
 )
 
@@ -78,7 +78,7 @@ func main() {
 	//   - A parser to parse traceroutes.
 	//   - A hop annotator for annotating IP addresses.
 	// The traceroute tool (scamper).
-	scamper := &tracer.Scamper{
+	scamperCfg := tracer.ScamperConfig{
 		Binary:           *scamperBin,
 		OutputPath:       *tracerouteOutput,
 		Timeout:          *scamperTimeout,
@@ -86,7 +86,8 @@ func main() {
 		TracelbPTR:       *scamperTracelbPTR,
 		TracelbWaitProbe: *scamperTracelbW,
 	}
-	if err := scamper.Validate(); err != nil {
+	scamper, err := tracer.NewScamper(scamperCfg)
+	if err != nil {
 		logFatal(fmt.Errorf("%v: %w", errScamper, err))
 	}
 	// The traceroute cache.
