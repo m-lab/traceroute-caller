@@ -20,6 +20,11 @@ func init() {
 }
 
 func TestNewScamper(t *testing.T) {
+	nonWritableDir := "testdata/non-writable"
+	if err := os.MkdirAll(nonWritableDir, 0555); err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(nonWritableDir)
 	tests := []struct {
 		binary           string
 		outputPath       string
@@ -33,7 +38,7 @@ func TestNewScamper(t *testing.T) {
 		{"testdata/non-existent", "testdata", 900 * time.Second, "mda", 15, true, "is not an executable file"},
 		{"testdata/non-executable", "testdata", 900 * time.Second, "mda", 15, true, "is not an executable file"},
 		{"/bin/echo", "/dev/null", 900 * time.Second, "mda", 15, true, "failed to create directory"},
-		{"/bin/echo", "/var/empty", 900 * time.Second, "mda", 15, true, "failed to create a directory inside"},
+		{"/bin/echo", nonWritableDir, 900 * time.Second, "mda", 15, true, "failed to create a directory inside"},
 		{"/bin/echo", "testdata", 0, "mda", 15, true, "invalid timeout value (min: 1s, max 3600s)"},
 		{"/bin/echo", "testdata", 3601 * time.Second, "mda", 15, true, "invalid timeout value (min: 1s, max 3600s)"},
 		{"/bin/echo", "testdata", 900 * time.Second, "bad", 15, true, "invalid traceroute type"},
