@@ -19,29 +19,37 @@ func init() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 }
 
-func TestValidate(t *testing.T) {
+func TestNewScamper(t *testing.T) {
 	tests := []struct {
 		binary           string
+		outputPath       string
+		timeout          time.Duration
 		traceType        string
 		tracelbWaitProbe int
 		shouldFail       bool
 		want             string
 	}{
-		{"testdata/non-existent", "mda", 15, true, "failed to stat scamper binary"},
-		{"testdata", "mda", 15, true, "scamper binary is not a regular file"},
-		{"testdata/non-executable", "mda", 15, true, "scamper binary is not executable by owner"},
-		{"/bin/echo", "bad", 15, true, "invalid traceroute type"},
-		{"/bin/echo", "mda", 14, true, "invalid tracelb wait probe value"},
-		{"/bin/echo", "mda", 201, true, "invalid tracelb wait probe value"},
-		{"/bin/echo", "mda", 25, false, ""},
+		{"testdata", "testdata", 900 * time.Second, "mda", 15, true, "is not an executable file"},
+		{"testdata/non-existent", "testdata", 900 * time.Second, "mda", 15, true, "is not an executable file"},
+		{"testdata/non-executable", "testdata", 900 * time.Second, "mda", 15, true, "is not an executable file"},
+		{"/bin/echo", "/dev/null", 900 * time.Second, "mda", 15, true, "failed to create directory"},
+		{"/bin/echo", "/var/empty", 900 * time.Second, "mda", 15, true, "failed to create a directory inside"},
+		{"/bin/echo", "testdata", 0, "mda", 15, true, "invalid timeout value (min: 1s, max 3600s)"},
+		{"/bin/echo", "testdata", 3601 * time.Second, "mda", 15, true, "invalid timeout value (min: 1s, max 3600s)"},
+		{"/bin/echo", "testdata", 900 * time.Second, "bad", 15, true, "invalid traceroute type"},
+		{"/bin/echo", "testdata", 900 * time.Second, "mda", 14, true, "invalid tracelb wait probe value"},
+		{"/bin/echo", "testdata", 900 * time.Second, "mda", 201, true, "invalid tracelb wait probe value"},
+		{"/bin/echo", "testdata", 900 * time.Second, "mda", 25, false, ""},
 	}
 	for _, test := range tests {
-		scamper := &Scamper{
+		scamperCfg := ScamperConfig{
 			Binary:           test.binary,
+			OutputPath:       test.outputPath,
+			Timeout:          test.timeout,
 			TraceType:        test.traceType,
 			TracelbWaitProbe: test.tracelbWaitProbe,
 		}
-		err := scamper.Validate()
+		_, err := NewScamper(scamperCfg)
 		if err != nil {
 			if !test.shouldFail || !strings.Contains(err.Error(), test.want) {
 				t.Errorf("Validate() = %v, want %q", err, test.want)
@@ -71,21 +79,25 @@ func TestTrace(t *testing.T) {
 		{"testdata/fail", "mda", true, true, "exit status 1: testdata/fail"},
 		{"testdata/loop", "mda", true, true, "signal: killed: testdata/loop"},
 
-		{"echo", "mda", true, false, `{"UUID":"","TracerouteCallerVersion":"` + prometheusx.GitShortCommit + `","CachedTrace":false,"CachedUUID":""}
+		{"/bin/echo", "mda", true, false, `{"UUID":"","TracerouteCallerVersion":"` + prometheusx.GitShortCommit + `","CachedTrace":false,"CachedUUID":""}
 -o- -O json -I tracelb -P icmp-echo -q 3 -W 39 -O ptr 10.1.1.1`},
-		{"echo", "mda", false, false, `{"UUID":"","TracerouteCallerVersion":"` + prometheusx.GitShortCommit + `","CachedTrace":false,"CachedUUID":""}
--o- -O json -I tracelb -P icmp-echo -q 3 -W 39  10.1.1.1`},
+		{"/bin/echo", "mda", false, false, `{"UUID":"","TracerouteCallerVersion":"` + prometheusx.GitShortCommit + `","CachedTrace":false,"CachedUUID":""}
+-o- -O json -I tracelb -P icmp-echo -q 3 -W 39 10.1.1.1`},
 	}
 	for _, test := range tests {
 		os.RemoveAll(path)
-		s := &Scamper{
+		scamperCfg := ScamperConfig{
+			Binary:           test.binary,
 			OutputPath:       dir,
 			Timeout:          1 * time.Second,
+			TraceType:        test.traceType,
 			TracelbWaitProbe: 39,
+			TracelbPTR:       test.tracelbPTR,
 		}
-		s.Binary = test.binary
-		s.TraceType = test.traceType
-		s.TracelbPTR = test.tracelbPTR
+		s, err := NewScamper(scamperCfg)
+		if err != nil {
+			t.Fatal(err)
+		}
 		// Run a traceroute.
 		out, err := s.Trace("10.1.1.1", cookie, "", now)
 		if test.shouldFail {
@@ -125,13 +137,17 @@ func TestTraceWritesMeta(t *testing.T) {
 	}(hostname)
 	hostname = "testhostname"
 
-	s := &Scamper{
-		Binary:           "echo",
+	scamperCfg := ScamperConfig{
+		Binary:           "/bin/echo",
 		OutputPath:       tempdir,
 		Timeout:          1 * time.Minute,
 		TraceType:        "mda",
 		TracelbPTR:       true,
 		TracelbWaitProbe: 39,
+	}
+	s, err := NewScamper(scamperCfg)
+	if err != nil {
+		t.Fatal(err)
 	}
 	faketime := time.Date(2019, time.April, 1, 3, 45, 51, 0, time.UTC)
 	prometheusx.GitShortCommit = "Fake Version"
@@ -170,13 +186,17 @@ func TestCachedTrace(t *testing.T) {
 	}(hostname)
 	hostname = "testhostname"
 
-	s := &Scamper{
-		Binary:           "echo",
+	scamperCfg := ScamperConfig{
+		Binary:           "/bin/echo",
 		OutputPath:       tempdir,
 		Timeout:          1 * time.Minute,
 		TraceType:        "mda",
 		TracelbPTR:       true,
 		TracelbWaitProbe: 39,
+	}
+	s, err := NewScamper(scamperCfg)
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	faketime := time.Date(2019, time.April, 1, 3, 45, 51, 0, time.UTC)
@@ -218,12 +238,6 @@ func TestCachedTrace(t *testing.T) {
 	if m.CachedUUID != "ndt-plh7v_1566050090_000000000004D64D" {
 		t.Errorf("got cached UUID %q, want %q", m.CachedUUID, wantUUID)
 	}
-
-	// Now test an error condition.
-	s.OutputPath = "/dev/null"
-	if s.CachedTrace("ndt-plh7v_1566050090_000000000004D64D", "1", faketime, cachedTrace) == nil {
-		t.Error("CachedTrace() = nil, want error")
-	}
 }
 
 func TestExtractUUID(t *testing.T) {
@@ -239,8 +253,17 @@ func TestExtractUUID(t *testing.T) {
 }
 
 func TestDontTrace(t *testing.T) {
-	s := &Scamper{
-		OutputPath: "/tmp",
+	scamperCfg := ScamperConfig{
+		Binary:           "/bin/echo",
+		OutputPath:       "/tmp",
+		Timeout:          1 * time.Minute,
+		TraceType:        "mda",
+		TracelbPTR:       true,
+		TracelbWaitProbe: 39,
+	}
+	s, err := NewScamper(scamperCfg)
+	if err != nil {
+		t.Fatal(err)
 	}
 	s.DontTrace()
 }
@@ -255,13 +278,30 @@ func TestCreateMetaline(t *testing.T) {
 }
 
 func TestInvalidCookie(t *testing.T) {
-	s := &Scamper{
-		OutputPath: "/tmp",
+	scamperCfg := ScamperConfig{
+		Binary:           "/bin/echo",
+		OutputPath:       "/tmp",
+		Timeout:          1 * time.Minute,
+		TraceType:        "mda",
+		TracelbPTR:       true,
+		TracelbWaitProbe: 39,
+	}
+	s, err := NewScamper(scamperCfg)
+	if err != nil {
+		t.Fatal(err)
 	}
 	if _, err := s.Trace("10.1.1.1", "an invalid cookie", "", time.Now()); err == nil {
 		t.Error("Trace() = nil, want error")
 	}
 	if err := s.CachedTrace("", "an invalid cookie", time.Now(), nil); err == nil {
 		t.Error("CachedTrace() = nil, want error")
+	}
+}
+
+func TestGenerateFilename(t *testing.T) {
+	_, err := generateFilename("/var/empty", "0000", time.Now())
+	wantErrStr := "failed to create output directory"
+	if err == nil || !strings.Contains(err.Error(), wantErrStr) {
+		t.Errorf("generateFilename() = %v, want %v", err, wantErrStr)
 	}
 }

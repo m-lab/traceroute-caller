@@ -120,7 +120,6 @@ func (h *Handler) Close(ctx context.Context, timestamp time.Time, uuid string) {
 		log.Printf("failed to find destination for UUID %q", uuid)
 		return
 	}
-
 	delete(h.Destinations, uuid)
 	h.DestinationsLock.Unlock()
 	// This goroutine will live for a few minutes and terminate
