@@ -4,7 +4,6 @@ import (
 	"log"
 	"strings"
 	"testing"
-	"time"
 )
 
 func init() {
@@ -17,6 +16,7 @@ func TestNew(t *testing.T) {
 		wantErr   error
 	}{
 		{"mda", nil},
+		{"regular", nil},
 		{"", errTracerouteType},
 		{"bad", errTracerouteType},
 	}
@@ -25,18 +25,6 @@ func TestNew(t *testing.T) {
 		if badErr(gotErr, test.wantErr) {
 			t.Fatalf("New() = %v, want %v", gotErr, test.wantErr)
 		}
-	}
-}
-
-func TestStartTime(t *testing.T) {
-	s1 := Scamper1{
-		CycleStart: CyclestartLine{
-			StartTime: 1566691268,
-		},
-	}
-	want := time.Unix(1566691268, 0).UTC()
-	if got := s1.StartTime(); got != want {
-		t.Fatalf("StartTime() = %v, want %v", got, want)
 	}
 }
 

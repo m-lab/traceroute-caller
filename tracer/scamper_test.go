@@ -45,6 +45,7 @@ func TestNewScamper(t *testing.T) {
 		{"/bin/echo", "testdata", 900 * time.Second, "mda", 14, true, "invalid tracelb wait probe value"},
 		{"/bin/echo", "testdata", 900 * time.Second, "mda", 201, true, "invalid tracelb wait probe value"},
 		{"/bin/echo", "testdata", 900 * time.Second, "mda", 25, false, ""},
+		{"/bin/echo", "testdata", 900 * time.Second, "regular", 25, false, ""},
 	}
 	for _, test := range tests {
 		scamperCfg := ScamperConfig{

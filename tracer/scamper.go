@@ -55,10 +55,11 @@ func NewScamper(cfg ScamperConfig) (*Scamper, error) {
 	if cfg.Timeout < 1*time.Second || cfg.Timeout > 3600*time.Second {
 		return nil, fmt.Errorf("%v: invalid timeout value (min: 1s, max 3600s)", cfg.Timeout)
 	}
-	// Regular traceroutes will soon be added an another valid type.
+	// See this package's documentation for descriptions of mda
+	// and regular traceroutes.
 	var traceCmd string
 	switch cfg.TraceType {
-	case "mda": // uses paris-traceroute algorithm
+	case "mda":
 		if cfg.TracelbWaitProbe < 15 || cfg.TracelbWaitProbe > 200 {
 			return nil, fmt.Errorf("%d: invalid tracelb wait probe value", cfg.TracelbWaitProbe)
 		}
@@ -66,6 +67,8 @@ func NewScamper(cfg ScamperConfig) (*Scamper, error) {
 		if cfg.TracelbPTR {
 			traceCmd += " -O ptr"
 		}
+	case "regular":
+		traceCmd = "trace -P icmp-paris"
 	default:
 		return nil, fmt.Errorf("%s: invalid traceroute type", cfg.TraceType)
 	}
@@ -78,7 +81,7 @@ func NewScamper(cfg ScamperConfig) (*Scamper, error) {
 }
 
 // Trace starts a new scamper process to run a traceroute based on the
-// traceroute type (e.g., "mda") and saves it in a file.
+// traceroute type and saves it in a file.
 func (s *Scamper) Trace(remoteIP, cookie, uuid string, t time.Time) (out []byte, err error) {
 	tracesInProgress.WithLabelValues("scamper").Inc()
 	defer tracesInProgress.WithLabelValues("scamper").Dec()
