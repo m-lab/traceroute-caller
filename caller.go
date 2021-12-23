@@ -28,13 +28,13 @@ import (
 
 var (
 	scamperBin       = flag.String("scamper.bin", "/usr/local/bin/scamper", "The path to the scamper binary.")
-	scamperTimeout   = flag.Duration("scamper.timeout", 900*time.Second, "Timeout duration in seconds for scamper to run a traceroute (min: 1s, max: 3600s).")
+	scamperTimeout   = flag.Duration("scamper.timeout", 900*time.Second, "Timeout duration in seconds for scamper to run a traceroute (min 1, max 3600).")
 	scamperTraceType = flagx.Enum{
-		Options: []string{"mda"}, // "regular" will be added soon
-		Value:   "mda",
+		Options: []string{"mda", "regular"},
+		Value:   "regular",
 	}
 	scamperTracelbPTR   = flag.Bool("scamper.tracelb-ptr", true, "mda traceroute option: Look up DNS pointer records for IP addresses.")
-	scamperTracelbW     = flag.Int("scamper.tracelb-W", 25, "mda traceroute option: Wait time between probes in 1/100ths of seconds (min 15, max 200).")
+	scamperTracelbW     = flag.Int("scamper.tracelb-W", 25, "mda traceroute option: Wait time in 1/100ths of seconds between probes (min 15, max 200).")
 	tracerouteOutput    = flag.String("traceroute-output", "/var/spool/scamper1", "The path to store traceroute output.")
 	hopAnnotationOutput = flag.String("hopannotation-output", "/var/spool/hopannotation1", "The path to store hop annotation output.")
 	// Keeping IP cache flags capitalized for backward compatibility.
@@ -51,7 +51,7 @@ var (
 )
 
 func init() {
-	flag.Var(&scamperTraceType, "scamper.trace-type", "Specify the type of traceroute to run (currently only mda).")
+	flag.Var(&scamperTraceType, "scamper.trace-type", "Specify the type of traceroute (mda or regular) to run.")
 }
 
 func main() {
@@ -73,38 +73,41 @@ func main() {
 	}()
 
 	// The triggertrace package needs the following:
-	//   - A traceroute tool for running traceroutes.
-	//   - A traceroute cache to keep traceroute results.
-	//   - A parser to parse traceroutes.
-	//   - A hop annotator for annotating IP addresses.
-	// The traceroute tool (scamper).
+	//   1. A traceroute tool for running traceroutes.
+	//   2. A traceroute cache to keep traceroute results.
+	//   3. A parser to parse traceroutes.
+	//   4. A hop annotator for annotating IP addresses.
+
+	// 1. The traceroute tool (scamper).
 	scamperCfg := tracer.ScamperConfig{
-		Binary:           *scamperBin,
-		OutputPath:       *tracerouteOutput,
-		Timeout:          *scamperTimeout,
-		TraceType:        scamperTraceType.Value,
-		TracelbPTR:       *scamperTracelbPTR,
-		TracelbWaitProbe: *scamperTracelbW,
+		Binary:     *scamperBin,
+		OutputPath: *tracerouteOutput,
+		Timeout:    *scamperTimeout,
+		TraceType:  scamperTraceType.Value,
+	}
+	if scamperCfg.TraceType == "mda" {
+		scamperCfg.TracelbPTR = *scamperTracelbPTR
+		scamperCfg.TracelbWaitProbe = *scamperTracelbW
 	}
 	scamper, err := tracer.NewScamper(scamperCfg)
 	if err != nil {
 		logFatal(fmt.Errorf("%v: %w", errScamper, err))
 	}
-	// The traceroute cache.
+	// 2. The traceroute cache.
 	// TODO(SaiedKazemi): The name ipcache (in its various forms)
 	// should be changed to trcache because the cache holds traceroutes
-	// values -- IP is simply the key.  Anyway, IP will go away when IP
+	// as values.  IP is simply the key and will go away when IP
 	// annonymization is implemented.
 	ipcCfg := ipcache.Config{
 		EntryTimeout: *ipcEntryTimeout,
 		ScanPeriod:   *ipcScanPeriod,
 	}
-	// The traceroute parser.
+	// 3. The traceroute parser.
 	newParser, err := parser.New(scamperTraceType.Value)
 	if err != nil {
 		logFatal(err)
 	}
-	// The hop annotator.
+	// 4. The hop annotator.
 	haCfg := hopannotation.Config{
 		AnnotatorClient: ipservice.NewClient(*ipservice.SocketFilename),
 		OutputPath:      *hopAnnotationOutput,

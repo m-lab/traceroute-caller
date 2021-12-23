@@ -1,5 +1,16 @@
-// Package tracer takes care of all interactions with the traceroute tools
-// (currently only scamper).
+// Package tracer takes care of all interactions with the traceroute
+// tools, currently only scamper.  This package supports two types
+// of traceroutes among the many that scamper can run: MDA and regular:
+//   - MDA traceroute (tracelb) finds load balanced paths between two
+//     addresses by varying the first 4 bytes of the transport header, but
+//     keeping the first 4 bytes constant when probing consecutive hops.
+//     the -P parameter to tracelb says what type of probes to send,
+//     and while the names have overlap with the -P parameter to trace,
+//     they mean different things.
+//   - Regular traceroute using Paris algorithm (trace -P icmp-paris)
+//     finds a single path between two addresses by keeping the first 4
+//     bytes of the transport header constant.
+// See scamper's man page for more details.
 package tracer
 
 import (
