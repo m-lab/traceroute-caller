@@ -13,7 +13,7 @@ import (
 
 	"github.com/m-lab/tcp-info/inetdiag"
 	"github.com/m-lab/traceroute-caller/hopannotation"
-	"github.com/m-lab/traceroute-caller/ipcache"
+	"github.com/m-lab/traceroute-caller/internal/ipcache"
 	"github.com/m-lab/traceroute-caller/parser"
 	"github.com/m-lab/uuid-annotator/annotator"
 )

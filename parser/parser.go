@@ -23,8 +23,8 @@ var (
 
 // TS contains a unix epoch timestamp.
 type TS struct {
-	Sec  int64 `json:"sec"`
-	Usec int64 `json:"usec"`
+	Sec  int64 `json:"sec" bigquery:"sec"`
+	Usec int64 `json:"usec" bigquery:"usec"`
 }
 
 // CyclestartLine contains the information about the scamper "cyclestart".

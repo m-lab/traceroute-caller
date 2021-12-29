@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/m-lab/traceroute-caller/ipcache"
+	"github.com/m-lab/traceroute-caller/internal/ipcache"
 )
 
 func init() {

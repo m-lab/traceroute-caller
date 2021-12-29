@@ -21,9 +21,9 @@ import (
 
 // Reply describes a single reply message.
 type Reply struct {
-	Rx       TS      `json:"rx"`
-	TTL      int     `json:"ttl"`
-	RTT      float64 `json:"rtt"`
+	Rx       TS      `json:"rx" bigquery:"rx"`
+	TTL      int     `json:"ttl" bigquery:"ttl"`
+	RTT      float64 `json:"rtt" bigquery:"rtt"`
 	IcmpType int     `json:"icmp_type" bigquery:"icmp_type"`
 	IcmpCode int     `json:"icmp_code" bigquery:"icmp_code"`
 	IcmpQTos int     `json:"icmp_q_tos" bigquery:"icmp_q_tos"`
@@ -32,28 +32,28 @@ type Reply struct {
 
 // Probe describes a single probe message, and all the associated replies.
 type Probe struct {
-	Tx      TS      `json:"tx"`
-	Replyc  int     `json:"replyc"`
-	TTL     int64   `json:"ttl"`
-	Attempt int     `json:"attempt"`
-	Flowid  int64   `json:"flowid"`
-	Replies []Reply `json:"replies"` // There is usually just a single reply
+	Tx      TS      `json:"tx" bigquery:"tx"`
+	Replyc  int     `json:"replyc" bigquery:"replyc"`
+	TTL     int64   `json:"ttl" bigquery:"ttl"`
+	Attempt int     `json:"attempt" bigquery:"attempt"`
+	Flowid  int64   `json:"flowid" bigquery:"flowid"`
+	Replies []Reply `json:"replies" bigquery:"replies"` // There is usually just a single reply.
 }
 
 // ScamperLink describes a single step in the traceroute.  The probes within a
 // ScamperLink appear to have the same value of TTL, but different flow_ids.
 type ScamperLink struct {
-	Addr   string  `json:"addr"`
-	Probes []Probe `json:"probes"`
+	Addr   string  `json:"addr" bigquery:"addr"`
+	Probes []Probe `json:"probes" bigquery:"probes"`
 }
 
 // ScamperNode describes a layer of links.
 type ScamperNode struct {
-	Addr  string          `json:"addr"`
-	Name  string          `json:"name"`
+	Addr  string          `json:"addr" bigquery:"addr"`
+	Name  string          `json:"name" bigquery:"name"`
 	QTTL  int             `json:"q_ttl" bigquery:"q_ttl"`
-	Linkc int64           `json:"linkc"`
-	Links [][]ScamperLink `json:"links"`
+	Linkc int64           `json:"linkc" bigquery:"linkc"`
+	Links [][]ScamperLink `json:"links" bigquery:"links"`
 }
 
 // Scamper1 encapsulates the four lines of a traceroute:
@@ -74,26 +74,26 @@ type Scamper1 struct {
 // TracelbLine contains scamper MDA traceroute details.
 // Not clear why so many fields are floats.  Fields in scamper code are uint16_t and uint8_t
 type TracelbLine struct {
-	Type        string        `json:"type"`
-	Version     string        `json:"version"`
-	Userid      float64       `json:"userid"`
-	Method      string        `json:"method"`
-	Src         string        `json:"src"`
-	Dst         string        `json:"dst"`
-	Start       TS            `json:"start"`
+	Type        string        `json:"type" bigquery:"type"`
+	Version     string        `json:"version" bigquery:"version"`
+	Userid      float64       `json:"userid" bigquery:"userid"`
+	Method      string        `json:"method" bigquery:"method"`
+	Src         string        `json:"src" bigquery:"src"`
+	Dst         string        `json:"dst" bigquery:"dst"`
+	Start       TS            `json:"start" bigquery:"start"`
 	ProbeSize   float64       `json:"probe_size" bigquery:"probe_size"`
-	Firsthop    float64       `json:"firsthop"`
-	Attempts    float64       `json:"attempts"`
-	Confidence  float64       `json:"confidence"`
-	Tos         float64       `json:"tos"`
-	Gaplint     float64       `json:"gaplint"`
+	Firsthop    float64       `json:"firsthop" bigquery:"firsthop"`
+	Attempts    float64       `json:"attempts" bigquery:"attempts"`
+	Confidence  float64       `json:"confidence" bigquery:"confidence"`
+	Tos         float64       `json:"tos" bigquery:"tos"`
+	Gaplint     float64       `json:"gaplint" bigquery:"gaplint"`
 	WaitTimeout float64       `json:"wait_timeout" bigquery:"wait_timeout"`
 	WaitProbe   float64       `json:"wait_probe" bigquery:"wait_probe"`
-	Probec      float64       `json:"probec"`
+	Probec      float64       `json:"probec" bigquery:"probec"`
 	ProbecMax   float64       `json:"probec_max" bigquery:"probec_max"`
-	Nodec       float64       `json:"nodec"`
-	Linkc       float64       `json:"linkc"`
-	Nodes       []ScamperNode `json:"nodes"`
+	Nodec       float64       `json:"nodec" bigquery:"nodec"`
+	Linkc       float64       `json:"linkc" bigquery:"linkc"`
+	Nodes       []ScamperNode `json:"nodes" bigquery:"nodes"`
 }
 
 type scamper1Parser struct {
@@ -102,7 +102,6 @@ type scamper1Parser struct {
 // ParseRawData parses scamper's MDA traceroute in JSONL format.
 func (s1 *scamper1Parser) ParseRawData(rawData []byte) (ParsedData, error) {
 	var scamper1 Scamper1
-	var err error
 
 	// First validate the traceroute data.	We account for the last
 	// newline because it's a lot faster than stripping it and creating
@@ -129,7 +128,7 @@ func (s1 *scamper1Parser) ParseRawData(rawData []byte) (ParsedData, error) {
 	}
 
 	// Parse and validate the tracelb line.
-	if err = json.Unmarshal(lines[2], &scamper1.Tracelb); err != nil {
+	if err := json.Unmarshal(lines[2], &scamper1.Tracelb); err != nil {
 		return nil, errTracelbLine
 	}
 	if scamper1.Tracelb.Type != "tracelb" {
@@ -137,7 +136,7 @@ func (s1 *scamper1Parser) ParseRawData(rawData []byte) (ParsedData, error) {
 	}
 
 	// Parse and validate the cycle-stop line.
-	if err = json.Unmarshal(lines[3], &scamper1.CycleStop); err != nil {
+	if err := json.Unmarshal(lines[3], &scamper1.CycleStop); err != nil {
 		return nil, errCycleStop
 	}
 	if scamper1.CycleStop.Type != "cycle-stop" {

@@ -70,7 +70,6 @@ type scamper2Parser struct {
 // ParseRawData parses scamper's normal traceroute in JSONL format.
 func (s2 *scamper2Parser) ParseRawData(rawData []byte) (ParsedData, error) {
 	var scamper2 Scamper2
-	var err error
 
 	// First validate the traceroute data.	We account for the last
 	// newline because it's a lot faster than stripping it and creating
@@ -97,7 +96,7 @@ func (s2 *scamper2Parser) ParseRawData(rawData []byte) (ParsedData, error) {
 	}
 
 	// Parse and validate the trace line.
-	if err = json.Unmarshal(lines[2], &scamper2.Trace); err != nil {
+	if err := json.Unmarshal(lines[2], &scamper2.Trace); err != nil {
 		return nil, errTraceLine
 	}
 	if scamper2.Trace.Type != "trace" {
@@ -105,7 +104,7 @@ func (s2 *scamper2Parser) ParseRawData(rawData []byte) (ParsedData, error) {
 	}
 
 	// Parse and validate the cycle-stop line.
-	if err = json.Unmarshal(lines[3], &scamper2.CycleStop); err != nil {
+	if err := json.Unmarshal(lines[3], &scamper2.CycleStop); err != nil {
 		return nil, errCycleStop
 	}
 	if scamper2.CycleStop.Type != "cycle-stop" {
