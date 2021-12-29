@@ -19,10 +19,10 @@ import (
 	"github.com/m-lab/go/prometheusx"
 	"github.com/m-lab/tcp-info/eventsocket"
 	"github.com/m-lab/traceroute-caller/hopannotation"
-	"github.com/m-lab/traceroute-caller/ipcache"
+	"github.com/m-lab/traceroute-caller/internal/ipcache"
+	"github.com/m-lab/traceroute-caller/internal/triggertrace"
 	"github.com/m-lab/traceroute-caller/parser"
 	"github.com/m-lab/traceroute-caller/tracer"
-	"github.com/m-lab/traceroute-caller/triggertrace"
 	"github.com/m-lab/uuid-annotator/ipservice"
 )
 
