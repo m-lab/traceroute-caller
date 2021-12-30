@@ -64,8 +64,9 @@ var (
 	hostname string
 
 	// Package testing aid.
-	tickerDuration = int64(60 * 1000 * time.Millisecond) // ticker duration for cache resetter
-	writeFile      = ioutil.WriteFile
+	tickerDuration   = int64(60 * 1000 * time.Millisecond) // ticker duration for cache resetter
+	writeFile        = ioutil.WriteFile
+	errInvalidConfig = errors.New("invalid hop annotation configuration")
 )
 
 // HopAnnotation1 is the datatype that is written to the hop annotation file.
@@ -107,8 +108,8 @@ func init() {
 // passage of the midnight every minute to reset the cache.  The goroutine
 // will terminate when the ctx is cancelled.
 func New(ctx context.Context, haCfg Config) (*HopCache, error) {
-	if haCfg.AnnotatorClient == nil || haCfg.OutputPath == "" {
-		return nil, fmt.Errorf("invalid hop annotation configuration: %+v", haCfg)
+	if ctx == nil || haCfg.AnnotatorClient == nil || haCfg.OutputPath == "" {
+		return nil, fmt.Errorf("%v: %+v", errInvalidConfig, haCfg)
 	}
 	hc := &HopCache{
 		hops:       make(map[string]bool, 10000), // based on observation
