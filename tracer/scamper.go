@@ -106,7 +106,8 @@ func (s *Scamper) CachedTrace(cookie, uuid string, t time.Time, cachedTrace []by
 
 	// Create and add the first line to the cached traceroute.
 	newTrace := append(createMetaline(uuid, true, extractUUID(cachedTrace[:split])), cachedTrace[split+1:]...)
-	return ioutil.WriteFile(filename, []byte(newTrace), 0666)
+	// Make the file readable so it won't be overwritten.
+	return ioutil.WriteFile(filename, []byte(newTrace), 0444)
 }
 
 // DontTrace is called when a previous traceroute that we were waiting for
@@ -159,7 +160,7 @@ func runCmd(ctx context.Context, label string, cmd []string) ([]byte, error) {
 	var outb, errb bytes.Buffer
 	c.Stdout = &outb
 	c.Stderr = &errb
-	log.Printf("context %p: command %s started\n", ctx, strings.Join(cmd, " "))
+	log.Printf("context %p: command started: %s\n", ctx, strings.Join(cmd, " "))
 	start := time.Now()
 	err := c.Run()
 	latency := time.Since(start).Seconds()
@@ -179,7 +180,7 @@ func runCmd(ctx context.Context, label string, cmd []string) ([]byte, error) {
 		return outb.Bytes(), err
 	}
 
-	log.Printf("Command succeeded in context %p\n", ctx)
+	log.Printf("context %p: command succeeded\n", ctx)
 	traceTimeHistogram.WithLabelValues("success").Observe(latency)
 	return outb.Bytes(), nil
 }

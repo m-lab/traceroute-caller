@@ -157,7 +157,13 @@ func (h *Handler) traceAnnotateAndArchive(ctx context.Context, dest Destination)
 		log.Printf("failed to annotate some or all hops (errors: %+v)\n", allErrs)
 	}
 	if len(annotations) > 0 {
-		h.HopAnnotator.WriteAnnotations(annotations, traceStartTime)
+		allErrs := h.HopAnnotator.WriteAnnotations(annotations, traceStartTime)
+		if allErrs != nil {
+			log.Printf("failed to write some or all annotations due to the following error(s):\n")
+			for _, err := range allErrs {
+				log.Printf("error: %v\n", err)
+			}
+		}
 	}
 }
 

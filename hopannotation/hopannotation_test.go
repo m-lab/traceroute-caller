@@ -76,6 +76,15 @@ func newHopCache(ctx context.Context, t *testing.T, path string) (*HopCache, *fa
 }
 
 func TestNew(t *testing.T) {
+	// First check with invalid parameters.
+	haCfg := Config{
+		AnnotatorClient: nil,
+		OutputPath:      "",
+	}
+	if _, err := New(context.TODO(), haCfg); !strings.Contains(err.Error(), errInvalidConfig.Error()) {
+		t.Fatalf("New() = %v, want %v", err, errInvalidConfig)
+	}
+
 	// Change ticker duration to 100ms to avoid waiting a long time for
 	// the resetter goroutine to notice passage of midnight or cancelled
 	// context.

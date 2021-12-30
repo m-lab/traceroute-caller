@@ -43,6 +43,12 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
+# Create /var/empty to avoid a race condition in scamper that results
+# in the following failure:
+#   scamper_privsep_init: could not mkdir /var/empty: File exists
+RUN mkdir -p /var/empty && \
+    chmod 555 /var/empty
+
 # Bring the statically-linked traceroute-caller binary from the go build image.
 COPY --from=build_caller /go/bin/traceroute-caller /
 
