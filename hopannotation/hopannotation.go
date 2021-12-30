@@ -66,7 +66,7 @@ var (
 	// Package testing aid.
 	tickerDuration   = int64(60 * 1000 * time.Millisecond) // ticker duration for cache resetter
 	writeFile        = ioutil.WriteFile
-	errInvalidConfig = errors.New("invalid hop annotation configuration")
+	errInvalidConfig = errors.New("invalid context or hop annotation configuration")
 )
 
 // HopAnnotation1 is the datatype that is written to the hop annotation file.
