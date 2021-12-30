@@ -13,7 +13,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/m-lab/go/shx"
 	"github.com/m-lab/uuid"
 )
 
@@ -155,13 +154,14 @@ func traceAndWrite(ctx context.Context, label string, filename string, cmd []str
 func runCmd(ctx context.Context, label string, cmd []string) ([]byte, error) {
 	deadline, _ := ctx.Deadline()
 	timeout := time.Until(deadline)
-	job := shx.Exec(cmd[0], cmd[1:]...)
-	buff := bytes.Buffer{}
-	fullCmd := shx.Pipe(job, shx.Write(&buff))
 
+	c := exec.CommandContext(ctx, cmd[0], cmd[1:]...)
+	var outb, errb bytes.Buffer
+	c.Stdout = &outb
+	c.Stderr = &errb
 	log.Printf("context %p: command %s started\n", ctx, strings.Join(cmd, " "))
 	start := time.Now()
-	err := fullCmd.Run(ctx, shx.New())
+	err := c.Run()
 	latency := time.Since(start).Seconds()
 	log.Printf("context %p: command finished in %v seconds", ctx, latency)
 	tracesPerformed.WithLabelValues(label).Inc()
@@ -175,12 +175,13 @@ func runCmd(ctx context.Context, label string, cmd []string) ([]byte, error) {
 		} else {
 			log.Printf("context %p: command failed (error: %v)\n", ctx, err)
 		}
-		return buff.Bytes(), err
+		log.Println(errb.String())
+		return outb.Bytes(), err
 	}
 
 	log.Printf("Command succeeded in context %p\n", ctx)
 	traceTimeHistogram.WithLabelValues("success").Observe(latency)
-	return buff.Bytes(), nil
+	return outb.Bytes(), nil
 }
 
 // generateFilename creates the string filename for storing the data.

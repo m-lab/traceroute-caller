@@ -82,8 +82,8 @@ func TestTrace(t *testing.T) {
 		shouldFail bool
 		want       string
 	}{
-		{"testdata/fail", "mda", true, true, "exit status 1: testdata/fail"},
-		{"testdata/loop", "mda", true, true, "signal: killed: testdata/loop"},
+		{"testdata/fail", "mda", true, true, "exit status 1"},
+		{"testdata/loop", "mda", true, true, "signal: killed"},
 
 		{"/bin/echo", "mda", true, false, `{"UUID":"","TracerouteCallerVersion":"` + prometheusx.GitShortCommit + `","CachedTrace":false,"CachedUUID":""}
 -o- -O json -I tracelb -P icmp-echo -q 3 -W 39 -O ptr 10.1.1.1`},
