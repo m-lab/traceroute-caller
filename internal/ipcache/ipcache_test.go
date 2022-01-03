@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/m-lab/traceroute-caller/ipcache"
+	"github.com/m-lab/traceroute-caller/internal/ipcache"
 )
 
 func init() {
@@ -19,8 +19,8 @@ func init() {
 }
 
 type fakeTracer struct {
-	nTrace                int
-	nTraceFromCachedTrace int
+	nTrace       int
+	nCachedTrace int
 }
 
 func (ft *fakeTracer) Trace(remoteIP, cookie, uuid string, t time.Time) ([]byte, error) {
@@ -28,8 +28,8 @@ func (ft *fakeTracer) Trace(remoteIP, cookie, uuid string, t time.Time) ([]byte,
 	return []byte("fake traceroute data to " + remoteIP), nil
 }
 
-func (ft *fakeTracer) TraceFromCachedTrace(cookie, uuid string, t time.Time, cachedTest []byte) error {
-	ft.nTraceFromCachedTrace++
+func (ft *fakeTracer) CachedTrace(cookie, uuid string, t time.Time, cachedTest []byte) error {
+	ft.nCachedTrace++
 	return nil
 }
 
@@ -49,13 +49,13 @@ func TestNew(t *testing.T) {
 
 func TestFetchTrace(t *testing.T) {
 	tests := []struct {
-		remoteIP                      string
-		cookie                        string
-		wantErr                       bool
-		wantData                      string
-		wantTraceCalls                int
-		wantTraceFromCachedTraceCalls int
-		wantEntries                   int
+		remoteIP             string
+		cookie               string
+		wantErr              bool
+		wantData             string
+		wantTraceCalls       int
+		wantCachedTraceCalls int
+		wantEntries          int
 	}{
 		{"1.1.1.1", "", true, "", 0, 0, 0},
 		{"1.1.1.1", "10f3d", false, "fake traceroute data to 1.1.1.1", 1, 0, 1},
@@ -93,8 +93,8 @@ func TestFetchTrace(t *testing.T) {
 		if gotCalls := tracer.nTrace; gotCalls != test.wantTraceCalls {
 			t.Errorf("got %d calls to Trace(), want %d", gotCalls, test.wantTraceCalls)
 		}
-		if gotCalls := tracer.nTraceFromCachedTrace; gotCalls != test.wantTraceFromCachedTraceCalls {
-			t.Errorf("got %d calls to TraceFromCachedTrace(), want %d", gotCalls, test.wantTraceFromCachedTraceCalls)
+		if gotCalls := tracer.nCachedTrace; gotCalls != test.wantCachedTraceCalls {
+			t.Errorf("got %d calls to CachedTrace(), want %d", gotCalls, test.wantCachedTraceCalls)
 		}
 		if gotEntries := ipCache.NumEntries(); gotEntries != test.wantEntries {
 			t.Errorf("got %d entries in IP cache, want %d", gotEntries, test.wantEntries)
@@ -132,7 +132,7 @@ func (pt *pausingTracer) Trace(remoteIP, cookie, uuid string, t time.Time) ([]by
 	return []byte("fake traceroute data to " + remoteIP), nil
 }
 
-func (pt *pausingTracer) TraceFromCachedTrace(cookie, uuid string, t time.Time, cachedTest []byte) error {
+func (pt *pausingTracer) CachedTrace(cookie, uuid string, t time.Time, cachedTest []byte) error {
 	randomDelay()
 	atomic.AddInt64(&pt.successes, 1)
 	return nil

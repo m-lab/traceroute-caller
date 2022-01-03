@@ -15,7 +15,7 @@ import (
 
 	"github.com/m-lab/tcp-info/inetdiag"
 	"github.com/m-lab/traceroute-caller/hopannotation"
-	"github.com/m-lab/traceroute-caller/ipcache"
+	"github.com/m-lab/traceroute-caller/internal/ipcache"
 	"github.com/m-lab/traceroute-caller/parser"
 	"github.com/m-lab/uuid-annotator/annotator"
 )
@@ -31,11 +31,18 @@ type Destination struct {
 	Cookie   string
 }
 
-// FetchTracer is the interface for obtaining a traceroute result.
-// The implementation can return results from a recent cache in order to
-// avoid running multiple traceroutes to the same destination in short time.
+// FetchTracer is the interface for obtaining a traceroute.  The
+// implementation will return the traceroute from a recent entry in the
+// cache (if it exists) in order to avoid running multiple traceroutes to
+// the same destination in a short time.
 type FetchTracer interface {
 	FetchTrace(remoteIP, cookie string) ([]byte, error)
+}
+
+// ParseTracer is the interface for parsing raw traceroutes obtained
+// from the traceroute tool.
+type ParseTracer interface {
+	ParseRawData(rawData []byte) (parser.ParsedData, error)
 }
 
 // AnnotateAndArchiver is the interface for annotating IP addresses and
@@ -50,15 +57,15 @@ type Handler struct {
 	Destinations     map[string]Destination // key is UUID
 	DestinationsLock sync.Mutex
 	LocalIPs         []*net.IP
-	Traceroutes      FetchTracer
+	IPCache          FetchTracer
+	Parser           ParseTracer
 	HopAnnotator     AnnotateAndArchiver
-	// For testing.
-	done chan struct{}
+	done             chan struct{} // For testing.
 }
 
 // NewHandler returns a new instance of Handler.
-func NewHandler(ctx context.Context, tracer ipcache.Tracer, ipcCfg ipcache.Config, haCfg hopannotation.Config) (*Handler, error) {
-	ipCache, err := ipcache.New(ctx, tracer, ipcCfg)
+func NewHandler(ctx context.Context, tracetool ipcache.Tracer, ipcCfg ipcache.Config, newParser parser.TracerouteParser, haCfg hopannotation.Config) (*Handler, error) {
+	ipCache, err := ipcache.New(ctx, tracetool, ipcCfg)
 	if err != nil {
 		return nil, err
 	}
@@ -72,8 +79,9 @@ func NewHandler(ctx context.Context, tracer ipcache.Tracer, ipcCfg ipcache.Confi
 	}
 	return &Handler{
 		Destinations: make(map[string]Destination),
-		Traceroutes:  ipCache,
 		LocalIPs:     myIPs,
+		IPCache:      ipCache,
+		Parser:       newParser,
 		HopAnnotator: hopCache,
 	}, nil
 }
@@ -112,7 +120,6 @@ func (h *Handler) Close(ctx context.Context, timestamp time.Time, uuid string) {
 		log.Printf("failed to find destination for UUID %q", uuid)
 		return
 	}
-
 	delete(h.Destinations, uuid)
 	h.DestinationsLock.Unlock()
 	// This goroutine will live for a few minutes and terminate
@@ -128,29 +135,35 @@ func (h *Handler) traceAnnotateAndArchive(ctx context.Context, dest Destination)
 			close(h.done)
 		}
 	}()
-	data, err := h.Traceroutes.FetchTrace(dest.RemoteIP, dest.Cookie)
+	rawData, err := h.IPCache.FetchTrace(dest.RemoteIP, dest.Cookie)
 	if err != nil {
 		log.Printf("failed to run a traceroute to %q (error: %v)\n", dest, err)
 		return
 	}
-	output, err := parser.ParseTraceroute(data)
+	parsedData, err := h.Parser.ParseRawData(rawData)
 	if err != nil {
 		log.Printf("failed to parse traceroute output (error: %v)\n", err)
 		return
 	}
-	hops := parser.ExtractHops(&output.Tracelb)
+	hops := parsedData.ExtractHops()
 	if len(hops) == 0 {
-		log.Printf("failed to extract hops from tracelb %+v\n", output.Tracelb)
+		log.Printf("failed to extract hops from traceroute %+v\n", string(rawData))
 		return
 	}
 
-	traceStartTime := time.Unix(int64(output.CycleStart.StartTime), 0).UTC()
+	traceStartTime := parsedData.StartTime()
 	annotations, allErrs := h.HopAnnotator.Annotate(ctx, hops, traceStartTime)
 	if allErrs != nil {
 		log.Printf("failed to annotate some or all hops (errors: %+v)\n", allErrs)
 	}
 	if len(annotations) > 0 {
-		h.HopAnnotator.WriteAnnotations(annotations, traceStartTime)
+		allErrs := h.HopAnnotator.WriteAnnotations(annotations, traceStartTime)
+		if allErrs != nil {
+			log.Printf("failed to write some or all annotations due to the following error(s):\n")
+			for _, err := range allErrs {
+				log.Printf("error: %v\n", err)
+			}
+		}
 	}
 }
 

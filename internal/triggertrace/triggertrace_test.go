@@ -13,7 +13,8 @@ import (
 
 	"github.com/m-lab/tcp-info/inetdiag"
 	"github.com/m-lab/traceroute-caller/hopannotation"
-	"github.com/m-lab/traceroute-caller/ipcache"
+	"github.com/m-lab/traceroute-caller/internal/ipcache"
+	"github.com/m-lab/traceroute-caller/parser"
 	"github.com/m-lab/uuid-annotator/annotator"
 )
 
@@ -29,8 +30,8 @@ func init() {
 }
 
 type fakeTracer struct {
-	nTraces                int32
-	nTraceFromCachedTraces int32
+	nTraces       int32
+	nCachedTraces int32
 }
 
 func (ft *fakeTracer) Trace(remoteIP, cookie, uuid string, t time.Time) ([]byte, error) {
@@ -55,9 +56,9 @@ func (ft *fakeTracer) Trace(remoteIP, cookie, uuid string, t time.Time) ([]byte,
 	return content, nil
 }
 
-func (ft *fakeTracer) TraceFromCachedTrace(cookie, uuid string, t time.Time, cachedTest []byte) error {
-	defer func() { atomic.AddInt32(&ft.nTraceFromCachedTraces, 1) }()
-	fmt.Printf("\nTraceFromCachedTrace()\n")
+func (ft *fakeTracer) CachedTrace(cookie, uuid string, t time.Time, cachedTest []byte) error {
+	defer func() { atomic.AddInt32(&ft.nCachedTraces, 1) }()
+	fmt.Printf("\nCachedTrace()\n")
 	return nil
 }
 
@@ -70,7 +71,7 @@ func (ft *fakeTracer) Traces() int32 {
 }
 
 func (ft *fakeTracer) TracesCached() int32 {
-	return atomic.LoadInt32(&ft.nTraceFromCachedTraces)
+	return atomic.LoadInt32(&ft.nCachedTraces)
 }
 
 type fakeAnnotator struct {
@@ -211,7 +212,11 @@ func newHandler(tracer *fakeTracer) (*Handler, error) {
 		AnnotatorClient: annotator,
 		OutputPath:      "/tmp/annotation1",
 	}
-	return NewHandler(context.TODO(), tracer, ipcCfg, haCfg)
+	newParser, err := parser.New("mda")
+	if err != nil {
+		return nil, err
+	}
+	return NewHandler(context.TODO(), tracer, ipcCfg, newParser, haCfg)
 }
 
 func waitForTrace(t *testing.T, handler *Handler) {

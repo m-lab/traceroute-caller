@@ -19,6 +19,10 @@ services:
         published: 9992
         protocol: tcp
         mode: bridge
+      - target: 9993
+        published: 9993
+        protocol: tcp
+        mode: bridge
     command:
       - -prometheusx.listen-address=:9990
       - -output=/local/tcpinfo
@@ -44,7 +48,7 @@ services:
       - -siteinfo.url=file:///testdata/annotations-incomplete.json
       - -hostname=mlab1-lga0t.mlab-sandbox.measurement-lab.org
 
-  traceroute-caller:
+  trc-scamper1:
     build:
       context: .
       dockerfile: Dockerfile
@@ -60,12 +64,38 @@ services:
         delay: 5s
     command:
       - -prometheusx.listen-address=:9992
-      - -traceroute-output=/local/scamper1
-      - -hopannotation-output=/local/hopannotation1
       - -tcpinfo.eventsocket=/local/tcpevents.sock
       - -ipservice.sock=/local/uuid-annotator.sock
-      - -IPCacheTimeout=10m
-      - -IPCacheUpdatePeriod=1m
+      - -IPCacheTimeout=1m
+      - -IPCacheUpdatePeriod=10s
+      - -hopannotation-output=/local/hopannotation1
+      - -scamper.trace-type=mda
+      - -traceroute-output=/local/scamper1
       - -scamper.timeout=30m
       - -scamper.tracelb-W=15
-      #- -scamper.tracelb-ptr=false
+      - -scamper.tracelb-ptr=true
+
+  trc-scamper2:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ./local:/local
+    network_mode: "service:tcpinfo"
+    deploy:
+      # NOTE: traceroute-caller may fail on startup if it tries to read a
+      # socket that the above services are not yet listening on.
+      # So, allow restart.
+      restart_policy:
+        condition: any
+        delay: 5s
+    command:
+      - -prometheusx.listen-address=:9993
+      - -tcpinfo.eventsocket=/local/tcpevents.sock
+      - -ipservice.sock=/local/uuid-annotator.sock
+      - -IPCacheTimeout=1m
+      - -IPCacheUpdatePeriod=10s
+      - -hopannotation-output=/local/hopannotation1
+      - -scamper.trace-type=regular
+      - -traceroute-output=/local/scamper2
+      - -scamper.timeout=10m

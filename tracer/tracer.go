@@ -1,5 +1,16 @@
-// Package tracer takes care of all interactions with the trace tools
-// (currently only scamper).
+// Package tracer takes care of all interactions with the traceroute
+// tools, currently only scamper.  This package supports two types
+// of traceroutes among the many that scamper can run: MDA and regular:
+//   - MDA traceroute (tracelb) finds load balanced paths between two
+//     addresses by varying the first 4 bytes of the transport header, but
+//     keeping the first 4 bytes constant when probing consecutive hops.
+//     the -P parameter to tracelb says what type of probes to send,
+//     and while the names have overlap with the -P parameter to trace,
+//     they mean different things.
+//   - Regular traceroute using Paris algorithm (trace -P icmp-paris)
+//     finds a single path between two addresses by keeping the first 4
+//     bytes of the transport header constant.
+// See scamper's man page for more details.
 package tracer
 
 import (
@@ -78,7 +89,7 @@ var (
 type Metadata struct {
 	UUID                    string
 	TracerouteCallerVersion string
-	CachedResult            bool
+	CachedTrace             bool
 	CachedUUID              string
 }
 
@@ -88,28 +99,28 @@ func init() {
 	rtx.Must(err, "failed to call os.Hostname")
 }
 
-// extractUUID retrieves the UUID from a cached line.
+// extractUUID returns the UUID in the metadata line of a traceroute.
 //
 // TODO: Eliminate the need to unmarshal data we marshaled in the first place.
 func extractUUID(metaline []byte) string {
-	var metaResult Metadata
-	err := json.Unmarshal(metaline, &metaResult)
+	var md Metadata
+	err := json.Unmarshal(metaline, &md)
 	if err != nil {
-		log.Println("failed to parse cached results:", string(metaline))
+		log.Println("failed to parse metaline:", string(metaline))
 		return ""
 	}
-	return metaResult.UUID
+	return md.UUID
 }
 
-// createMetaline returns the what the first line of the output jsonl file should
-// be. Parameter isCache indicates whether this meta line is for an original
-// trace test or a cached test, and parameter cachedUUID is the original test if
-// isCache is 1.
+// createMetaline returns what the first line of the .jsonl output file
+// should be. Parameter isCache indicates whether this meta line is for an
+// original traceroute or a cached traceroute, and parameter cachedUUID is
+// the original traceroute if isCache is 1.
 func createMetaline(uuid string, isCache bool, cachedUUID string) []byte {
 	meta := Metadata{
 		UUID:                    uuid,
 		TracerouteCallerVersion: prometheusx.GitShortCommit,
-		CachedResult:            isCache,
+		CachedTrace:             isCache,
 		CachedUUID:              cachedUUID,
 	}
 	metaJSON, _ := json.Marshal(meta)
