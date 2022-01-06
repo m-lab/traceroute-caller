@@ -141,6 +141,9 @@ func traceAndWrite(ctx context.Context, label string, filename string, cmd []str
 	if err != nil {
 		return nil, err
 	}
+	if len(data) == 0 {
+		return nil, fmt.Errorf("context %p: failed to obtain a traceroute (command: %v)", ctx, cmd)
+	}
 
 	buff := bytes.Buffer{}
 	// It's OK to ignore the return values because err is always nil. If

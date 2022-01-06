@@ -100,7 +100,7 @@ func (h *Handler) Open(ctx context.Context, timestamp time.Time, uuid string, so
 	defer h.DestinationsLock.Unlock()
 	destination, err := h.findDestination(sockID)
 	if err != nil {
-		log.Printf("failed to find destination from SockID %+v\n", *sockID)
+		log.Printf("context %p: failed to find destination from SockID %+v\n", ctx, *sockID)
 		return
 	}
 	if uuid == "" {
@@ -117,7 +117,7 @@ func (h *Handler) Close(ctx context.Context, timestamp time.Time, uuid string) {
 	destination, ok := h.Destinations[uuid]
 	if !ok {
 		h.DestinationsLock.Unlock()
-		log.Printf("failed to find destination for UUID %q", uuid)
+		log.Printf("context %p: failed to find destination for UUID %q", ctx, uuid)
 		return
 	}
 	delete(h.Destinations, uuid)
@@ -137,29 +137,29 @@ func (h *Handler) traceAnnotateAndArchive(ctx context.Context, dest Destination)
 	}()
 	rawData, err := h.IPCache.FetchTrace(dest.RemoteIP, dest.Cookie)
 	if err != nil {
-		log.Printf("failed to run a traceroute to %q (error: %v)\n", dest, err)
+		log.Printf("context %p: failed to run a traceroute to %q (error: %v)\n", ctx, dest, err)
 		return
 	}
 	parsedData, err := h.Parser.ParseRawData(rawData)
 	if err != nil {
-		log.Printf("failed to parse traceroute output (error: %v)\n", err)
+		log.Printf("context %p: failed to parse traceroute output (error: %v)\n", ctx, err)
 		return
 	}
 	hops := parsedData.ExtractHops()
 	if len(hops) == 0 {
-		log.Printf("failed to extract hops from traceroute %+v\n", string(rawData))
+		log.Printf("context %p: failed to extract hops from traceroute %+v\n", ctx, string(rawData))
 		return
 	}
 
 	traceStartTime := parsedData.StartTime()
 	annotations, allErrs := h.HopAnnotator.Annotate(ctx, hops, traceStartTime)
 	if allErrs != nil {
-		log.Printf("failed to annotate some or all hops (errors: %+v)\n", allErrs)
+		log.Printf("context %p: failed to annotate some or all hops (errors: %+v)\n", ctx, allErrs)
 	}
 	if len(annotations) > 0 {
 		allErrs := h.HopAnnotator.WriteAnnotations(annotations, traceStartTime)
 		if allErrs != nil {
-			log.Printf("failed to write some or all annotations due to the following error(s):\n")
+			log.Printf("context %p: failed to write some or all annotations due to the following error(s):\n", ctx)
 			for _, err := range allErrs {
 				log.Printf("error: %v\n", err)
 			}

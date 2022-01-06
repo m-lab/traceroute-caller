@@ -165,7 +165,7 @@ func (s1 Scamper1) ExtractHops() []string {
 				link := &links[k]
 				// Parse the IP string, to avoid formatting variations.
 				ip := net.ParseIP(link.Addr)
-				if ip.String() != "<nil>" {
+				if ip.String() != "<nil>" && ip.String() != "*" {
 					hops[ip.String()] = struct{}{}
 				}
 			}
