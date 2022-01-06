@@ -34,6 +34,14 @@ func TestScamper1Parser(t *testing.T) {
 			"2600:803::79",
 			"2600:803:150f::4a"},
 		},
+		{"valid-star", nil, []string{
+			"2804:a8:2:c4::52",
+			"2001:41a8:4020:2::12a",
+			"2804:a8::200:246:59:198",
+			"2001:41a8:4020::f",
+			"2804:14d:1800:a4::2",
+			"2804:a8::200:244:41:252"},
+		},
 	}
 	for i, test := range tests {
 		// Read in the test traceroute output file.
