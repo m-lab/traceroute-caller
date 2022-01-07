@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"net"
 	"time"
 
 	"github.com/m-lab/traceroute-caller/tracer"
@@ -126,7 +127,9 @@ func (s2 Scamper2) ExtractHops() []string {
 	hops := make(map[string]struct{}, 100)
 	for i := range trace.Hops {
 		hop := &trace.Hops[i]
-		hops[hop.Addr] = struct{}{}
+		if net.ParseIP(hop.Addr) != nil {
+			hops[hop.Addr] = struct{}{}
+		}
 	}
 	hopStrings := make([]string, 0, len(hops))
 	for h := range hops {

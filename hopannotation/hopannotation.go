@@ -163,7 +163,7 @@ func (hc *HopCache) Annotate(ctx context.Context, hops []string, traceStartTime 
 	// Validate all hop IP addresses.
 	allErrs := []error{}
 	for _, hop := range hops {
-		if net.ParseIP(hop).String() == "<nil>" {
+		if net.ParseIP(hop) == nil {
 			allErrs = append(allErrs, fmt.Errorf("%w: %v", ErrParseHopIP, hop))
 		}
 	}

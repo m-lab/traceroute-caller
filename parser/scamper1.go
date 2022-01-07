@@ -158,15 +158,15 @@ func (s1 Scamper1) ExtractHops() []string {
 	hops := make(map[string]struct{}, 100)
 	for i := range tracelb.Nodes {
 		node := &tracelb.Nodes[i]
-		hops[node.Addr] = struct{}{}
+		if net.ParseIP(node.Addr) != nil {
+			hops[node.Addr] = struct{}{}
+		}
 		for j := range node.Links {
 			links := node.Links[j]
 			for k := range links {
 				link := &links[k]
-				// Parse the IP string, to avoid formatting variations.
-				ip := net.ParseIP(link.Addr)
-				if ip.String() != "<nil>" {
-					hops[ip.String()] = struct{}{}
+				if net.ParseIP(link.Addr) != nil {
+					hops[link.Addr] = struct{}{}
 				}
 			}
 		}

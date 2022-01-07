@@ -81,7 +81,7 @@ func NewScamper(cfg ScamperConfig) (*Scamper, error) {
 
 // Trace starts a new scamper process to run a traceroute based on the
 // traceroute type and saves it in a file.
-func (s *Scamper) Trace(remoteIP, cookie, uuid string, t time.Time) (out []byte, err error) {
+func (s *Scamper) Trace(remoteIP, cookie, uuid string, t time.Time) ([]byte, error) {
 	tracesInProgress.WithLabelValues("scamper").Inc()
 	defer tracesInProgress.WithLabelValues("scamper").Dec()
 	return s.trace(remoteIP, cookie, uuid, t)
@@ -140,6 +140,9 @@ func traceAndWrite(ctx context.Context, label string, filename string, cmd []str
 	data, err := runCmd(ctx, label, cmd)
 	if err != nil {
 		return nil, err
+	}
+	if len(data) == 0 {
+		return nil, fmt.Errorf("context %p: failed to obtain a traceroute (command: %v)", ctx, cmd)
 	}
 
 	buff := bytes.Buffer{}

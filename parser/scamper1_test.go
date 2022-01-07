@@ -34,6 +34,7 @@ func TestScamper1Parser(t *testing.T) {
 			"2600:803::79",
 			"2600:803:150f::4a"},
 		},
+		{"valid-star", nil, []string{}}, // all "addr" values are either "*" or ""
 	}
 	for i, test := range tests {
 		// Read in the test traceroute output file.
