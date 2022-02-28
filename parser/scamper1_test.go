@@ -14,16 +14,16 @@ func TestScamper1Parser(t *testing.T) {
 		wantErr  error
 		wantHops []string
 	}{
-		{"invalid-num-lines", errTracerouteFile, nil},
-		{"invalid-last-line", errTracerouteFile, nil},
-		{"invalid-metadata", errMetadata, nil},
-		{"invalid-metadata-uuid", errMetadataUUID, nil},
-		{"invalid-cycle-start", errCycleStart, nil},
-		{"invalid-cycle-start-type", errCycleStartType, nil},
-		{"invalid-tracelb", errTracelbLine, nil},
-		{"invalid-tracelb-type", errTraceType, nil},
-		{"invalid-cycle-stop", errCycleStop, nil},
-		{"invalid-cycle-stop-type", errCycleStopType, nil},
+		{"invalid-num-lines", ErrTracerouteFile, nil},
+		{"invalid-last-line", ErrTracerouteFile, nil},
+		{"invalid-metadata", ErrMetadata, nil},
+		{"invalid-metadata-uuid", ErrMetadataUUID, nil},
+		{"invalid-cycle-start", ErrCycleStart, nil},
+		{"invalid-cycle-start-type", ErrCycleStartType, nil},
+		{"invalid-tracelb", ErrTracelbLine, nil},
+		{"invalid-tracelb-type", ErrTraceType, nil},
+		{"invalid-cycle-stop", ErrCycleStop, nil},
+		{"invalid-cycle-stop-type", ErrCycleStopType, nil},
 		{"invalid-tracelb-links", nil, nil},
 		{"valid-simple", nil, []string{}},
 		{"valid-complex", nil, []string{

@@ -77,39 +77,39 @@ func (s2 *scamper2Parser) ParseRawData(rawData []byte) (ParsedData, error) {
 	// a new slice.  We just confirm that the last line is empty.
 	lines := bytes.Split(rawData, []byte("\n"))
 	if len(lines) != 5 || len(lines[4]) != 0 {
-		return nil, errTracerouteFile
+		return nil, ErrTracerouteFile
 	}
 
 	// Parse and validate the metadata line.
 	if err := json.Unmarshal(lines[0], &scamper2.Metadata); err != nil {
-		return nil, errMetadata
+		return nil, ErrMetadata
 	}
 	if scamper2.Metadata.UUID == "" {
-		return nil, fmt.Errorf("%w: %v", errMetadataUUID, scamper2.Metadata.UUID)
+		return nil, fmt.Errorf("%w: %v", ErrMetadataUUID, scamper2.Metadata.UUID)
 	}
 
 	// Parse and validate the cycle-start line.
 	if err := json.Unmarshal(lines[1], &scamper2.CycleStart); err != nil {
-		return nil, errCycleStart
+		return nil, ErrCycleStart
 	}
 	if scamper2.CycleStart.Type != "cycle-start" {
-		return nil, fmt.Errorf("%w: %v", errCycleStartType, scamper2.CycleStart.Type)
+		return nil, fmt.Errorf("%w: %v", ErrCycleStartType, scamper2.CycleStart.Type)
 	}
 
 	// Parse and validate the trace line.
 	if err := json.Unmarshal(lines[2], &scamper2.Trace); err != nil {
-		return nil, errTraceLine
+		return nil, ErrTraceLine
 	}
 	if scamper2.Trace.Type != "trace" {
-		return nil, fmt.Errorf("%w: %v", errTraceType, scamper2.Trace.Type)
+		return nil, fmt.Errorf("%w: %v", ErrTraceType, scamper2.Trace.Type)
 	}
 
 	// Parse and validate the cycle-stop line.
 	if err := json.Unmarshal(lines[3], &scamper2.CycleStop); err != nil {
-		return nil, errCycleStop
+		return nil, ErrCycleStop
 	}
 	if scamper2.CycleStop.Type != "cycle-stop" {
-		return nil, fmt.Errorf("%w: %v", errCycleStopType, scamper2.CycleStop.Type)
+		return nil, fmt.Errorf("%w: %v", ErrCycleStopType, scamper2.CycleStop.Type)
 	}
 
 	return scamper2, nil
