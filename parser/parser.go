@@ -7,6 +7,7 @@ import (
 	"time"
 )
 
+// Errors returned by parser.
 var (
 	ErrTracerouteType = errors.New("unknown traceroute type")
 	ErrTracerouteFile = errors.New("invalid traceroute file")

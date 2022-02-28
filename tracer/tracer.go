@@ -89,7 +89,7 @@ var (
 type Metadata struct {
 	UUID                    string
 	TracerouteCallerVersion string
-	CachedTrace             bool
+	CachedResult            bool
 	CachedUUID              string
 }
 
@@ -120,7 +120,7 @@ func createMetaline(uuid string, isCache bool, cachedUUID string) []byte {
 	meta := Metadata{
 		UUID:                    uuid,
 		TracerouteCallerVersion: prometheusx.GitShortCommit,
-		CachedTrace:             isCache,
+		CachedResult:            isCache,
 		CachedUUID:              cachedUUID,
 	}
 	metaJSON, _ := json.Marshal(meta)

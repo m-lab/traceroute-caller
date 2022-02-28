@@ -85,9 +85,9 @@ func TestTrace(t *testing.T) {
 		{"testdata/fail", "mda", true, true, "exit status 1"},
 		{"testdata/loop", "mda", true, true, "signal: killed"},
 
-		{"/bin/echo", "mda", true, false, `{"UUID":"","TracerouteCallerVersion":"` + prometheusx.GitShortCommit + `","CachedTrace":false,"CachedUUID":""}
+		{"/bin/echo", "mda", true, false, `{"UUID":"","TracerouteCallerVersion":"` + prometheusx.GitShortCommit + `","CachedResult":false,"CachedUUID":""}
 -o- -O json -I tracelb -P icmp-echo -q 3 -W 39 -O ptr 10.1.1.1`},
-		{"/bin/echo", "mda", false, false, `{"UUID":"","TracerouteCallerVersion":"` + prometheusx.GitShortCommit + `","CachedTrace":false,"CachedUUID":""}
+		{"/bin/echo", "mda", false, false, `{"UUID":"","TracerouteCallerVersion":"` + prometheusx.GitShortCommit + `","CachedResult":false,"CachedUUID":""}
 -o- -O json -I tracelb -P icmp-echo -q 3 -W 39 10.1.1.1`},
 	}
 	for _, test := range tests {
@@ -237,8 +237,8 @@ func TestCachedTrace(t *testing.T) {
 	if m.TracerouteCallerVersion != "Fake Version" {
 		t.Errorf("got traceroute caller version %q, want %q", m.TracerouteCallerVersion, "Fake Version")
 	}
-	if m.CachedTrace != true {
-		t.Errorf("got cached result %v, want true", m.CachedTrace)
+	if m.CachedResult != true {
+		t.Errorf("got cached result %v, want true", m.CachedResult)
 	}
 	wantUUID = "ndt-plh7v_1566050090_000000000004D64D"
 	if m.CachedUUID != "ndt-plh7v_1566050090_000000000004D64D" {
@@ -277,7 +277,7 @@ func TestDontTrace(t *testing.T) {
 func TestCreateMetaline(t *testing.T) {
 	prometheusx.GitShortCommit = "Fake Version"
 	gotMeta := createMetaline("0000000000000ABC", true, "00EF")
-	wantMeta := []byte("0000000000000ABC\",\"TracerouteCallerVersion\":\"Fake Version\",\"CachedTrace\":true,\"CachedUUID\":\"00EF\"")
+	wantMeta := []byte("0000000000000ABC\",\"TracerouteCallerVersion\":\"Fake Version\",\"CachedResult\":true,\"CachedUUID\":\"00EF\"")
 	if !bytes.Contains(gotMeta, wantMeta) {
 		t.Errorf("gotMeta %q does not contain wantMeta %q", gotMeta, wantMeta)
 	}
