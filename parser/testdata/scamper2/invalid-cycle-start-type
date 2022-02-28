@@ -1,4 +1,4 @@
-{"UUID":"0000000000","TracerouteCallerVersion":"0000000","CachedTrace":false,"CachedUUID":""}
+{"UUID":"0000000000","TracerouteCallerVersion":"0000000","CachedResult":false,"CachedUUID":""}
 {"type":"cycle-start-invalid", "list_name":"/tmp/scamperctrl:51811", "id":1, "hostname":"ndt-plh7v", "start_time":1566691298}
 {"type":"trace"}
 {"type":"cycle-stop"}

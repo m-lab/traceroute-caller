@@ -1,4 +1,4 @@
-{"UUID":"0000000000","TracerouteCallerVersion":"0000000","CachedTrace":false,"CachedUUID":""}
+{"UUID":"0000000000","TracerouteCallerVersion":"0000000","CachedResult":false,"CachedUUID":""}
 {"type":"cycle-start", "list_name":"/tmp/scamperctrl:51811", "id":1, "hostname":"ndt-plh7v", "start_time":1566691298}
 {"type":"trace","version":"0.1","userid":0,"method":"icmp-echo-paris","src":"192.168.144.2","dst":"91.189.88.142","icmp_sum":33009,"stop_reason":"COMPLETED","stop_data":0,"start":{"sec":1638999963,"usec":787829,"ftime":"2021-12-08 21:46:03"},"hop_count":2,"attempts":2,"hoplimit":0,"firsthop":1,"wait":5,"wait_probe":0,"tos":0,"probe_size":44,"probe_count":16}
 {"type":"cycle-stop", "list_name":"/tmp/scamperctrl:51811", "id":1, "hostname":"ndt-plh7v", "stop_time":1566691298}
