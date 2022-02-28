@@ -17,8 +17,8 @@ func TestNew(t *testing.T) {
 	}{
 		{"mda", nil},
 		{"regular", nil},
-		{"", errTracerouteType},
-		{"bad", errTracerouteType},
+		{"", ErrTracerouteType},
+		{"bad", ErrTracerouteType},
 	}
 	for _, test := range tests {
 		_, gotErr := New(test.traceType)

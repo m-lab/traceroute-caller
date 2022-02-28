@@ -8,17 +8,17 @@ import (
 )
 
 var (
-	errTracerouteType = errors.New("unknown traceroute type")
-	errTracerouteFile = errors.New("invalid traceroute file")
-	errMetadata       = errors.New("invalid metadata")
-	errMetadataUUID   = errors.New("invalid UUID (empty)")
-	errCycleStart     = errors.New("invalid cycle-start")
-	errCycleStartType = errors.New("invalid cycle-start type")
-	errTraceType      = errors.New("invalid traceroute type")
-	errTraceLine      = errors.New("invalid trace line")
-	errTracelbLine    = errors.New("invalid tracelb line")
-	errCycleStop      = errors.New("invalid cycle-stop")
-	errCycleStopType  = errors.New("invalid cycle-stop type")
+	ErrTracerouteType = errors.New("unknown traceroute type")
+	ErrTracerouteFile = errors.New("invalid traceroute file")
+	ErrMetadata       = errors.New("invalid metadata")
+	ErrMetadataUUID   = errors.New("invalid UUID (empty)")
+	ErrCycleStart     = errors.New("invalid cycle-start")
+	ErrCycleStartType = errors.New("invalid cycle-start type")
+	ErrTraceType      = errors.New("invalid traceroute type")
+	ErrTraceLine      = errors.New("invalid trace line")
+	ErrTracelbLine    = errors.New("invalid tracelb line")
+	ErrCycleStop      = errors.New("invalid cycle-stop")
+	ErrCycleStopType  = errors.New("invalid cycle-stop type")
 )
 
 // TS contains a unix epoch timestamp.
@@ -65,5 +65,5 @@ func New(traceType string) (TracerouteParser, error) {
 	case "regular":
 		return &scamper2Parser{}, nil
 	}
-	return nil, fmt.Errorf("%q: %v", traceType, errTracerouteType)
+	return nil, fmt.Errorf("%q: %v", traceType, ErrTracerouteType)
 }
