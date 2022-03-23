@@ -49,3 +49,111 @@ restarting your docker-compose environment.
 docker-compose down
 docker-compose up
 ```
+
+## Traceroute Examiner Tool: trex
+
+The `trex` command line tool in this repo can examine `scamper` MDA
+traceroutes that are in `.jsonl` format and do the following:
+
+1. Extract single-path traceroutes from an MDA traceroute.
+2. List traceroutes that took longer than a specified duration.
+3. List complete and incomplete traceroutes.
+
+Note:
+* Not all traceroutes are complete.  That is, not all traceroutes
+trace all the way to the destination IP address.
+* By default, `trex` only prints out single-paths that are complete.
+To see everything, use the "-v" flag to enable verbose mode.
+* Some hops are unresponsive and are shown as "*" in the output.
+* There may be multiple replies from the same hop.  When showing
+single-paths, only one reply is printed.  If you need to see all replies,
+use the "-v" flag to enable verbose mode and see all replies.
+
+The easiest way to get started with `trex` is to first fetch an archive
+of M-Lab's MDA traceroutes to examine.  This can be done as shown below:
+
+```sh
+$ mkdir ~/traceroutes
+$ cd ~/traceroutes
+$ gsutil cp gs://archive-measurement-lab/ndt/scamper1/2021/10/01/20211001T003000.005106Z-scamper1-mlab1-lis02-ndt.tgz .
+$ tar xzf 20211001T003000.005106Z-scamper1-mlab1-lis02-ndt.tgz 
+```
+
+The above command extracts individual traceroute files to a directory
+called `2021`.  Now build the `trex` tool as shown below:
+
+```sh
+$ git clone https://github.com/m-lab/traceroute-caller
+$ cd traceroute-caller/cmd/trex
+$ go build
+```
+
+The above command builds `trex` and now you can use it to examine the
+traceroute files that you extracted.  If `trex` examines more than
+one file, it prints statistics on how many files were found, how many
+were skipped because they were not `.jsonl` files, how many errors, etc.
+
+
+```sh
+# Show usage message.
+$ ./trex -h
+Usage: ./trex [-cehv] [-d <seconds>] path [path...]
+path  a pathname to a file or directory (if directory, all files are processed recursively)
+-h    print usage message and exit
+-c    print + and - in front of complete and incomplete traceroutes respectively
+-d    print file names that took the specified duration or longer
+-e    print examples how to use this tool and exit
+-v    enable verbose mode
+
+# Show examples.
+$ ./trex -e
+Examples:
+# Extract and print a single-path traceroute (if it exists) from a traceroute file
+$ ./trex ~/traceroutes/2021/10/01/20211001T002556Z_ndt-292jb_1632518393_0000000000051A0C.jsonl
+
+2021/10/01/20211001T002556Z_ndt-292jb_1632518393_0000000000051A0C.jsonl
+flowid: 1
+TTL     RTT(ms) IP address
+  0       0.000 2001:500d:200:3::139
+  1       0.000 2001:500d:200:3::1
+  2       6.510 2001:500d:100::2
+  3       1.197 2001:4860:0:23::2
+  4      43.398 2001:4860::9:4001:2751
+  5      34.590 2001:4860::c:4000:d9ab
+  6      33.923 2001:4860::c:4000:dd7a
+  7      34.548 2607:f8b0:e000:8000::5
+  8           * *
+  9      33.530 2a00:1450:4009:817::2010  <=== destination
+
+# Print all traceroute files in a directory hierarchy that took longer than 5 minutes
+$ ./trex -d 300 ~/traceroutes/2021
+2021/10/01/20211001T000053Z_ndt-292jb_1632518393_00000000000516D4.jsonl: 428 seconds
+2021/10/01/20211001T000151Z_ndt-292jb_1632518393_000000000005160D.jsonl: 386 seconds
+...
+
+files found:                          425
+files skipped (not .jsonl):             0
+files that could not be read:           0
+files that could not be parsed:         0
+files successfully parsed:            425
+files with no traceroute data:          0
+
+minimum duration:                       4 seconds
+maximum duration:                     456 seconds
+average duration:                     220 seconds
+
+# Print flow ID of complete traceroutes ("--" if incomplete) in a directory hierarchy
+$ ./trex -c 2021    
+ 1 2021/10/01/20211001T000014Z_ndt-292jb_1632518393_00000000000516C8.jsonl
+ 1 2021/10/01/20211001T000015Z_ndt-292jb_1632518393_00000000000516C9.jsonl
+-- 2021/10/01/20211001T000023Z_ndt-292jb_1632518393_00000000000516C4.jsonl
+...
+
+files found:                          425
+files skipped (not .jsonl):             0
+files that could not be read:           0
+files that could not be parsed:         0
+files successfully parsed:            425
+files with no traceroute data:          0
+files with complete traceroutes:      149  (35%)
+```
