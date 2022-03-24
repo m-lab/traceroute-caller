@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/fs"
 	"io/ioutil"
+	"math"
 	"os"
 	"path/filepath"
 	"sort"
@@ -14,21 +15,22 @@ import (
 
 var (
 	prComplete = flag.Bool("c", false, "print flow IDs and file names of traceroutes that completed (\"--\" for incomplete traceroutes)")
-	duration   = flag.Int("d", -1, "print times and file names of traceroutes that took more than the specified duration")
+	duration   = flag.Uint("d", 0, "print times and file names of traceroutes that took more than the specified duration")
 	examples   = flag.Bool("e", false, "print examples how to use this tool and exit")
 	verbose    = flag.Bool("v", false, "enable verbose mode (mostly for debugging)")
+	flagSet    = make(map[string]bool)
 
 	// Statistics printed before exiting.
-	nFilesFound   int   // files found
-	nFilesSkipped int   // files skipped (not .jsonl)
-	nReadErrors   int   // files that couldn't be read
-	nParseErrors  int   // files that couldn't be parsed
-	nFilesParsed  int   // files successfully parsed
-	nNoTraceroute int   // files with no traceroute data
-	nCompletes    int   // files with complete traceroutes (i.e., traceroute reaches destination)
-	minDuration   int   // minimum traceroute duration
-	maxDuration   int   // maximum traceroute duration
-	totDuration   int64 // total duration of all traceroutes
+	nFilesFound   uint32 // files found
+	nFilesSkipped uint32 // files skipped (not .jsonl)
+	nReadErrors   uint32 // files that couldn't be read
+	nParseErrors  uint32 // files that couldn't be parsed
+	nFilesParsed  uint32 // files successfully parsed
+	nNoTraceroute uint32 // files with no traceroute data
+	nCompletes    uint32 // files with complete traceroutes (i.e., traceroute reaches destination)
+	minDuration   uint32 // minimum traceroute duration
+	maxDuration   uint32 // maximum traceroute duration
+	totDuration   uint64 // total duration of all traceroutes
 )
 
 // Hop defines a hop.
@@ -78,7 +80,6 @@ func main() {
 }
 
 func parseCommandLine() {
-	flagSet := make(map[string]bool)
 	flag.Usage = usage
 	flag.Parse()
 	flag.Visit(func(f *flag.Flag) { flagSet[f.Name] = true })
@@ -90,17 +91,11 @@ func parseCommandLine() {
 		usage()
 		os.Exit(1)
 	}
-	if flagSet["d"] {
-		if flagSet["c"] {
-			fmt.Fprintf(os.Stderr, "cannot specify both -c and -d\n")
-			os.Exit(1)
-		}
-		if *duration < 0 {
-			fmt.Fprintf(os.Stderr, "%d: invalid duration value\n", *duration)
-			os.Exit(1)
-		}
+	if flagSet["d"] && flagSet["c"] {
+		fmt.Fprintf(os.Stderr, "cannot specify both -c and -d\n")
+		os.Exit(1)
 	}
-	minDuration = 1000000
+	minDuration = math.MaxUint32
 }
 
 func walk(path string, info fs.FileInfo, err error) error {
@@ -120,8 +115,8 @@ func parseAndExamine(fileName string) {
 	}
 
 	// Are we just printing traceroutes that exceeded durations?
-	if *duration >= 0 {
-		if d := computeDuration(scamper1); d > *duration {
+	if flagSet["d"] {
+		if d := computeDuration(scamper1); d > uint32(*duration) {
 			fmt.Printf("%4d %s\n", d, fileName)
 		}
 		return
@@ -136,9 +131,9 @@ func parseAndExamine(fileName string) {
 	printSinglePaths(fileName, routes)
 }
 
-func computeDuration(scamper1 *parser.Scamper1) int {
-	d := int(scamper1.CycleStop.StopTime - scamper1.CycleStart.StartTime)
-	totDuration += int64(d)
+func computeDuration(scamper1 *parser.Scamper1) uint32 {
+	d := uint32(scamper1.CycleStop.StopTime - scamper1.CycleStart.StartTime)
+	totDuration += uint64(d)
 	if d < minDuration {
 		minDuration = d
 	}
@@ -179,7 +174,7 @@ func parseFile(fileName string) *parser.Scamper1 {
 		// This is an internal error because we instantiated a new MDA
 		// parser which should return Scamper1 as the concrete type.
 		fmt.Fprintf(os.Stderr, "%T: unknown datatype (expected scamper1)", p)
-		return nil
+		os.Exit(1)
 	}
 	nFilesParsed++
 	if len(scamper1.Tracelb.Nodes) == 0 {
@@ -190,12 +185,12 @@ func parseFile(fileName string) *parser.Scamper1 {
 }
 
 // extractSinglePaths extracts single paths from MDA traceroutes.
-// * Not all traceroutes are complete.  That is, not all traceroutes
+// - Not all traceroutes are complete.  That is, not all traceroutes
 //   trace all the way to the destination IP address.
-// * Different hops associated with the same flow ID constitute a single path.
-// * The order of hops in a path is determined by the TTL.
-// * Unresponsive hops are marked as an asterisk ("*").
-// * It is possible for a hop to return multiple replies to a probe.
+// - Different hops associated with the same flow ID constitute a single path.
+// - The order of hops in a path is determined by the TTL.
+// - Unresponsive hops are marked as an asterisk ("*").
+// - It is possible for a hop to return multiple replies to a probe.
 //   Therefore, for the same flow ID and TTL, there may be zero, one, or more
 //   than one replies.
 func extractSinglePaths(fileName string, scamper1 *parser.Scamper1) map[int][]Hop {
@@ -334,7 +329,7 @@ func printStats() {
 		fmt.Printf("files that could not be parsed:  %8d\n", nParseErrors)
 		fmt.Printf("files successfully parsed:       %8d\n", nFilesParsed)
 		fmt.Printf("files with no traceroute data:   %8d\n", nNoTraceroute)
-		if *duration < 0 {
+		if !flagSet["d"] {
 			fmt.Printf("files with complete traceroutes: %8d ", nCompletes)
 			if nFilesParsed != 0 {
 				fmt.Printf(" (%.f%%)", float32((nCompletes*100.0)/nFilesParsed))
@@ -342,11 +337,11 @@ func printStats() {
 		}
 		fmt.Println()
 	}
-	if *duration >= 0 && nFilesParsed > 0 {
+	if flagSet["d"] && nFilesParsed > 0 {
 		fmt.Printf("minimum duration:                %8d seconds\n", minDuration)
 		fmt.Printf("maximum duration:                %8d seconds\n", maxDuration)
 		if nFilesParsed != 0 {
-			fmt.Printf("average duration:                %8d seconds\n", totDuration/int64(nFilesParsed))
+			fmt.Printf("average duration:                %8d seconds\n", totDuration/uint64(nFilesParsed))
 		}
 	}
 }
