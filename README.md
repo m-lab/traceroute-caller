@@ -59,15 +59,19 @@ traceroutes that are in `.jsonl` format and do the following:
 2. List traceroutes that took longer than a specified duration.
 3. List complete and incomplete traceroutes.
 
+
 Note:
 * Not all traceroutes are complete.  That is, not all traceroutes
 trace all the way to the destination IP address.
-* By default, `trex` only prints out single-paths that are complete.
-To see everything, use the "-v" flag to enable verbose mode.
-* Some hops are unresponsive and are shown as "*" in the output.
-* There may be multiple replies from the same hop.  When showing
-single-paths, only one reply is printed.  If you need to see all replies,
-use the "-v" flag to enable verbose mode and see all replies.
+* Different hops associated with the same flow ID constitute a single path.
+* The order of hops in a path is determined by the TTL.
+* Unresponsive hops are marked as an asterisk ("*").
+* It is possible for a hop to return multiple replies to a probe.
+Therefore, for the same flow ID and TTL, there may be zero, one, or more
+than one replies.
+* When showing single-paths, only complete paths (if any) are printed.
+* If you need to see all paths, use the "-v" flag to enable the verbose
+mode.
 
 The easiest way to get started with `trex` is to first fetch an archive
 of M-Lab's MDA traceroutes to examine.  This can be done as shown below:
@@ -76,7 +80,7 @@ of M-Lab's MDA traceroutes to examine.  This can be done as shown below:
 $ mkdir ~/traceroutes
 $ cd ~/traceroutes
 $ gsutil cp gs://archive-measurement-lab/ndt/scamper1/2021/10/01/20211001T003000.005106Z-scamper1-mlab1-lis02-ndt.tgz .
-$ tar xzf 20211001T003000.005106Z-scamper1-mlab1-lis02-ndt.tgz 
+$ tar xzf 20211001T003000.005106Z-scamper1-mlab1-lis02-ndt.tgz
 ```
 
 The above command extracts individual traceroute files to a directory
@@ -143,7 +147,7 @@ maximum duration:                     456 seconds
 average duration:                     220 seconds
 
 # Print flow ID of complete traceroutes ("--" if incomplete) in a directory hierarchy
-$ ./trex -c 2021    
+$ ./trex -c 2021
  1 2021/10/01/20211001T000014Z_ndt-292jb_1632518393_00000000000516C8.jsonl
  1 2021/10/01/20211001T000015Z_ndt-292jb_1632518393_00000000000516C9.jsonl
 -- 2021/10/01/20211001T000023Z_ndt-292jb_1632518393_00000000000516C4.jsonl

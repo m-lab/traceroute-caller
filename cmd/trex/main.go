@@ -67,12 +67,11 @@ func main() {
 			continue
 		}
 		if stat.IsDir() {
-			err = filepath.Walk(path, walk)
+			if err := filepath.Walk(path, walk); err != nil {
+				fmt.Fprintf(os.Stderr, "%s: %v\n", path, err)
+			}
 		} else {
 			parseAndExamine(path)
-		}
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "%s: %v\n", path, err)
 		}
 	}
 	printStats()
@@ -106,15 +105,10 @@ func parseCommandLine() {
 
 func walk(path string, info fs.FileInfo, err error) error {
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "%q: %v\n", path, err)
 		return err
 	}
 	if info.Mode().IsRegular() {
-		if filepath.Ext(path) == ".jsonl" {
-			parseAndExamine(path)
-		} else {
-			nFilesSkipped++
-		}
+		parseAndExamine(path)
 	}
 	return nil
 }
@@ -166,12 +160,12 @@ func parseFile(fileName string) *parser.Scamper1 {
 		nReadErrors++
 		return nil
 	}
-	newParser, err := parser.New("mda")
+	mdaParser, err := parser.New("mda")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 		return nil
 	}
-	parsedData, err := newParser.ParseRawData(rawData)
+	parsedData, err := mdaParser.ParseRawData(rawData)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 		nParseErrors++
@@ -182,6 +176,8 @@ func parseFile(fileName string) *parser.Scamper1 {
 	case parser.Scamper1:
 		scamper1 = p
 	default:
+		// This is an internal error because we instantiated a new MDA
+		// parser which should return Scamper1 as the concrete type.
 		fmt.Fprintf(os.Stderr, "%T: unknown datatype (expected scamper1)", p)
 		return nil
 	}
@@ -193,6 +189,15 @@ func parseFile(fileName string) *parser.Scamper1 {
 	return &scamper1
 }
 
+// extractSinglePaths extracts single paths from MDA traceroutes.
+// * Not all traceroutes are complete.  That is, not all traceroutes
+//   trace all the way to the destination IP address.
+// * Different hops associated with the same flow ID constitute a single path.
+// * The order of hops in a path is determined by the TTL.
+// * Unresponsive hops are marked as an asterisk ("*").
+// * It is possible for a hop to return multiple replies to a probe.
+//   Therefore, for the same flow ID and TTL, there may be zero, one, or more
+//   than one replies.
 func extractSinglePaths(fileName string, scamper1 *parser.Scamper1) map[int][]Hop {
 	routes := make(map[int][]Hop)
 	complete := false
@@ -259,6 +264,10 @@ func extractSinglePaths(fileName string, scamper1 *parser.Scamper1) map[int][]Ho
 	return routes
 }
 
+// printSinglePaths prints single-path traceroutes.
+// When showing single-paths, only complete paths (if any) are printed.
+// If you need to see all paths, use the "-v" flag to enable the verbose
+// mode.
 func printSinglePaths(fileName string, routes map[int][]Hop) {
 	// Sort the flow IDs so we always print in ascending order.
 	flowids := make([]int, 0)
