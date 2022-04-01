@@ -38,7 +38,7 @@ FROM ubuntu:20.04
 # Install all the packages we need and then remove the apt-get lists.
 # iproute2 gives us ss
 RUN apt-get update && \
-    apt-get install -y iproute2 tini && \
+    apt-get install -y iproute2 python3-pip tini && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
@@ -55,11 +55,15 @@ COPY --from=build_caller /go/bin/traceroute-caller /
 # libraries from their build image.
 COPY --from=build_tracers /scamper /usr/local
 
+# Install fast-mda-traceroute from PyPI
+RUN pip3 install --no-cache-dir fast-mda-traceroute==0.1.10
+
 # They are dynamically-linked, so make sure to run ldconfig to locate all new
 # libraries.
 RUN ldconfig
 
 # Verify that all the binaries we depend on are actually available
+RUN which fast-mda-traceroute
 RUN which scamper
 RUN which sc_attach
 RUN which sc_warts2json
