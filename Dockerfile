@@ -55,8 +55,9 @@ COPY --from=build_caller /go/bin/traceroute-caller /
 # libraries from their build image.
 COPY --from=build_tracers /scamper /usr/local
 
-# Install fast-mda-traceroute from PyPI
-RUN pip3 install --no-cache-dir fast-mda-traceroute==0.1.10
+# Install fast-mda-traceroute from PyPI.
+# We build pycaracal from source to avoid pulling precompiled binaries.
+RUN pip3 install --no-binary pycaracal --no-cache-dir --verbose fast-mda-traceroute==0.1.10
 
 # They are dynamically-linked, so make sure to run ldconfig to locate all new
 # libraries.
