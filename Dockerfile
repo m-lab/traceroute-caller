@@ -40,8 +40,9 @@ RUN mkdir -p /var/empty && \
 COPY --from=build_caller /go/bin/traceroute-caller /
 # Copy the dynamically-linked scamper binary and its associated libraries.
 COPY --from=build_tracers /scamper /usr/local
-# Install fast-mda-traceroute from PyPI
-RUN pip3 install --no-cache-dir fast-mda-traceroute==0.1.10
+# Install fast-mda-traceroute from PyPI.
+# We build pycaracal from source to avoid pulling precompiled binaries.
+RUN pip3 install --no-binary pycaracal --no-cache-dir --verbose fast-mda-traceroute==0.1.10
 # Run ldconfig to locate all new libraries and verify the tools we need
 # are available.
 RUN ldconfig && \
