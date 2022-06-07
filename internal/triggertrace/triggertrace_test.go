@@ -4,9 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net"
+	"os"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -49,7 +49,7 @@ func (ft *fakeTracer) Trace(remoteIP, cookie, uuid string, t time.Time) ([]byte,
 	default:
 		jsonl = "./testdata/valid.jsonl"
 	}
-	content, err := ioutil.ReadFile(jsonl)
+	content, err := os.ReadFile(jsonl)
 	if err != nil {
 		return nil, err
 	}

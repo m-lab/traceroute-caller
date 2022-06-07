@@ -31,7 +31,7 @@ var (
 	scamperTimeout   = flag.Duration("scamper.timeout", 900*time.Second, "Timeout duration in seconds for scamper to run a traceroute (min 1, max 3600).")
 	scamperTraceType = flagx.Enum{
 		Options: []string{"mda", "regular"},
-		Value:   "regular",
+		Value:   "mda",
 	}
 	scamperTracelbPTR   = flag.Bool("scamper.tracelb-ptr", true, "mda traceroute option: Look up DNS pointer records for IP addresses.")
 	scamperTracelbW     = flag.Int("scamper.tracelb-W", 25, "mda traceroute option: Wait time in 1/100ths of seconds between probes (min 15, max 200).")

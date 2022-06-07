@@ -21,7 +21,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net"
 	"os"
@@ -65,7 +64,7 @@ var (
 
 	// Package testing aid.
 	tickerDuration   = int64(60 * 1000 * time.Millisecond) // ticker duration for cache resetter
-	writeFile        = ioutil.WriteFile
+	writeFile        = os.WriteFile
 	errInvalidConfig = errors.New("invalid context or hop annotation configuration")
 )
 

@@ -4,7 +4,6 @@ import (
 	"flag"
 	"fmt"
 	"io/fs"
-	"io/ioutil"
 	"math"
 	"os"
 	"path/filepath"
@@ -149,7 +148,7 @@ func parseFile(fileName string) *parser.Scamper1 {
 		nFilesSkipped++
 		return nil
 	}
-	rawData, err := ioutil.ReadFile(fileName)
+	rawData, err := os.ReadFile(fileName)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%s: %v\n", fileName, err)
 		nReadErrors++

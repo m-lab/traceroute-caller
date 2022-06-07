@@ -5,7 +5,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
@@ -45,7 +44,7 @@ func NewScamper(cfg ScamperConfig) (*Scamper, error) {
 	if err := os.MkdirAll(cfg.OutputPath, 0777); err != nil {
 		return nil, fmt.Errorf("failed to create directory %q (error: %v)", cfg.OutputPath, err)
 	}
-	dir, err := ioutil.TempDir(cfg.OutputPath, "trc-testdir")
+	dir, err := os.MkdirTemp(cfg.OutputPath, "trc-testdir")
 	if err != nil {
 		return nil, fmt.Errorf("failed to create a directory inside %q (error: %v)", cfg.OutputPath, err)
 	}
@@ -107,7 +106,7 @@ func (s *Scamper) CachedTrace(cookie, uuid string, t time.Time, cachedTrace []by
 	// Create and add the first line to the cached traceroute.
 	newTrace := append(createMetaline(uuid, true, extractUUID(cachedTrace[:split])), cachedTrace[split+1:]...)
 	// Make the file readable so it won't be overwritten.
-	return ioutil.WriteFile(filename, []byte(newTrace), 0444)
+	return os.WriteFile(filename, []byte(newTrace), 0444)
 }
 
 // DontTrace is called when a previous traceroute that we were waiting for
@@ -151,7 +150,7 @@ func traceAndWrite(ctx context.Context, label string, filename string, cmd []str
 	_, _ = buff.Write(createMetaline(uuid, false, ""))
 	_, _ = buff.Write(data)
 	// Make the file readable so it won't be overwritten.
-	return buff.Bytes(), ioutil.WriteFile(filename, buff.Bytes(), 0444)
+	return buff.Bytes(), os.WriteFile(filename, buff.Bytes(), 0444)
 }
 
 // runCmd runs the given command and returns its output.

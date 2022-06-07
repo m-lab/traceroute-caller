@@ -76,6 +76,8 @@ services:
       - -scamper.tracelb-ptr=true
 
   trc-scamper2:
+    profiles:
+      - donotstart
     build:
       context: .
       dockerfile: Dockerfile
