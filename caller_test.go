@@ -28,6 +28,7 @@ func init() {
 
 func TestMain(m *testing.M) {
 	var err error
+	// testing.M does not have a TempDir() method.
 	testDir, err = os.MkdirTemp("", "test-directory")
 	if err != nil {
 		log.Fatalf("failed to create test directory (error: %v)", err)

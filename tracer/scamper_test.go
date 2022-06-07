@@ -66,13 +66,10 @@ func TestNewScamper(t *testing.T) {
 }
 
 func TestTrace(t *testing.T) {
-	dir, err := os.MkdirTemp("", "TestScamper")
-	if err != nil {
-		t.Fatal(err)
-	}
+	tempdir := t.TempDir()
 	cookie := "12AB"
 	now := time.Date(2003, 11, 9, 15, 55, 59, 0, time.UTC)
-	path := dir + "/2003/11/09/20031109T155559Z_" + prefix.UnsafeString() + "_00000000000012AB.jsonl"
+	path := tempdir + "/2003/11/09/20031109T155559Z_" + prefix.UnsafeString() + "_00000000000012AB.jsonl"
 
 	tests := []struct {
 		binary     string
@@ -93,7 +90,7 @@ func TestTrace(t *testing.T) {
 		os.RemoveAll(path)
 		scamperCfg := ScamperConfig{
 			Binary:           test.binary,
-			OutputPath:       dir,
+			OutputPath:       tempdir,
 			Timeout:          1 * time.Second,
 			TraceType:        test.traceType,
 			TracelbWaitProbe: 39,
@@ -132,9 +129,7 @@ func TestTrace(t *testing.T) {
 }
 
 func TestTraceWritesMeta(t *testing.T) {
-	tempdir, err := os.MkdirTemp("", "TestTraceWritesUUID")
-	rtx.Must(err, "failed to create tempdir")
-	defer os.RemoveAll(tempdir)
+	tempdir := t.TempDir()
 
 	// Temporarily set the hostname to a value for testing.
 	defer func(oldHn string) {
@@ -181,9 +176,7 @@ func TestTraceWritesMeta(t *testing.T) {
 }
 
 func TestCachedTrace(t *testing.T) {
-	tempdir, err := os.MkdirTemp("", "TestCachedTrace")
-	rtx.Must(err, "failed to create tempdir")
-	defer os.RemoveAll(tempdir)
+	tempdir := t.TempDir()
 
 	// Temporarily set the hostname to a value for testing.
 	defer func(oldHn string) {
