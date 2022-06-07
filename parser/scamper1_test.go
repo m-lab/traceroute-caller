@@ -1,7 +1,7 @@
 package parser
 
 import (
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -40,7 +40,7 @@ func TestScamper1Parser(t *testing.T) {
 		// Read in the test traceroute output file.
 		f := filepath.Join("./testdata/scamper1", test.file)
 		t.Logf("\nTest %v: file: %v", i, f)
-		content, err := ioutil.ReadFile(f)
+		content, err := os.ReadFile(f)
 		if err != nil {
 			t.Fatalf(err.Error())
 		}

@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
@@ -29,7 +28,8 @@ func init() {
 
 func TestMain(m *testing.M) {
 	var err error
-	testDir, err = ioutil.TempDir("", "test-directory")
+	// testing.M does not have a TempDir() method.
+	testDir, err = os.MkdirTemp("", "test-directory")
 	if err != nil {
 		log.Fatalf("failed to create test directory (error: %v)", err)
 	}

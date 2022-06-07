@@ -3,7 +3,6 @@ package tracer
 import (
 	"bytes"
 	"encoding/json"
-	"io/ioutil"
 	"log"
 	"os"
 	"strings"
@@ -67,13 +66,10 @@ func TestNewScamper(t *testing.T) {
 }
 
 func TestTrace(t *testing.T) {
-	dir, err := ioutil.TempDir("", "TestScamper")
-	if err != nil {
-		t.Fatal(err)
-	}
+	tempdir := t.TempDir()
 	cookie := "12AB"
 	now := time.Date(2003, 11, 9, 15, 55, 59, 0, time.UTC)
-	path := dir + "/2003/11/09/20031109T155559Z_" + prefix.UnsafeString() + "_00000000000012AB.jsonl"
+	path := tempdir + "/2003/11/09/20031109T155559Z_" + prefix.UnsafeString() + "_00000000000012AB.jsonl"
 
 	tests := []struct {
 		binary     string
@@ -94,7 +90,7 @@ func TestTrace(t *testing.T) {
 		os.RemoveAll(path)
 		scamperCfg := ScamperConfig{
 			Binary:           test.binary,
-			OutputPath:       dir,
+			OutputPath:       tempdir,
 			Timeout:          1 * time.Second,
 			TraceType:        test.traceType,
 			TracelbWaitProbe: 39,
@@ -121,7 +117,7 @@ func TestTrace(t *testing.T) {
 			t.Errorf("Trace() = %q, want %q", strings.TrimSpace(got), strings.TrimSpace(test.want))
 		}
 		// Make sure that the output was correctly written to file.
-		out, err = ioutil.ReadFile(path)
+		out, err = os.ReadFile(path)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -133,9 +129,7 @@ func TestTrace(t *testing.T) {
 }
 
 func TestTraceWritesMeta(t *testing.T) {
-	tempdir, err := ioutil.TempDir("", "TestTraceWritesUUID")
-	rtx.Must(err, "failed to create tempdir")
-	defer os.RemoveAll(tempdir)
+	tempdir := t.TempDir()
 
 	// Temporarily set the hostname to a value for testing.
 	defer func(oldHn string) {
@@ -164,7 +158,7 @@ func TestTraceWritesMeta(t *testing.T) {
 	}
 
 	// Unmarshal the first line of the output file.
-	b, err := ioutil.ReadFile(tempdir + "/2019/04/01/20190401T034551Z_" + prefix.UnsafeString() + "_0000000000000001.jsonl")
+	b, err := os.ReadFile(tempdir + "/2019/04/01/20190401T034551Z_" + prefix.UnsafeString() + "_0000000000000001.jsonl")
 	rtx.Must(err, "failed to read file")
 	m := Metadata{}
 	lines := strings.Split(string(b), "\n")
@@ -182,9 +176,7 @@ func TestTraceWritesMeta(t *testing.T) {
 }
 
 func TestCachedTrace(t *testing.T) {
-	tempdir, err := ioutil.TempDir("", "TestCachedTrace")
-	rtx.Must(err, "failed to create tempdir")
-	defer os.RemoveAll(tempdir)
+	tempdir := t.TempDir()
 
 	// Temporarily set the hostname to a value for testing.
 	defer func(oldHn string) {
@@ -213,14 +205,14 @@ func TestCachedTrace(t *testing.T) {
 	{"type":"cycle-stop", "list_name":"/tmp/scamperctrl:51811", "id":1, "hostname":"ndt-plh7v", "stop_time":1566691298}`)
 
 	_ = s.CachedTrace("1", "ndt-plh7v_1566050090_000000000004D64D", faketime, []byte("Broken cached traceroute"))
-	_, errInvalidTest := ioutil.ReadFile(tempdir + "/2019/04/01/20190401T034551Z_" + prefix.UnsafeString() + "_0000000000000001.jsonl")
+	_, errInvalidTest := os.ReadFile(tempdir + "/2019/04/01/20190401T034551Z_" + prefix.UnsafeString() + "_0000000000000001.jsonl")
 	if errInvalidTest == nil {
 		t.Error("CachedTrace() = nil, want error")
 	}
 
 	_ = s.CachedTrace("1", "ndt-plh7v_1566050090_000000000004D64D", faketime, cachedTrace)
 	// Unmarshal the first line of the output file.
-	b, err := ioutil.ReadFile(tempdir + "/2019/04/01/20190401T034551Z_" + prefix.UnsafeString() + "_0000000000000001.jsonl")
+	b, err := os.ReadFile(tempdir + "/2019/04/01/20190401T034551Z_" + prefix.UnsafeString() + "_0000000000000001.jsonl")
 	rtx.Must(err, "failed to read file")
 	m := Metadata{}
 	lines := strings.Split(string(b), "\n")
