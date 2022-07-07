@@ -64,6 +64,30 @@ func TestNewScamper(t *testing.T) {
 	}
 }
 
+func TestEmptyUUID(t *testing.T) {
+	wantErr := "uuid is empty"
+	scamperCfg := ScamperConfig{
+		Binary:           "/bin/false",
+		OutputPath:       t.TempDir(),
+		Timeout:          1 * time.Second,
+		TraceType:        "mda",
+		TracelbWaitProbe: 39,
+		TracelbPTR:       false,
+	}
+	s, err := NewScamper(scamperCfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = s.Trace("1.2.3.4", "", time.Now())
+	if err == nil || !strings.Contains(err.Error(), wantErr) {
+		t.Errorf("Trace() = %v, want %q", err, wantErr)
+	}
+	err = s.CachedTrace("", time.Now(), []byte("does not matter"))
+	if err == nil || !strings.Contains(err.Error(), wantErr) {
+		t.Errorf("Trace() = %v, want %q", err, wantErr)
+	}
+}
+
 func TestTrace(t *testing.T) {
 	tempdir := t.TempDir()
 	yyyymmdd := "/2003/11/09/20031109T155559Z"

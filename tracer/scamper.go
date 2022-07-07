@@ -187,6 +187,9 @@ func runCmd(ctx context.Context, label string, cmd []string) ([]byte, error) {
 
 // generateFilename creates the string filename for storing the data.
 func generateFilename(path, uuid string, t time.Time) (string, error) {
+	if uuid == "" {
+		return "", errors.New("uuid is empty")
+	}
 	dir, err := createDatePath(path, t)
 	if err != nil {
 		// TODO(SaiedKazemi): Add metric here.

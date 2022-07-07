@@ -88,7 +88,13 @@ func NewHandler(ctx context.Context, tracetool ipcache.Tracer, ipcCfg ipcache.Co
 // Note that this function doesn't use timestamp.
 func (h *Handler) Open(ctx context.Context, timestamp time.Time, uuid string, sockID *inetdiag.SockID) {
 	if sockID == nil {
-		log.Printf("warning: sockID is nil")
+		// TODO(SaiedKazemi): Add a metric here.
+		log.Printf("error: tcp-info passed a nil sockID\n")
+		return
+	}
+	if uuid == "" {
+		// TODO(SaiedKazemi): Add a metric here.
+		log.Printf("error: tcp-info passed an empty uuid for sockID %+v\n", *sockID)
 		return
 	}
 
@@ -100,10 +106,6 @@ func (h *Handler) Open(ctx context.Context, timestamp time.Time, uuid string, so
 	if err != nil {
 		log.Printf("context %p: failed to find destination from SockID %+v\n", ctx, *sockID)
 		return
-	}
-	if uuid == "" {
-		// TODO(SaiedKazemi): Add a metric here.
-		log.Printf("warning: uuid for SockID %+v is empty\n", *sockID)
 	}
 	h.Destinations[uuid] = destination
 }
