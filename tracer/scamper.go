@@ -11,8 +11,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/m-lab/uuid"
 )
 
 // ScamperConfig contains configuration parameters of scamper.
@@ -80,15 +78,15 @@ func NewScamper(cfg ScamperConfig) (*Scamper, error) {
 
 // Trace starts a new scamper process to run a traceroute based on the
 // traceroute type and saves it in a file.
-func (s *Scamper) Trace(remoteIP, cookie, uuid string, t time.Time) ([]byte, error) {
+func (s *Scamper) Trace(remoteIP, uuid string, t time.Time) ([]byte, error) {
 	tracesInProgress.WithLabelValues("scamper").Inc()
 	defer tracesInProgress.WithLabelValues("scamper").Dec()
-	return s.trace(remoteIP, cookie, uuid, t)
+	return s.trace(remoteIP, uuid, t)
 }
 
 // CachedTrace creates a traceroute from the traceroute cache and saves it in a file.
-func (s *Scamper) CachedTrace(cookie, uuid string, t time.Time, cachedTrace []byte) error {
-	filename, err := generateFilename(s.outputPath, cookie, t)
+func (s *Scamper) CachedTrace(uuid string, t time.Time, cachedTrace []byte) error {
+	filename, err := generateFilename(s.outputPath, uuid, t)
 	if err != nil {
 		log.Printf("failed to generate filename (error: %v)\n", err)
 		tracerCacheErrors.WithLabelValues("scamper", err.Error()).Inc()
@@ -118,11 +116,11 @@ func (*Scamper) DontTrace() {
 // trace runs a traceroute using scamper as a standalone binary. The
 // command line to invoke scamper varies depending on the traceroute type
 // and its options.
-func (s *Scamper) trace(remoteIP, cookie, uuid string, t time.Time) ([]byte, error) {
+func (s *Scamper) trace(remoteIP, uuid string, t time.Time) ([]byte, error) {
 	// Make sure a directory path based on the current date exists,
 	// generate a filename to save in that directory, and create
 	// a buffer to hold traceroute data.
-	filename, err := generateFilename(s.outputPath, cookie, t)
+	filename, err := generateFilename(s.outputPath, uuid, t)
 	if err != nil {
 		return nil, err
 	}
@@ -178,7 +176,7 @@ func runCmd(ctx context.Context, label string, cmd []string) ([]byte, error) {
 		} else {
 			log.Printf("context %p: command failed (error: %v)\n", ctx, err)
 		}
-		log.Println(errb.String())
+		log.Printf("context %p: standard error: %q\n", ctx, errb.String())
 		return outb.Bytes(), err
 	}
 
@@ -188,17 +186,11 @@ func runCmd(ctx context.Context, label string, cmd []string) ([]byte, error) {
 }
 
 // generateFilename creates the string filename for storing the data.
-func generateFilename(path string, cookie string, t time.Time) (string, error) {
+func generateFilename(path, uuid string, t time.Time) (string, error) {
 	dir, err := createDatePath(path, t)
 	if err != nil {
 		// TODO(SaiedKazemi): Add metric here.
 		return "", errors.New("failed to create output directory")
 	}
-	c, err := strconv.ParseUint(cookie, 16, 64)
-	if err != nil {
-		log.Printf("failed to parse cookie %v (error: %v)\n", cookie, err)
-		tracerCacheErrors.WithLabelValues("scamper", "badcookie").Inc()
-		return "", errors.New("failed to parse cookie")
-	}
-	return dir + t.Format("20060102T150405Z") + "_" + uuid.FromCookie(c) + ".jsonl", nil
+	return dir + t.Format("20060102T150405Z") + "_" + uuid + ".jsonl", nil
 }

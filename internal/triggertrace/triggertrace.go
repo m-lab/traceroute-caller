@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"log"
 	"net"
-	"strconv"
 	"sync"
 	"time"
 
@@ -28,7 +27,6 @@ var (
 // Destination is the host to run a traceroute to.
 type Destination struct {
 	RemoteIP string
-	Cookie   string
 }
 
 // FetchTracer is the interface for obtaining a traceroute.  The
@@ -36,7 +34,7 @@ type Destination struct {
 // cache (if it exists) in order to avoid running multiple traceroutes to
 // the same destination in a short time.
 type FetchTracer interface {
-	FetchTrace(remoteIP, cookie string) ([]byte, error)
+	FetchTrace(remoteIP, uuid string) ([]byte, error)
 }
 
 // ParseTracer is the interface for parsing raw traceroutes obtained
@@ -124,18 +122,18 @@ func (h *Handler) Close(ctx context.Context, timestamp time.Time, uuid string) {
 	h.DestinationsLock.Unlock()
 	// This goroutine will live for a few minutes and terminate
 	// after all hop annotations are archived.
-	go h.traceAnnotateAndArchive(ctx, destination)
+	go h.traceAnnotateAndArchive(ctx, uuid, destination)
 }
 
 // traceAnnotateAndArchive runs a traceroute, annotates the hops
 // in the traceroute output, and archives the annotations.
-func (h *Handler) traceAnnotateAndArchive(ctx context.Context, dest Destination) {
+func (h *Handler) traceAnnotateAndArchive(ctx context.Context, uuid string, dest Destination) {
 	defer func() {
 		if h.done != nil {
 			close(h.done)
 		}
 	}()
-	rawData, err := h.IPCache.FetchTrace(dest.RemoteIP, dest.Cookie)
+	rawData, err := h.IPCache.FetchTrace(dest.RemoteIP, uuid)
 	if err != nil {
 		log.Printf("context %p: failed to run a traceroute to %q (error: %v)\n", ctx, dest, err)
 		return
@@ -188,13 +186,11 @@ func (h *Handler) findDestination(sockid *inetdiag.SockID) (Destination, error) 
 	if srcLocal && !dstLocal {
 		return Destination{
 			RemoteIP: sockid.DstIP,
-			Cookie:   strconv.FormatUint(sockid.CookieUint64(), 16),
 		}, nil
 	}
 	if !srcLocal && dstLocal {
 		return Destination{
 			RemoteIP: sockid.SrcIP,
-			Cookie:   strconv.FormatUint(sockid.CookieUint64(), 16),
 		}, nil
 	}
 	return Destination{}, fmt.Errorf("failed to find a local/remote IP pair in %+v", sockid)

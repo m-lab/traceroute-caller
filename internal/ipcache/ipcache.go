@@ -6,17 +6,14 @@ package ipcache
 import (
 	"context"
 	"fmt"
-	"strconv"
 	"sync"
 	"time"
-
-	"github.com/m-lab/uuid"
 )
 
 // Tracer is the generic interface for all things that can perform a traceroute.
 type Tracer interface {
-	Trace(remoteIP, cookie, uuid string, t time.Time) ([]byte, error)
-	CachedTrace(cookie, uuid string, t time.Time, cachedTrace []byte) error
+	Trace(remoteIP, uuid string, t time.Time) ([]byte, error)
+	CachedTrace(uuid string, t time.Time, cachedTrace []byte) error
 	DontTrace()
 }
 
@@ -90,16 +87,10 @@ func New(ctx context.Context, tracetool Tracer, ipcCfg Config) (*IPCache, error)
 // FetchTrace checks the IP cache to determine if a recent traceroute to
 // the remote IP exists or not. If a traceroute exists, it will be used.
 // Otherwise, it calls the tracetool to run a new traceroute.
-func (ic *IPCache) FetchTrace(remoteIP, cookie string) ([]byte, error) {
-	// Get a globally unique identifier for the given cookie.
-	// For example, if cookie is "4418bb", we want something like:
-	// "fd73893d272d_1633013267_unsafe_00000000004418BB".
-	c, err := strconv.ParseUint(cookie, 16, 64)
-	if err != nil {
-		return nil, err
+func (ic *IPCache) FetchTrace(remoteIP, uuid string) ([]byte, error) {
+	if uuid == "" {
+		return nil, fmt.Errorf("empty uuid")
 	}
-	uuid := uuid.FromCookie(c)
-
 	cachedTrace, existed := ic.getEntry(remoteIP)
 	if existed {
 		<-cachedTrace.dataReady
@@ -107,10 +98,10 @@ func (ic *IPCache) FetchTrace(remoteIP, cookie string) ([]byte, error) {
 			ic.tracetool.DontTrace()
 			return nil, cachedTrace.err
 		}
-		_ = ic.tracetool.CachedTrace(cookie, uuid, time.Now(), cachedTrace.data)
+		_ = ic.tracetool.CachedTrace(uuid, time.Now(), cachedTrace.data)
 		return cachedTrace.data, nil
 	}
-	cachedTrace.data, cachedTrace.err = ic.tracetool.Trace(remoteIP, cookie, uuid, cachedTrace.timeStamp)
+	cachedTrace.data, cachedTrace.err = ic.tracetool.Trace(remoteIP, uuid, cachedTrace.timeStamp)
 	close(cachedTrace.dataReady)
 	return cachedTrace.data, cachedTrace.err
 }
