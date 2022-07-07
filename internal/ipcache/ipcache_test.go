@@ -23,12 +23,12 @@ type fakeTracer struct {
 	nCachedTrace int
 }
 
-func (ft *fakeTracer) Trace(remoteIP, cookie, uuid string, t time.Time) ([]byte, error) {
+func (ft *fakeTracer) Trace(remoteIP, uuid string, t time.Time) ([]byte, error) {
 	ft.nTrace++
 	return []byte("fake traceroute data to " + remoteIP), nil
 }
 
-func (ft *fakeTracer) CachedTrace(cookie, uuid string, t time.Time, cachedTest []byte) error {
+func (ft *fakeTracer) CachedTrace(uuid string, t time.Time, cachedTest []byte) error {
 	ft.nCachedTrace++
 	return nil
 }
@@ -50,7 +50,7 @@ func TestNew(t *testing.T) {
 func TestFetchTrace(t *testing.T) {
 	tests := []struct {
 		remoteIP             string
-		cookie               string
+		uuid                 string
 		wantErr              bool
 		wantData             string
 		wantTraceCalls       int
@@ -77,7 +77,7 @@ func TestFetchTrace(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		data, err := ipCache.FetchTrace(test.remoteIP, test.cookie)
+		data, err := ipCache.FetchTrace(test.remoteIP, test.uuid)
 		if test.wantErr {
 			if err == nil {
 				t.Errorf("FetchTrace(%s) = nil, want error", test.remoteIP)
@@ -120,7 +120,7 @@ type pausingTracer struct {
 	successes            int64
 }
 
-func (pt *pausingTracer) Trace(remoteIP, cookie, uuid string, t time.Time) ([]byte, error) {
+func (pt *pausingTracer) Trace(remoteIP, uuid string, t time.Time) ([]byte, error) {
 	randomDelay()
 	if remoteIP == pt.traceToBlock || remoteIP == pt.traceToBlockAndError {
 		<-pt.ctx.Done()
@@ -132,7 +132,7 @@ func (pt *pausingTracer) Trace(remoteIP, cookie, uuid string, t time.Time) ([]by
 	return []byte("fake traceroute data to " + remoteIP), nil
 }
 
-func (pt *pausingTracer) CachedTrace(cookie, uuid string, t time.Time, cachedTest []byte) error {
+func (pt *pausingTracer) CachedTrace(uuid string, t time.Time, cachedTest []byte) error {
 	randomDelay()
 	atomic.AddInt64(&pt.successes, 1)
 	return nil

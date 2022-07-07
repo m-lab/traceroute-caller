@@ -34,7 +34,7 @@ type fakeTracer struct {
 	nCachedTraces int32
 }
 
-func (ft *fakeTracer) Trace(remoteIP, cookie, uuid string, t time.Time) ([]byte, error) {
+func (ft *fakeTracer) Trace(remoteIP, uuid string, t time.Time) ([]byte, error) {
 	defer func() { atomic.AddInt32(&ft.nTraces, 1) }()
 	var jsonl string
 	switch remoteIP {
@@ -56,7 +56,7 @@ func (ft *fakeTracer) Trace(remoteIP, cookie, uuid string, t time.Time) ([]byte,
 	return content, nil
 }
 
-func (ft *fakeTracer) CachedTrace(cookie, uuid string, t time.Time, cachedTest []byte) error {
+func (ft *fakeTracer) CachedTrace(uuid string, t time.Time, cachedTest []byte) error {
 	defer func() { atomic.AddInt32(&ft.nCachedTraces, 1) }()
 	fmt.Printf("\nCachedTrace()\n")
 	return nil
