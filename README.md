@@ -104,35 +104,92 @@ $ ./trex -h
 Usage: ./trex [-cehv] [-d <seconds>] path [path...]
 path  a pathname to a file or directory (if directory, all files are processed recursively)
 -h    print usage message and exit
--c    print + and - in front of complete and incomplete traceroutes respectively
--d    print file names that took the specified duration or longer
+-c    print flow IDs and file names of traceroutes that completed ("--" for incomplete traceroutes)
+-d    print times and file names of traceroutes that took more than the specified duration
 -e    print examples how to use this tool and exit
--v    enable verbose mode
+-v    enable verbose mode (mostly for debugging)
 
 # Show examples.
-$ ./trex -e
 Examples:
 # Extract and print a single-path traceroute (if it exists) from a traceroute file
-$ ./trex ~/traceroutes/2021/10/01/20211001T002556Z_ndt-292jb_1632518393_0000000000051A0C.jsonl
+$ trex /traceroutes/2022/04/01/20220401T001905Z_ndt-qqvlt_1647967485_000000000009379D.jsonl
 
-2021/10/01/20211001T002556Z_ndt-292jb_1632518393_0000000000051A0C.jsonl
+file: /traceroutes/2022/04/01/20220401T001905Z_ndt-qqvlt_1647967485_000000000009379D.jsonl
+src: 209.170.110.216
+dst: 199.19.248.6
+scamper start: 1648772345
+tracelb start: 1648772345 (0 seconds after scamper start)
+scamper stop:  1648772346 (1 seconds after scamper start)
 flowid: 1
-TTL     RTT(ms) IP address
-  0       0.000 2001:500d:200:3::139
-  1       0.000 2001:500d:200:3::1
-  2       6.510 2001:500d:100::2
-  3       1.197 2001:4860:0:23::2
-  4      43.398 2001:4860::9:4001:2751
-  5      34.590 2001:4860::c:4000:d9ab
-  6      33.923 2001:4860::c:4000:dd7a
-  7      34.548 2607:f8b0:e000:8000::5
-  8           * *
-  9      33.530 2a00:1450:4009:817::2010  <=== destination
+TTL    TX(ms)   RX(ms)    RTT(ms)  IP address
+  1       N/A      N/A      0.000  209.170.110.193
+  2       150      151      0.653  213.248.100.57
+  3      1055     1062      7.244  199.19.248.6  <=== destination
+
+The TX and RX columns are elapsed transmit and receive times since the tracelb
+command was started.
+
+
+# Same command as above but enable the verbose mode (useful for debugging).
+$ trex -v /traceroutes/2022/04/01/20220401T001905Z_ndt-qqvlt_1647967485_000000000009379D.jsonl
+
+/traceroutes/2022/04/01/20220401T001905Z_ndt-qqvlt_1647967485_000000000009379D.jsonl
+Tracelb.Src: 209.170.110.216
+Tracelb.Dst: 199.19.248.6
+Tracelb.Nodes[0] 209.170.110.193
+  Tracelb.Nodes[0].Links[0][0] 213.248.100.57
+    Tracelb.Nodes[0].Links[0][0].Probes[0].Flowid: 1
+    Tracelb.Nodes[0].Links[0][0].Probes[1].Flowid: 2
+    Tracelb.Nodes[0].Links[0][0].Probes[2].Flowid: 3
+    Tracelb.Nodes[0].Links[0][0].Probes[3].Flowid: 4
+    Tracelb.Nodes[0].Links[0][0].Probes[4].Flowid: 5
+    Tracelb.Nodes[0].Links[0][0].Probes[5].Flowid: 6
+Tracelb.Nodes[1] 213.248.100.57
+  Tracelb.Nodes[1].Links[0][0] 199.19.248.6
+    Tracelb.Nodes[1].Links[0][0].Probes[0].Flowid: 1
+
+file: /traceroutes/2022/04/01/20220401T001905Z_ndt-qqvlt_1647967485_000000000009379D.jsonl
+src: 209.170.110.216
+dst: 199.19.248.6
+scamper start: 1648772345
+tracelb start: 1648772345 (0 seconds after scamper start)
+scamper stop:  1648772346 (1 seconds after scamper start)
+flowid: 1
+TTL    TX(ms)   RX(ms)    RTT(ms)  IP address
+  1       N/A      N/A      0.000  209.170.110.193
+  2       150      151      0.653  213.248.100.57
+  3      1055     1062      7.244  199.19.248.6  <=== destination
+
+flowid: 2
+TTL    TX(ms)   RX(ms)    RTT(ms)  IP address
+  1       N/A      N/A      0.000  209.170.110.193
+  2       301      302      0.644  213.248.100.57
+
+flowid: 3
+TTL    TX(ms)   RX(ms)    RTT(ms)  IP address
+  1       N/A      N/A      0.000  209.170.110.193
+  2       452      453      0.707  213.248.100.57
+
+flowid: 4
+TTL    TX(ms)   RX(ms)    RTT(ms)  IP address
+  1       N/A      N/A      0.000  209.170.110.193
+  2       603      604      0.608  213.248.100.57
+
+flowid: 5
+TTL    TX(ms)   RX(ms)    RTT(ms)  IP address
+  1       N/A      N/A      0.000  209.170.110.193
+  2       754      754      0.621  213.248.100.57
+
+flowid: 6
+TTL    TX(ms)   RX(ms)    RTT(ms)  IP address
+  1       N/A      N/A      0.000  209.170.110.193
+  2       904      905      0.673  213.248.100.57
+
 
 # Print all traceroute files in a directory hierarchy that took longer than 5 minutes
-$ ./trex -d 300 ~/traceroutes/2021
-2021/10/01/20211001T000053Z_ndt-292jb_1632518393_00000000000516D4.jsonl: 428 seconds
-2021/10/01/20211001T000151Z_ndt-292jb_1632518393_000000000005160D.jsonl: 386 seconds
+$ trex -d 300 /traceroutes/2021
+ 428 /traceroutes/2021/10/01/20211001T000053Z_ndt-292jb_1632518393_00000000000516D4.jsonl
+ 386 /traceroutes/2021/10/01/20211001T000151Z_ndt-292jb_1632518393_000000000005160D.jsonl
 ...
 
 files found:                          425
@@ -146,11 +203,12 @@ minimum duration:                       4 seconds
 maximum duration:                     456 seconds
 average duration:                     220 seconds
 
+
 # Print flow ID of complete traceroutes ("--" if incomplete) in a directory hierarchy
-$ ./trex -c 2021
- 1 2021/10/01/20211001T000014Z_ndt-292jb_1632518393_00000000000516C8.jsonl
- 1 2021/10/01/20211001T000015Z_ndt-292jb_1632518393_00000000000516C9.jsonl
--- 2021/10/01/20211001T000023Z_ndt-292jb_1632518393_00000000000516C4.jsonl
+$ ./trex -c /traceroutes/2021
+ 1 /traceroutes/2021/10/01/20211001T000014Z_ndt-292jb_1632518393_00000000000516C8.jsonl
+ 1 /traceroutes/2021/10/01/20211001T000015Z_ndt-292jb_1632518393_00000000000516C9.jsonl
+-- /traceroutes/2021/10/01/20211001T000023Z_ndt-292jb_1632518393_00000000000516C4.jsonl
 ...
 
 files found:                          425
