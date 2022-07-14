@@ -125,7 +125,6 @@ TTL    TX(ms)   RX(ms)    RTT(ms)  IP address
   1       N/A      N/A      0.000  209.170.110.193
   2       150      151      0.653  213.248.100.57
   3      1055     1062      7.244  199.19.248.6  <=== destination
-                            7.897
 
 The TX and RX columns are elapsed transmit and receive times since the tracelb
 command was started.
@@ -160,32 +159,31 @@ TTL    TX(ms)   RX(ms)    RTT(ms)  IP address
   1       N/A      N/A      0.000  209.170.110.193
   2       150      151      0.653  213.248.100.57
   3      1055     1062      7.244  199.19.248.6  <=== destination
-                            7.897
+
 flowid: 2
 TTL    TX(ms)   RX(ms)    RTT(ms)  IP address
   1       N/A      N/A      0.000  209.170.110.193
   2       301      302      0.644  213.248.100.57
-                            0.644
+
 flowid: 3
 TTL    TX(ms)   RX(ms)    RTT(ms)  IP address
   1       N/A      N/A      0.000  209.170.110.193
   2       452      453      0.707  213.248.100.57
-                            0.707
+
 flowid: 4
 TTL    TX(ms)   RX(ms)    RTT(ms)  IP address
   1       N/A      N/A      0.000  209.170.110.193
   2       603      604      0.608  213.248.100.57
-                            0.608
+
 flowid: 5
 TTL    TX(ms)   RX(ms)    RTT(ms)  IP address
   1       N/A      N/A      0.000  209.170.110.193
   2       754      754      0.621  213.248.100.57
-                            0.621
+
 flowid: 6
 TTL    TX(ms)   RX(ms)    RTT(ms)  IP address
   1       N/A      N/A      0.000  209.170.110.193
   2       904      905      0.673  213.248.100.57
-                            0.673
 
 
 # Print all traceroute files in a directory hierarchy that took longer than 5 minutes

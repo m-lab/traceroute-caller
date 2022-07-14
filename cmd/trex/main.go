@@ -15,7 +15,6 @@ import (
 var (
 	prComplete = flag.Bool("c", false, "print flow IDs and file names of traceroutes that completed (\"--\" for incomplete traceroutes)")
 	duration   = flag.Uint("d", 0, "print times and file names of traceroutes that took more than the specified duration")
-	examples   = flag.Bool("e", false, "print examples how to use this tool and exit")
 	verbose    = flag.Bool("v", false, "enable verbose mode (mostly for debugging)")
 	flagSet    = make(map[string]bool)
 
@@ -59,6 +58,8 @@ func usage() {
 			fmt.Fprintf(os.Stderr, "-%v    %v\n", f.Name, f.Usage)
 		}
 	})
+	fmt.Println("Example usages are provided at the following URL:")
+	fmt.Println("https://github.com/m-lab/traceroute-caller/blob/master/README.md#traceroute-examiner-tool-trex")
 }
 
 func main() {
@@ -84,10 +85,6 @@ func parseCommandLine() {
 	flag.Usage = usage
 	flag.Parse()
 	flag.Visit(func(f *flag.Flag) { flagSet[f.Name] = true })
-	if *examples {
-		printExamples()
-		os.Exit(0)
-	}
 	if flag.NArg() == 0 {
 		usage()
 		os.Exit(1)
@@ -229,9 +226,11 @@ func extractSinglePaths(fileName string, scamper1 *parser.Scamper1) map[int64][]
 						node0 := Hop{addr: scamper1.Tracelb.Nodes[0].Addr, flowid: flowid, ttl: 1}
 						routes[flowid] = append(routes[flowid], node0)
 					}
-					// Add this hop.
+					// Add this hop.  Note that the number of times this hop is
+					// added to the map is equal to the number of the probes it
+					// has transmitted (usually one, but sometimes more than one).
 					hop := Hop{addr: link.Addr, flowid: flowid, ttl: int(probe.TTL)}
-					processProbeReplies(scamper1, probe, &hop)
+					processProbe(scamper1, probe, &hop)
 					// Did this traceroute complete (i.e., reach destination)?
 					if hop.addr == scamper1.Tracelb.Dst {
 						hop.complete = true
@@ -257,13 +256,10 @@ func extractSinglePaths(fileName string, scamper1 *parser.Scamper1) map[int64][]
 	return routes
 }
 
-// processProbeReplies processes the replies to a single probe which
-// may have zero, one, or multiple.
-func processProbeReplies(scamper1 *parser.Scamper1, probe parser.Probe, hop *Hop) {
+// processProbe processes a single probe which may have zero, one,
+// or multiple replies.
+func processProbe(scamper1 *parser.Scamper1, probe parser.Probe, hop *Hop) {
 	replies := probe.Replies
-	if len(replies) > 1 {
-		fmt.Printf(">>> len(replies)=%d\n", len(replies))
-	}
 	tx := sinceTracelbStart(scamper1, probe.Tx.Sec*1000000+probe.Tx.Usec)
 	if len(replies) == 0 {
 		hop.tx = []int64{tx}
@@ -334,8 +330,7 @@ func printHops(hops []Hop) {
 	fmt.Printf("%3s  %8s %8s %10s  %s\n", "TTL", "TX(ms)", "RX(ms)", "RTT(ms)", "IP address")
 
 	prevTTL := 1
-	var totRTT float64
-	for _, hop := range hops {
+	for i, hop := range hops {
 		// Sanity check.
 		if hop.ttl == 0 {
 			panic("ttl 0")
@@ -348,28 +343,40 @@ func printHops(hops []Hop) {
 		}
 		prevTTL = hop.ttl + 1
 
+		// If not in verbose mode, print this hop only once
+		// even if it sent multiple probes.
+		if !*verbose && i > 0 && hop.ttl == hops[i-1].ttl {
+			continue
+		}
+
+		s := ""
+		if hop.complete {
+			s = "  <=== destination"
+		}
 		if hop.ttl == 1 {
-			fmt.Printf("%3d  %8s %8s %10s  %s", hop.ttl, "N/A", "N/A", "N/A", hop.addr)
+			fmt.Printf("%3d  %8s %8s %10s  %s%s\n", hop.ttl, "N/A", "N/A", "N/A", hop.addr, s)
 		} else {
 			for n := 0; n < len(hop.rtt); n++ {
 				if hop.rtt[n] == -1.0 { // no replies
-					fmt.Printf("%3d  %8s %8s %10s  %s", hop.ttl, "*", "*", "*", hop.addr)
+					fmt.Printf("%3d  %8s %8s %10s  %s%s", hop.ttl, "*", "*", "*", hop.addr, s)
 				} else {
-					fmt.Printf("%3d  %8d %8d %10.3f  %s", hop.ttl, hop.tx[n], hop.rx[n], hop.rtt[n], hop.addr)
-					totRTT += hop.rtt[n]
+					fmt.Printf("%3d  %8d %8d %10.3f  %s%s", hop.ttl, hop.tx[n], hop.rx[n], hop.rtt[n], hop.addr, s)
 				}
-				// If not in verbose mode, only print one reply.
+				// If not in verbose mode, print only one reply.
 				if !*verbose {
-					break
+					if len(hop.rtt) > 1 {
+						fmt.Printf("  <=== %d more probe replies\n", len(hop.rtt)-1)
+						break
+					}
 				}
+				fmt.Println()
 			}
 		}
-		if hop.complete {
-			fmt.Printf("  <=== destination")
+		// If not in verbose mode, stop after reaching destination.
+		if !*verbose && hop.complete {
+			break
 		}
-		fmt.Println()
 	}
-	fmt.Printf("%3s  %8s %8s %10.3f\n", " ", " ", " ", totRTT)
 }
 
 // printSummary prints a summary of the specified traceroute.
@@ -410,123 +417,4 @@ func printStats() {
 			fmt.Printf("average duration:                %8d seconds\n", totDuration/uint64(nFilesParsed))
 		}
 	}
-}
-
-// printExample prints one example command line for different use cases
-// of this tool:
-// 1. Extract single-path traceroutes.
-// 2. List traceroutes that took longer than a specified duration.
-// 3. List complete and incomplete traceroutes.
-func printExamples() {
-	fmt.Printf(`Examples:
-# Extract and print a single-path traceroute (if it exists) from a traceroute file
-$ trex /traceroutes/2022/04/01/20220401T001905Z_ndt-qqvlt_1647967485_000000000009379D.jsonl
-
-file: /traceroutes/2022/04/01/20220401T001905Z_ndt-qqvlt_1647967485_000000000009379D.jsonl
-src: 209.170.110.216
-dst: 199.19.248.6
-scamper start: 1648772345
-tracelb start: 1648772345 (0 seconds after scamper start)
-scamper stop:  1648772346 (1 seconds after scamper start)
-flowid: 1
-TTL    TX(ms)   RX(ms)    RTT(ms)  IP address
-  1       N/A      N/A      0.000  209.170.110.193
-  2       150      151      0.653  213.248.100.57
-  3      1055     1062      7.244  199.19.248.6  <=== destination
-                            7.897
-
-The TX and RX columns are elapsed transmit and receive times since the tracelb
-command was started.
-
-
-# Same command as above but enable the verbose mode (useful for debugging).
-$ trex -v /traceroutes/2022/04/01/20220401T001905Z_ndt-qqvlt_1647967485_000000000009379D.jsonl
-
-/traceroutes/2022/04/01/20220401T001905Z_ndt-qqvlt_1647967485_000000000009379D.jsonl
-Tracelb.Src: 209.170.110.216
-Tracelb.Dst: 199.19.248.6
-Tracelb.Nodes[0] 209.170.110.193
-  Tracelb.Nodes[0].Links[0][0] 213.248.100.57
-    Tracelb.Nodes[0].Links[0][0].Probes[0].Flowid: 1
-    Tracelb.Nodes[0].Links[0][0].Probes[1].Flowid: 2
-    Tracelb.Nodes[0].Links[0][0].Probes[2].Flowid: 3
-    Tracelb.Nodes[0].Links[0][0].Probes[3].Flowid: 4
-    Tracelb.Nodes[0].Links[0][0].Probes[4].Flowid: 5
-    Tracelb.Nodes[0].Links[0][0].Probes[5].Flowid: 6
-Tracelb.Nodes[1] 213.248.100.57
-  Tracelb.Nodes[1].Links[0][0] 199.19.248.6
-    Tracelb.Nodes[1].Links[0][0].Probes[0].Flowid: 1
-
-file: /traceroutes/2022/04/01/20220401T001905Z_ndt-qqvlt_1647967485_000000000009379D.jsonl
-src: 209.170.110.216
-dst: 199.19.248.6
-scamper start: 1648772345
-tracelb start: 1648772345 (0 seconds after scamper start)
-scamper stop:  1648772346 (1 seconds after scamper start)
-flowid: 1
-TTL    TX(ms)   RX(ms)    RTT(ms)  IP address
-  1       N/A      N/A      0.000  209.170.110.193
-  2       150      151      0.653  213.248.100.57
-  3      1055     1062      7.244  199.19.248.6  <=== destination
-                            7.897
-flowid: 2
-TTL    TX(ms)   RX(ms)    RTT(ms)  IP address
-  1       N/A      N/A      0.000  209.170.110.193
-  2       301      302      0.644  213.248.100.57
-                            0.644
-flowid: 3
-TTL    TX(ms)   RX(ms)    RTT(ms)  IP address
-  1       N/A      N/A      0.000  209.170.110.193
-  2       452      453      0.707  213.248.100.57
-                            0.707
-flowid: 4
-TTL    TX(ms)   RX(ms)    RTT(ms)  IP address
-  1       N/A      N/A      0.000  209.170.110.193
-  2       603      604      0.608  213.248.100.57
-                            0.608
-flowid: 5
-TTL    TX(ms)   RX(ms)    RTT(ms)  IP address
-  1       N/A      N/A      0.000  209.170.110.193
-  2       754      754      0.621  213.248.100.57
-                            0.621
-flowid: 6
-TTL    TX(ms)   RX(ms)    RTT(ms)  IP address
-  1       N/A      N/A      0.000  209.170.110.193
-  2       904      905      0.673  213.248.100.57
-                            0.673
-
-
-# Print all traceroute files in a directory hierarchy that took longer than 5 minutes
-$ trex -d 300 /traceroutes/2021
- 428 /traceroutes/2021/10/01/20211001T000053Z_ndt-292jb_1632518393_00000000000516D4.jsonl
- 386 /traceroutes/2021/10/01/20211001T000151Z_ndt-292jb_1632518393_000000000005160D.jsonl
-...
-
-files found:                          425
-files skipped (not .jsonl):             0
-files that could not be read:           0
-files that could not be parsed:         0
-files successfully parsed:            425
-files with no traceroute data:          0
-
-minimum duration:                       4 seconds
-maximum duration:                     456 seconds
-average duration:                     220 seconds
-
-
-# Print flow ID of complete traceroutes ("--" if incomplete) in a directory hierarchy
-$ ./trex -c /traceroutes/2021
- 1 /traceroutes/2021/10/01/20211001T000014Z_ndt-292jb_1632518393_00000000000516C8.jsonl
- 1 /traceroutes/2021/10/01/20211001T000015Z_ndt-292jb_1632518393_00000000000516C9.jsonl
--- /traceroutes/2021/10/01/20211001T000023Z_ndt-292jb_1632518393_00000000000516C4.jsonl
-...
-
-files found:                          425
-files skipped (not .jsonl):             0
-files that could not be read:           0
-files that could not be parsed:         0
-files successfully parsed:            425
-files with no traceroute data:          0
-files with complete traceroutes:      149  (35%%)
-`)
 }
