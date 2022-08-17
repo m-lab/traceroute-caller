@@ -1,6 +1,6 @@
 language: go
 go:
-- "1.16"
+- 1.18
 
 before_install:
 - go get github.com/mattn/goveralls
@@ -11,7 +11,7 @@ before_install:
 script:
 # Vet the code, build the code, and run all the tests.
 - go vet ./...
-- go build ./...
+- CGO_ENABLED=0 go build ./...
 - go test ./... -race
 - go test ./... -v -coverprofile=_coverage.cov
 

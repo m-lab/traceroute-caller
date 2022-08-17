@@ -48,4 +48,6 @@ RUN pip3 install --no-binary pycaracal --no-cache-dir --verbose fast-mda-tracero
 RUN ldconfig && \
     which scamper tini
 WORKDIR /
+# Make sure /traceroute-caller can run (has no missing external dependencies).
+RUN /traceroute-caller -h 2> /dev/null
 ENTRYPOINT ["tini", "--", "/traceroute-caller"]
