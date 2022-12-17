@@ -50,7 +50,7 @@ type AnnotateAndArchiver interface {
 	WriteAnnotations(map[string]*annotator.ClientAnnotations, time.Time) []error
 }
 
-type ScamperTracerWriter interface {
+type TracerWriter interface {
 	ipcache.Tracer
 	WriteFile(uuid string, t time.Time, b []byte) error
 }
@@ -63,12 +63,12 @@ type Handler struct {
 	IPCache          FetchTracer
 	Parser           ParseTracer
 	HopAnnotator     AnnotateAndArchiver
-	Scamper          ScamperTracerWriter
+	Scamper          TracerWriter
 	done             chan struct{} // For testing.
 }
 
 // NewHandler returns a new instance of Handler.
-func NewHandler(ctx context.Context, tracetool ScamperTracerWriter, ipcCfg ipcache.Config, newParser parser.TracerouteParser, haCfg hopannotation.Config) (*Handler, error) {
+func NewHandler(ctx context.Context, tracetool TracerWriter, ipcCfg ipcache.Config, newParser parser.TracerouteParser, haCfg hopannotation.Config) (*Handler, error) {
 	ipCache, err := ipcache.New(ctx, tracetool, ipcCfg)
 	if err != nil {
 		return nil, err
