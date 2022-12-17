@@ -180,20 +180,20 @@ func TestTraceWritesMeta(t *testing.T) {
 	faketime := time.Date(2019, time.April, 1, 3, 45, 51, 0, time.UTC)
 	prometheusx.GitShortCommit = "Fake Version"
 	wantUUID := "0123456789"
-	b, err := s.Trace("1.2.3.4", wantUUID, faketime)
+	out, err := s.Trace("1.2.3.4", wantUUID, faketime)
 	if err != nil {
 		t.Errorf("Trace() = %v, want nil", err)
 	}
-	err = s.WriteFile(wantUUID, faketime, b)
+	err = s.WriteFile(wantUUID, faketime, out)
 	if err != nil {
 		t.Errorf("WriteFile() error = %v, want nil", err)
 	}
 
 	// Unmarshal the first line of the output file.
-	b, err = os.ReadFile(tempdir + "/2019/04/01/20190401T034551Z_" + wantUUID + ".jsonl")
+	out, err = os.ReadFile(tempdir + "/2019/04/01/20190401T034551Z_" + wantUUID + ".jsonl")
 	rtx.Must(err, "failed to read file")
 	m := Metadata{}
-	lines := strings.Split(string(b), "\n")
+	lines := strings.Split(string(out), "\n")
 	if len(lines) < 2 {
 		t.Errorf("len(lines) = %d, want 2", len(lines))
 	}
