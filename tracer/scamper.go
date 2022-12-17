@@ -14,6 +14,7 @@ import (
 )
 
 var (
+	// ErrEmptyUUID is returned when a required UUID is empty.
 	ErrEmptyUUID = errors.New("uuid is empty")
 )
 
@@ -80,7 +81,7 @@ func NewScamper(cfg ScamperConfig) (*Scamper, error) {
 	}, nil
 }
 
-// WriteFile write the given data to a file in the configured Scamper output
+// WriteFile writes the given data to a file in the configured Scamper output
 // path using the given UUID and time.
 func (s *Scamper) WriteFile(uuid string, t time.Time, data []byte) error {
 	filename, err := generateFilename(s.outputPath, uuid, t)
