@@ -13,6 +13,10 @@ import (
 	"time"
 )
 
+var (
+	ErrEmptyUUID = errors.New("uuid is empty")
+)
+
 // ScamperConfig contains configuration parameters of scamper.
 type ScamperConfig struct {
 	Binary           string
@@ -76,35 +80,43 @@ func NewScamper(cfg ScamperConfig) (*Scamper, error) {
 	}, nil
 }
 
+// WriteFile write the given data to a file in the configured Scamper output
+// path using the given UUID and time.
+func (s *Scamper) WriteFile(uuid string, t time.Time, data []byte) error {
+	filename, err := generateFilename(s.outputPath, uuid, t)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(filename, data, 0644)
+}
+
 // Trace starts a new scamper process to run a traceroute based on the
 // traceroute type and saves it in a file.
 func (s *Scamper) Trace(remoteIP, uuid string, t time.Time) ([]byte, error) {
 	tracesInProgress.WithLabelValues("scamper").Inc()
 	defer tracesInProgress.WithLabelValues("scamper").Dec()
+	if uuid == "" {
+		return nil, ErrEmptyUUID
+	}
 	return s.trace(remoteIP, uuid, t)
 }
 
-// CachedTrace creates a traceroute from the traceroute cache and saves it in a file.
-func (s *Scamper) CachedTrace(uuid string, t time.Time, cachedTrace []byte) error {
-	filename, err := generateFilename(s.outputPath, uuid, t)
-	if err != nil {
-		log.Printf("failed to generate filename (error: %v)\n", err)
-		tracerCacheErrors.WithLabelValues("scamper", err.Error()).Inc()
-		return err
+// CachedTrace creates an updated traceroute using the given uuid and time based on the traceroute cache.
+func (s *Scamper) CachedTrace(uuid string, t time.Time, cachedTrace []byte) ([]byte, error) {
+	if uuid == "" {
+		return nil, ErrEmptyUUID
 	}
-
 	// Remove the first line of the cached traceroute.
 	split := bytes.Index(cachedTrace, []byte{'\n'})
 	if split <= 0 || split == len(cachedTrace) {
 		log.Printf("failed to split cached traceroute (split: %v)\n", split)
 		tracerCacheErrors.WithLabelValues("scamper", "badcache").Inc()
-		return errors.New("invalid cached traceroute")
+		return nil, errors.New("invalid cached traceroute")
 	}
 
 	// Create and add the first line to the cached traceroute.
 	newTrace := append(createMetaline(uuid, true, extractUUID(cachedTrace[:split])), cachedTrace[split+1:]...)
-	// Make the file readable so it won't be overwritten.
-	return os.WriteFile(filename, []byte(newTrace), 0444)
+	return []byte(newTrace), nil
 }
 
 // DontTrace is called when a previous traceroute that we were waiting for
@@ -117,23 +129,15 @@ func (*Scamper) DontTrace() {
 // command line to invoke scamper varies depending on the traceroute type
 // and its options.
 func (s *Scamper) trace(remoteIP, uuid string, t time.Time) ([]byte, error) {
-	// Make sure a directory path based on the current date exists,
-	// generate a filename to save in that directory, and create
-	// a buffer to hold traceroute data.
-	filename, err := generateFilename(s.outputPath, uuid, t)
-	if err != nil {
-		return nil, err
-	}
-
-	// Create a context, run a traceroute, and write the output to file.
+	// Create a context, run a traceroute, and return the output.
 	ctx, cancel := context.WithTimeout(context.Background(), s.timeout)
 	defer cancel()
 	cmd := []string{s.binary, "-o-", "-O", "json", "-I", fmt.Sprintf("%s %s", s.cmd, remoteIP)}
-	return traceAndWrite(ctx, "scamper", filename, cmd, uuid)
+	return traceWithMeta(ctx, "scamper", cmd, uuid)
 }
 
-// traceAndWrite runs a traceroute and writes the result.
-func traceAndWrite(ctx context.Context, label string, filename string, cmd []string, uuid string) ([]byte, error) {
+// traceWithMeta runs a traceroute and adds a metadata line to the result.
+func traceWithMeta(ctx context.Context, label string, cmd []string, uuid string) ([]byte, error) {
 	data, err := runCmd(ctx, label, cmd)
 	if err != nil {
 		return nil, err
@@ -147,8 +151,7 @@ func traceAndWrite(ctx context.Context, label string, filename string, cmd []str
 	// the buffer becomes too large, Write() will panic with ErrTooLarge.
 	_, _ = buff.Write(createMetaline(uuid, false, ""))
 	_, _ = buff.Write(data)
-	// Make the file readable so it won't be overwritten.
-	return buff.Bytes(), os.WriteFile(filename, buff.Bytes(), 0444)
+	return buff.Bytes(), nil
 }
 
 // runCmd runs the given command and returns its output.
@@ -188,7 +191,7 @@ func runCmd(ctx context.Context, label string, cmd []string) ([]byte, error) {
 // generateFilename creates the string filename for storing the data.
 func generateFilename(path, uuid string, t time.Time) (string, error) {
 	if uuid == "" {
-		return "", errors.New("uuid is empty")
+		return "", ErrEmptyUUID
 	}
 	dir, err := createDatePath(path, t)
 	if err != nil {
