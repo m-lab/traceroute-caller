@@ -13,7 +13,7 @@ import (
 // Tracer is the generic interface for all things that can perform a traceroute.
 type Tracer interface {
 	Trace(remoteIP, uuid string, t time.Time) ([]byte, error)
-	CachedTrace(uuid string, t time.Time, cachedTrace []byte) error
+	CachedTrace(uuid string, t time.Time, cachedTrace []byte) ([]byte, error)
 	DontTrace()
 }
 
@@ -98,8 +98,8 @@ func (ic *IPCache) FetchTrace(remoteIP, uuid string) ([]byte, error) {
 			ic.tracetool.DontTrace()
 			return nil, cachedTrace.err
 		}
-		_ = ic.tracetool.CachedTrace(uuid, time.Now(), cachedTrace.data)
-		return cachedTrace.data, nil
+		data, err := ic.tracetool.CachedTrace(uuid, time.Now(), cachedTrace.data)
+		return data, err
 	}
 	cachedTrace.data, cachedTrace.err = ic.tracetool.Trace(remoteIP, uuid, cachedTrace.timeStamp)
 	close(cachedTrace.dataReady)

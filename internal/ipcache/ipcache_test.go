@@ -28,9 +28,9 @@ func (ft *fakeTracer) Trace(remoteIP, uuid string, t time.Time) ([]byte, error) 
 	return []byte("fake traceroute data to " + remoteIP), nil
 }
 
-func (ft *fakeTracer) CachedTrace(uuid string, t time.Time, cachedTest []byte) error {
+func (ft *fakeTracer) CachedTrace(uuid string, t time.Time, cachedTest []byte) ([]byte, error) {
 	ft.nCachedTrace++
-	return nil
+	return cachedTest, nil
 }
 
 func (ft *fakeTracer) DontTrace() {
@@ -132,10 +132,10 @@ func (pt *pausingTracer) Trace(remoteIP, uuid string, t time.Time) ([]byte, erro
 	return []byte("fake traceroute data to " + remoteIP), nil
 }
 
-func (pt *pausingTracer) CachedTrace(uuid string, t time.Time, cachedTest []byte) error {
+func (pt *pausingTracer) CachedTrace(uuid string, t time.Time, cachedTest []byte) ([]byte, error) {
 	randomDelay()
 	atomic.AddInt64(&pt.successes, 1)
-	return nil
+	return cachedTest, nil
 }
 
 func (pt *pausingTracer) DontTrace() {

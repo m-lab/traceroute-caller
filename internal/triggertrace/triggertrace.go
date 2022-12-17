@@ -50,6 +50,11 @@ type AnnotateAndArchiver interface {
 	WriteAnnotations(map[string]*annotator.ClientAnnotations, time.Time) []error
 }
 
+type ScamperTracerWriter interface {
+	ipcache.Tracer
+	WriteFile(uuid string, t time.Time, b []byte) error
+}
+
 // Handler implements the tcp-info/eventsocket.Handler's interface.
 type Handler struct {
 	Destinations     map[string]Destination // key is UUID
@@ -58,11 +63,12 @@ type Handler struct {
 	IPCache          FetchTracer
 	Parser           ParseTracer
 	HopAnnotator     AnnotateAndArchiver
+	Scamper          ScamperTracerWriter
 	done             chan struct{} // For testing.
 }
 
 // NewHandler returns a new instance of Handler.
-func NewHandler(ctx context.Context, tracetool ipcache.Tracer, ipcCfg ipcache.Config, newParser parser.TracerouteParser, haCfg hopannotation.Config) (*Handler, error) {
+func NewHandler(ctx context.Context, tracetool ScamperTracerWriter, ipcCfg ipcache.Config, newParser parser.TracerouteParser, haCfg hopannotation.Config) (*Handler, error) {
 	ipCache, err := ipcache.New(ctx, tracetool, ipcCfg)
 	if err != nil {
 		return nil, err
@@ -81,6 +87,7 @@ func NewHandler(ctx context.Context, tracetool ipcache.Tracer, ipcCfg ipcache.Co
 		IPCache:      ipCache,
 		Parser:       newParser,
 		HopAnnotator: hopCache,
+		Scamper:      tracetool,
 	}, nil
 }
 
@@ -145,13 +152,17 @@ func (h *Handler) traceAnnotateAndArchive(ctx context.Context, uuid string, dest
 		log.Printf("context %p: failed to parse traceroute output (error: %v)\n", ctx, err)
 		return
 	}
+	traceStartTime := parsedData.StartTime()
+	err = h.Scamper.WriteFile(uuid, traceStartTime, rawData)
+	if err != nil {
+		log.Printf("writing scamper trace failed for uuid: %s: %v\n", uuid, err)
+	}
+
 	hops := parsedData.ExtractHops()
 	if len(hops) == 0 {
 		log.Printf("context %p: failed to extract hops from traceroute %+v\n", ctx, string(rawData))
 		return
 	}
-
-	traceStartTime := parsedData.StartTime()
 	annotations, allErrs := h.HopAnnotator.Annotate(ctx, hops, traceStartTime)
 	if allErrs != nil {
 		log.Printf("context %p: failed to annotate some or all hops (errors: %+v)\n", ctx, allErrs)
