@@ -67,7 +67,7 @@ func TestNewScamper(t *testing.T) {
 func TestEmptyUUID(t *testing.T) {
 	wantErr := "uuid is empty"
 	scamperCfg := ScamperConfig{
-		Binary:           "/usr/bin/false",
+		Binary:           "/bin/false",
 		OutputPath:       t.TempDir(),
 		Timeout:          1 * time.Second,
 		TraceType:        "mda",
