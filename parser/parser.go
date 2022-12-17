@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"time"
+
+	"github.com/m-lab/go/anonymize"
 )
 
 // Errors returned by parser.
@@ -51,6 +53,8 @@ type CyclestopLine struct {
 type ParsedData interface {
 	StartTime() time.Time
 	ExtractHops() []string
+	MarshalJSONL() []byte
+	AnonymizeHops(anon anonymize.IPAnonymizer)
 }
 
 // TracerouteParser defines the interface for raw traceroute data.
