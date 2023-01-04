@@ -186,7 +186,7 @@ func TestTraceWritesMeta(t *testing.T) {
 	}
 	err = s.WriteFile(wantUUID, faketime, out)
 	if err != nil {
-		t.Errorf("WriteFile() error = %v, want nil", err)
+		t.Errorf("WriteFile() = %v, want nil", err)
 	}
 
 	// Unmarshal the first line of the output file.
@@ -244,7 +244,7 @@ func TestCachedTrace(t *testing.T) {
 
 	b, err := s.CachedTrace(uuid, faketime, cachedTrace)
 	if err != nil {
-		t.Errorf("CacheTrace() returned error %v, want nil", err)
+		t.Errorf("CacheTrace() = %v, want nil", err)
 	}
 	// Unmarshal the first line of the output file.
 	m := Metadata{}
