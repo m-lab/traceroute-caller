@@ -63,7 +63,7 @@ type Handler struct {
 	IPCache          FetchTracer
 	Parser           ParseTracer
 	HopAnnotator     AnnotateAndArchiver
-	Scamper          TracerWriter
+	Tracer           TracerWriter
 	done             chan struct{} // For testing.
 }
 
@@ -87,7 +87,7 @@ func NewHandler(ctx context.Context, tracetool TracerWriter, ipcCfg ipcache.Conf
 		IPCache:      ipCache,
 		Parser:       newParser,
 		HopAnnotator: hopCache,
-		Scamper:      tracetool,
+		Tracer:       tracetool,
 	}, nil
 }
 
@@ -153,9 +153,9 @@ func (h *Handler) traceAnnotateAndArchive(ctx context.Context, uuid string, dest
 		return
 	}
 	traceStartTime := parsedData.StartTime()
-	err = h.Scamper.WriteFile(uuid, traceStartTime, rawData)
+	err = h.Tracer.WriteFile(uuid, traceStartTime, rawData)
 	if err != nil {
-		log.Printf("writing scamper trace failed for uuid: %s: %v\n", uuid, err)
+		log.Printf("context %p: failed to write trace file for uuid: %s: (error: %v)\n", ctx, uuid, err)
 	}
 
 	hops := parsedData.ExtractHops()
