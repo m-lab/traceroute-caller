@@ -156,14 +156,11 @@ func parseFile(fileName string) *parser.Scamper1 {
 		nParseErrors++
 		return nil
 	}
-	var scamper1 parser.Scamper1
-	switch p := parsedData.(type) {
-	case parser.Scamper1:
-		scamper1 = p
-	default:
+	scamper1, ok := parsedData.(*parser.Scamper1)
+	if !ok {
 		// This is an internal error because we instantiated a new MDA
 		// parser which should return Scamper1 as the concrete type.
-		fmt.Fprintf(os.Stderr, "%T: unknown datatype (expected scamper1)", p)
+		fmt.Fprintf(os.Stderr, "%T: unknown datatype (expected scamper1)", parsedData)
 		os.Exit(1)
 	}
 	nFilesParsed++
@@ -171,7 +168,7 @@ func parseFile(fileName string) *parser.Scamper1 {
 		nNoTraceroute++
 		return nil
 	}
-	return &scamper1
+	return scamper1
 }
 
 // tracerouteDuration returns the duration of the specified traceroute
