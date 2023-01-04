@@ -156,6 +156,7 @@ func (s2 *Scamper2) Anonymize(anon anonymize.IPAnonymizer) {
 	}
 }
 
+// MarshalJSONL encodes the scamper object as JSONL.
 func (s2 Scamper2) MarshalJSONL() []byte {
 	buff := &bytes.Buffer{}
 	enc := json.NewEncoder(buff)

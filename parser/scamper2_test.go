@@ -86,7 +86,7 @@ func TestScamper2Parser(t *testing.T) {
 	}
 }
 
-func TestScamper2_AnonymizeHops(t *testing.T) {
+func TestScamper2_Anonymize(t *testing.T) {
 	tests := []struct {
 		name    string
 		file    string
@@ -134,7 +134,7 @@ func TestScamper2_AnonymizeHops(t *testing.T) {
 			testingx.Must(t, err, "failed to parse raw data for %s", tt.file)
 
 			s2 := dp.(*Scamper2)
-			s2.AnonymizeHops(tt.anon)
+			s2.Anonymize(tt.anon)
 
 			// After anonymization.
 			dst := net.ParseIP(s2.Trace.Dst)
