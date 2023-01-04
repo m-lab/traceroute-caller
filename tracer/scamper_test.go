@@ -82,7 +82,7 @@ func TestEmptyUUID(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), wantErr) {
 		t.Errorf("Trace() = %v, want %q", err, wantErr)
 	}
-	err = s.CachedTrace("", time.Now(), []byte("does not matter"))
+	_, err = s.CachedTrace("", time.Now(), []byte("does not matter"))
 	if err == nil || !strings.Contains(err.Error(), wantErr) {
 		t.Errorf("Trace() = %v, want %q", err, wantErr)
 	}
@@ -139,6 +139,11 @@ func TestTrace(t *testing.T) {
 		if strings.TrimSpace(got) != strings.TrimSpace(test.want) {
 			t.Errorf("Trace() = %q, want %q", strings.TrimSpace(got), strings.TrimSpace(test.want))
 		}
+		err = s.WriteFile(uuid, now, out)
+		if err != nil {
+			t.Errorf("WriteFile() = %v, want nil", err)
+			continue
+		}
 		// Make sure that the output was correctly written to file.
 		out, err = os.ReadFile(filename)
 		if err != nil {
@@ -175,16 +180,20 @@ func TestTraceWritesMeta(t *testing.T) {
 	faketime := time.Date(2019, time.April, 1, 3, 45, 51, 0, time.UTC)
 	prometheusx.GitShortCommit = "Fake Version"
 	wantUUID := "0123456789"
-	_, err = s.Trace("1.2.3.4", wantUUID, faketime)
+	out, err := s.Trace("1.2.3.4", wantUUID, faketime)
 	if err != nil {
 		t.Errorf("Trace() = %v, want nil", err)
 	}
+	err = s.WriteFile(wantUUID, faketime, out)
+	if err != nil {
+		t.Errorf("WriteFile() = %v, want nil", err)
+	}
 
 	// Unmarshal the first line of the output file.
-	b, err := os.ReadFile(tempdir + "/2019/04/01/20190401T034551Z_" + wantUUID + ".jsonl")
+	out, err = os.ReadFile(tempdir + "/2019/04/01/20190401T034551Z_" + wantUUID + ".jsonl")
 	rtx.Must(err, "failed to read file")
 	m := Metadata{}
-	lines := strings.Split(string(b), "\n")
+	lines := strings.Split(string(out), "\n")
 	if len(lines) < 2 {
 		t.Errorf("len(lines) = %d, want 2", len(lines))
 	}
@@ -228,16 +237,16 @@ func TestCachedTrace(t *testing.T) {
 	{"type":"tracelb", "version":"0.1", "userid":0, "method":"icmp-echo", "src":"::ffff:180.87.97.101", "dst":"::ffff:1.47.236.62", "start":{"sec":1566691298, "usec":476221, "ftime":"2019-08-25 00:01:38"}, "probe_size":60, "firsthop":1, "attempts":3, "confidence":95, "tos":0, "gaplimit":3, "wait_timeout":5, "wait_probe":250, "probec":0, "probec_max":3000, "nodec":0, "linkc":0}
 	{"type":"cycle-stop", "list_name":"/tmp/scamperctrl:51811", "id":1, "hostname":"ndt-plh7v", "stop_time":1566691298}`)
 
-	_ = s.CachedTrace(uuid, faketime, []byte("Broken cached traceroute"))
-	_, errInvalidTest := os.ReadFile(tempdir + "/2019/04/01/20190401T034551Z_" + uuid + ".jsonl")
-	if errInvalidTest == nil {
-		t.Error("CachedTrace() = nil, want error")
+	_, err = s.CachedTrace(uuid, faketime, []byte("Broken cached traceroute"))
+	if err == nil {
+		t.Error("CacheTrace() returned nil error, want error")
 	}
 
-	_ = s.CachedTrace(uuid, faketime, cachedTrace)
+	b, err := s.CachedTrace(uuid, faketime, cachedTrace)
+	if err != nil {
+		t.Errorf("CacheTrace() = %v, want nil", err)
+	}
 	// Unmarshal the first line of the output file.
-	b, err := os.ReadFile(tempdir + "/2019/04/01/20190401T034551Z_" + uuid + ".jsonl")
-	rtx.Must(err, "failed to read file")
 	m := Metadata{}
 	lines := strings.Split(string(b), "\n")
 	if len(lines) < 2 {

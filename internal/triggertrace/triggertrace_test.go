@@ -56,10 +56,14 @@ func (ft *fakeTracer) Trace(remoteIP, uuid string, t time.Time) ([]byte, error) 
 	return content, nil
 }
 
-func (ft *fakeTracer) CachedTrace(uuid string, t time.Time, cachedTest []byte) error {
+func (ft *fakeTracer) WriteFile(uuid string, t time.Time, data []byte) error {
+	return nil
+}
+
+func (ft *fakeTracer) CachedTrace(uuid string, t time.Time, cachedTest []byte) ([]byte, error) {
 	defer func() { atomic.AddInt32(&ft.nCachedTraces, 1) }()
 	fmt.Printf("\nCachedTrace()\n")
-	return nil
+	return nil, nil
 }
 
 func (ft *fakeTracer) DontTrace() {
