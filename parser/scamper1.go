@@ -181,7 +181,7 @@ func (s1 Scamper1) ExtractHops() []string {
 	return hopStrings
 }
 
-// AnonymizeHops looks for hops that are in the client subnet, and anonymizes them using the anonymize.
+// Anonymize looks for hops that are in the client subnet, and anonymizes them using the given anonymizer.
 func (s1 *Scamper1) Anonymize(anon anonymize.IPAnonymizer) {
 	tracelb := s1.Tracelb
 	dst := net.ParseIP(tracelb.Dst)

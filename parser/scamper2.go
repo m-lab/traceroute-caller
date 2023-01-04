@@ -140,6 +140,7 @@ func (s2 Scamper2) ExtractHops() []string {
 	return hopStrings
 }
 
+// Anonymize looks for hops that are in the client subnet, and anonymizes them using the given anonymizer.
 func (s2 *Scamper2) Anonymize(anon anonymize.IPAnonymizer) {
 	trace := s2.Trace
 	dst := net.ParseIP(trace.Dst)
