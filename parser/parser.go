@@ -54,7 +54,7 @@ type ParsedData interface {
 	StartTime() time.Time
 	ExtractHops() []string
 	MarshalJSONL() []byte
-	AnonymizeHops(anon anonymize.IPAnonymizer)
+	Anonymize(anon anonymize.IPAnonymizer)
 }
 
 // TracerouteParser defines the interface for raw traceroute data.

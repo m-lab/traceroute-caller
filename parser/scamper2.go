@@ -31,10 +31,11 @@ type ScamperHop struct {
 }
 
 // Scamper2 encapsulates the four lines of a traceroute:
-//   {"UUID":...}
-//   {"type":"cycle-start"...}
-//   {"type":"trace"...}
-//   {"type":"cycle-stop"...}
+//
+//	{"UUID":...}
+//	{"type":"cycle-start"...}
+//	{"type":"trace"...}
+//	{"type":"cycle-stop"...}
 type Scamper2 struct {
 	Metadata   tracer.Metadata
 	CycleStart CyclestartLine
@@ -139,7 +140,7 @@ func (s2 Scamper2) ExtractHops() []string {
 	return hopStrings
 }
 
-func (s2 *Scamper2) AnonymizeHops(anon anonymize.IPAnonymizer) {
+func (s2 *Scamper2) Anonymize(anon anonymize.IPAnonymizer) {
 	trace := s2.Trace
 	dst := net.ParseIP(trace.Dst)
 	anon.IP(dst)

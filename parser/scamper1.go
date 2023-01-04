@@ -58,10 +58,12 @@ type ScamperNode struct {
 }
 
 // Scamper1 encapsulates the four lines of a traceroute:
-//   {"UUID":...}
-//   {"type":"cycle-start"...}
-//   {"type":"tracelb"...}
-//   {"type":"cycle-stop"...}
+//
+//	{"UUID":...}
+//	{"type":"cycle-start"...}
+//	{"type":"tracelb"...}
+//	{"type":"cycle-stop"...}
+//
 // Refer to scamper source code files scamper/scamper_list.h and
 // scamper/tracelb/scamper_tracelb.h for the definitions of cycle_start,
 // tracelb, and cycle_stop lines.
@@ -180,7 +182,7 @@ func (s1 Scamper1) ExtractHops() []string {
 }
 
 // AnonymizeHops looks for hops that are in the client subnet, and anonymizes them using the anonymize.
-func (s1 *Scamper1) AnonymizeHops(anon anonymize.IPAnonymizer) {
+func (s1 *Scamper1) Anonymize(anon anonymize.IPAnonymizer) {
 	tracelb := s1.Tracelb
 	dst := net.ParseIP(tracelb.Dst)
 	anon.IP(dst)
