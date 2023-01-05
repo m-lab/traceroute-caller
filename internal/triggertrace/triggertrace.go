@@ -65,7 +65,7 @@ type Handler struct {
 	IPCache          FetchTracer
 	Parser           ParseTracer
 	HopAnnotator     AnnotateAndArchiver
-	Tracer           TracerWriter
+	Tracetool        TracerWriter
 	Anonymizer       anonymize.IPAnonymizer
 	done             chan struct{} // For testing.
 }
@@ -90,7 +90,7 @@ func NewHandler(ctx context.Context, tracetool TracerWriter, ipcCfg ipcache.Conf
 		IPCache:      ipCache,
 		Parser:       newParser,
 		HopAnnotator: hopCache,
-		Tracer:       tracetool,
+		Tracetool:    tracetool,
 		Anonymizer:   anonymize.New(anonymize.IPAnonymizationFlag),
 	}, nil
 }
@@ -163,7 +163,7 @@ func (h *Handler) traceAnnotateAndArchive(ctx context.Context, uuid string, dest
 	rawData = parsedData.MarshalJSONL()
 
 	traceStartTime := parsedData.StartTime()
-	err = h.Tracer.WriteFile(uuid, traceStartTime, rawData)
+	err = h.Tracetool.WriteFile(uuid, traceStartTime, rawData)
 	if err != nil {
 		log.Printf("context %p: failed to write trace file for uuid: %s: (error: %v)\n", ctx, uuid, err)
 	}
