@@ -116,7 +116,7 @@ func TestNewHandler(t *testing.T) {
 	}
 }
 
-func xTestOpen(t *testing.T) {
+func TestOpen(t *testing.T) {
 	saveNetInterfaceAddrs := netInterfaceAddrs
 	netInterfaceAddrs = fakeInterfaceAddrs
 	defer func() { netInterfaceAddrs = saveNetInterfaceAddrs }()
