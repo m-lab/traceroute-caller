@@ -384,6 +384,7 @@ func (st *staticTracer) Trace(remoteIP, uuid string, t time.Time) ([]byte, error
 	defer func() { atomic.AddInt32(&st.nTraces, 1) }()
 	return st.input.MarshalJSONL(), nil
 }
+
 func (st *staticTracer) WriteFile(uuid string, t time.Time, data []byte) error {
 	p, err := parser.New("mda")
 	if err != nil {
