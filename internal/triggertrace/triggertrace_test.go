@@ -7,6 +7,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"path"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -23,6 +24,7 @@ var (
 	forceParseErr      = "88.88.88.88" // force a failure parsing a traceroute output
 	forceExtractErr    = "77.77.77.77" // force a failure extracting hops
 	forceAnnotateErr   = "66.66.66.66" // force a failure annotating hops
+	forceWriteErr      = "write-err-8" // force a failure writing trace
 )
 
 func init() {
@@ -57,7 +59,12 @@ func (ft *fakeTracer) Trace(remoteIP, uuid string, t time.Time) ([]byte, error) 
 }
 
 func (ft *fakeTracer) WriteFile(uuid string, t time.Time, data []byte) error {
-	return nil
+	switch uuid {
+	case forceWriteErr:
+		return errors.New("forced write error")
+	default:
+		return nil
+	}
 }
 
 func (ft *fakeTracer) CachedTrace(uuid string, t time.Time, cachedTest []byte) ([]byte, error) {
@@ -99,12 +106,12 @@ func TestNewHandler(t *testing.T) {
 	defer func() { netInterfaceAddrs = saveNetInterfaceAddrs }()
 
 	netInterfaceAddrs = fakeInterfaceAddrsBad
-	if _, err := newHandler(&fakeTracer{}); err == nil {
+	if _, err := newHandler(t, &fakeTracer{}); err == nil {
 		t.Fatalf("NewHandler() = nil, want error")
 	}
 
 	netInterfaceAddrs = fakeInterfaceAddrs
-	if _, err := newHandler(&fakeTracer{}); err != nil {
+	if _, err := newHandler(t, &fakeTracer{}); err != nil {
 		t.Fatalf("NewHandler() = %v, want nil", err)
 	}
 }
@@ -114,7 +121,7 @@ func TestOpen(t *testing.T) {
 	netInterfaceAddrs = fakeInterfaceAddrs
 	defer func() { netInterfaceAddrs = saveNetInterfaceAddrs }()
 
-	handler, err := newHandler(&fakeTracer{})
+	handler, err := newHandler(t, &fakeTracer{})
 	if err != nil {
 		t.Fatalf("NewHandler() = %v, want nil", err)
 	}
@@ -164,13 +171,14 @@ func TestClose(t *testing.T) {
 		{"bad6", "127.0.0.1", forceAnnotateErr, "00005", true, true, 1, 0},
 		{"good1", "127.0.0.1", "3.4.5.6", "00006", true, true, 1, 0},
 		{"good2", "4.5.6.7", "127.0.0.1", "00007", true, true, 1, 1},
+		{"bad7", "127.0.0.1", "192.168.33.2", forceWriteErr, true, true, 1, 0},
 	}
 	for _, test := range tests {
 		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 			tracer := &fakeTracer{}
-			handler, err := newHandler(tracer)
+			handler, err := newHandler(t, tracer)
 			if err != nil {
 				t.Fatalf("NewHandler() = %v, want nil", err)
 			}
@@ -206,7 +214,7 @@ func TestClose(t *testing.T) {
 	}
 }
 
-func newHandler(tracer *fakeTracer) (*Handler, error) {
+func newHandler(t *testing.T, tracer *fakeTracer) (*Handler, error) {
 	ipcCfg := ipcache.Config{
 		EntryTimeout: 2 * time.Second,
 		ScanPeriod:   1 * time.Second,
@@ -214,7 +222,7 @@ func newHandler(tracer *fakeTracer) (*Handler, error) {
 	annotator := &fakeAnnotator{}
 	haCfg := hopannotation.Config{
 		AnnotatorClient: annotator,
-		OutputPath:      "/tmp/annotation1",
+		OutputPath:      path.Join(t.TempDir(), "annotation1"),
 	}
 	newParser, err := parser.New("mda")
 	if err != nil {

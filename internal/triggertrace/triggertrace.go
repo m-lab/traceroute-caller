@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/m-lab/go/anonymize"
 	"github.com/m-lab/tcp-info/inetdiag"
 	"github.com/m-lab/traceroute-caller/hopannotation"
 	"github.com/m-lab/traceroute-caller/internal/ipcache"
@@ -50,6 +51,7 @@ type AnnotateAndArchiver interface {
 	WriteAnnotations(map[string]*annotator.ClientAnnotations, time.Time) []error
 }
 
+// TracerWriter provides the interface for issuing traces and writing results.
 type TracerWriter interface {
 	ipcache.Tracer
 	WriteFile(uuid string, t time.Time, b []byte) error
@@ -63,7 +65,8 @@ type Handler struct {
 	IPCache          FetchTracer
 	Parser           ParseTracer
 	HopAnnotator     AnnotateAndArchiver
-	Tracer           TracerWriter
+	Tracetool        TracerWriter
+	Anonymizer       anonymize.IPAnonymizer
 	done             chan struct{} // For testing.
 }
 
@@ -87,7 +90,8 @@ func NewHandler(ctx context.Context, tracetool TracerWriter, ipcCfg ipcache.Conf
 		IPCache:      ipCache,
 		Parser:       newParser,
 		HopAnnotator: hopCache,
-		Tracer:       tracetool,
+		Tracetool:    tracetool,
+		Anonymizer:   anonymize.New(anonymize.IPAnonymizationFlag),
 	}, nil
 }
 
@@ -152,8 +156,14 @@ func (h *Handler) traceAnnotateAndArchive(ctx context.Context, uuid string, dest
 		log.Printf("context %p: failed to parse traceroute output (error: %v)\n", ctx, err)
 		return
 	}
+
+	// Anonymize the parsed data in place.
+	parsedData.Anonymize(h.Anonymizer)
+	// Remarshal anonymized data for writing.
+	rawData = parsedData.MarshalJSONL()
+
 	traceStartTime := parsedData.StartTime()
-	err = h.Tracer.WriteFile(uuid, traceStartTime, rawData)
+	err = h.Tracetool.WriteFile(uuid, traceStartTime, rawData)
 	if err != nil {
 		log.Printf("context %p: failed to write trace file for uuid: %s: (error: %v)\n", ctx, uuid, err)
 	}
