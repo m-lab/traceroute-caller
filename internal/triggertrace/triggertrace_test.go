@@ -396,9 +396,6 @@ func (st *staticTracer) WriteFile(uuid string, t time.Time, data []byte) error {
 	}
 	return nil
 }
-func (st *staticTracer) CachedTrace(uuid string, t time.Time, cachedTest []byte) ([]byte, error) {
-	return nil, nil
-}
 
 func TestAnonymize(t *testing.T) {
 
