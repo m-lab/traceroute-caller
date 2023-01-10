@@ -8,9 +8,14 @@ import (
 	"net"
 	"os"
 	"path"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/go-test/deep"
+	"github.com/m-lab/go/anonymize"
+	"github.com/m-lab/traceroute-caller/tracer"
 
 	"github.com/m-lab/tcp-info/inetdiag"
 	"github.com/m-lab/traceroute-caller/hopannotation"
@@ -214,7 +219,7 @@ func TestClose(t *testing.T) {
 	}
 }
 
-func newHandler(t *testing.T, tracer *fakeTracer) (*Handler, error) {
+func newHandler(t *testing.T, tracer TracerWriter) (*Handler, error) {
 	ipcCfg := ipcache.Config{
 		EntryTimeout: 2 * time.Second,
 		ScanPeriod:   1 * time.Second,
@@ -254,4 +259,184 @@ func fakeInterfaceAddrs() ([]net.Addr, error) {
 
 func fakeInterfaceAddrsBad() ([]net.Addr, error) {
 	return nil, errors.New("forced inet.InterfaceAddrs error")
+}
+
+var (
+	staticIPv4None = &parser.Scamper1{
+		Metadata:   tracer.Metadata{UUID: "ndt-b9w8b_1667420871_00000000001EDE79"},
+		CycleStart: parser.CyclestartLine{Type: "cycle-start", ListName: "default", ID: 0, Hostname: "ndt-b9w8b", StartTime: 1.671301854e+09},
+		CycleStop:  parser.CyclestopLine{Type: "cycle-stop", ListName: "default", ID: 0, Hostname: "ndt-b9w8b", StopTime: 1.671301856e+09},
+		Tracelb: parser.TracelbLine{
+			Type:    "tracelb",
+			Version: "0.1",
+			Method:  "icmp-echo",
+			Src:     "1.1.1.1",
+			Dst:     "4.4.4.4",
+			Nodes: []parser.ScamperNode{
+				{
+					Addr:  "2.2.2.2",
+					Links: [][]parser.ScamperLink{{{Addr: "3.3.3.3"}}},
+				},
+				{
+					Addr:  "3.3.3.3",
+					Links: [][]parser.ScamperLink{{{Addr: "4.4.4.2"}}},
+				},
+				{
+					Addr:  "4.4.4.2",
+					Name:  "",
+					Links: [][]parser.ScamperLink{{{Addr: "4.4.4.4"}}},
+				},
+			},
+		},
+	}
+
+	staticIPv4Netblock = &parser.Scamper1{
+		Metadata:   tracer.Metadata{UUID: "ndt-b9w8b_1667420871_00000000001EDE79"},
+		CycleStart: parser.CyclestartLine{Type: "cycle-start", ListName: "default", ID: 0, Hostname: "ndt-b9w8b", StartTime: 1.671301854e+09},
+		CycleStop:  parser.CyclestopLine{Type: "cycle-stop", ListName: "default", ID: 0, Hostname: "ndt-b9w8b", StopTime: 1.671301856e+09},
+		Tracelb: parser.TracelbLine{
+			Type:    "tracelb",
+			Version: "0.1",
+			Method:  "icmp-echo",
+			Src:     "1.1.1.1",
+			Dst:     "4.4.4.0", // NETBLOCK
+			Nodes: []parser.ScamperNode{
+				{
+					Addr:  "2.2.2.2",
+					Links: [][]parser.ScamperLink{{{Addr: "3.3.3.3"}}},
+				},
+				{
+					Addr:  "3.3.3.3",
+					Links: [][]parser.ScamperLink{{{Addr: "4.4.4.0"}}}, // NETBLOCK
+				},
+				{
+					Addr:  "4.4.4.0", // NETBLOCK
+					Name:  "",
+					Links: [][]parser.ScamperLink{{{Addr: "4.4.4.0"}}}, // NETBLOCK
+				},
+			},
+		},
+	}
+
+	staticIPv6None = &parser.Scamper1{
+		Metadata:   tracer.Metadata{UUID: "ndt-b9w8b_1667420871_00000000001EDE79"},
+		CycleStart: parser.CyclestartLine{Type: "cycle-start", ListName: "default", ID: 0, Hostname: "ndt-b9w8b", StartTime: 1.671301854e+09},
+		CycleStop:  parser.CyclestopLine{Type: "cycle-stop", ListName: "default", ID: 0, Hostname: "ndt-b9w8b", StopTime: 1.671301856e+09},
+		Tracelb: parser.TracelbLine{
+			Type:    "tracelb",
+			Version: "0.1",
+			Method:  "icmp-echo",
+			Src:     "2001:1:1:1::1",
+			Dst:     "2006:4:4:4::4",
+			Nodes: []parser.ScamperNode{
+				{
+					Addr:  "2001:2:2:2::2",
+					Links: [][]parser.ScamperLink{{{Addr: "2001:3:3:3::3"}}},
+				},
+				{
+					Addr:  "2001:3:3:3::3",
+					Links: [][]parser.ScamperLink{{{Addr: "2006:4:4:4::2"}}},
+				},
+				{
+					Addr:  "2006:4:4:4::2",
+					Name:  "",
+					Links: [][]parser.ScamperLink{{{Addr: "2006:4:4:4::4"}}},
+				},
+			},
+		},
+	}
+
+	staticIPv6Netblock = &parser.Scamper1{
+		Metadata:   tracer.Metadata{UUID: "ndt-b9w8b_1667420871_00000000001EDE79"},
+		CycleStart: parser.CyclestartLine{Type: "cycle-start", ListName: "default", ID: 0, Hostname: "ndt-b9w8b", StartTime: 1.671301854e+09},
+		CycleStop:  parser.CyclestopLine{Type: "cycle-stop", ListName: "default", ID: 0, Hostname: "ndt-b9w8b", StopTime: 1.671301856e+09},
+		Tracelb: parser.TracelbLine{
+			Type:    "tracelb",
+			Version: "0.1",
+			Method:  "icmp-echo",
+			Src:     "2001:1:1:1::1",
+			Dst:     "2006:4:4:4::", // NETBLOCK
+			Nodes: []parser.ScamperNode{
+				{
+					Addr:  "2001:2:2:2::2",
+					Links: [][]parser.ScamperLink{{{Addr: "2001:3:3:3::3"}}},
+				},
+				{
+					Addr:  "2001:3:3:3::3",
+					Links: [][]parser.ScamperLink{{{Addr: "2006:4:4:4::"}}}, // NETBLOCK
+				},
+				{
+					Addr:  "2006:4:4:4::", // NETBLOCK
+					Name:  "",
+					Links: [][]parser.ScamperLink{{{Addr: "2006:4:4:4::"}}}, // NETBLOCK
+				},
+			},
+		},
+	}
+)
+
+type staticTracer struct {
+	fakeTracer
+	input  *parser.Scamper1
+	output *parser.Scamper1
+}
+
+func (st *staticTracer) Trace(remoteIP, uuid string, t time.Time) ([]byte, error) {
+	defer func() { atomic.AddInt32(&st.nTraces, 1) }()
+	return st.input.MarshalJSONL(), nil
+}
+func (st *staticTracer) WriteFile(uuid string, t time.Time, data []byte) error {
+	p, err := parser.New("mda")
+	if err != nil {
+		return err
+	}
+	pd, err := p.ParseRawData(data)
+	st.output = pd.(*parser.Scamper1)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+func (st *staticTracer) CachedTrace(uuid string, t time.Time, cachedTest []byte) ([]byte, error) {
+	return nil, nil
+}
+
+func TestAnonymize(t *testing.T) {
+
+	tests := []struct {
+		name   string
+		srcIP  string
+		dstIP  string
+		uuid   string
+		method anonymize.Method
+		input  *parser.Scamper1
+		want   *parser.Scamper1
+	}{
+		{"ipv4-netblock-none", "127.0.0.1", "4.4.4.4", "v4-none", anonymize.None, staticIPv4None, staticIPv4None},
+		{"ipv4-netblock-netblock", "127.0.0.1", "4.4.4.4", "v4-netblock", anonymize.Netblock, staticIPv4None, staticIPv4Netblock},
+		{"ipv6-netblock-none", "::1", "2006:4:4:4::4", "v6-none", anonymize.None, staticIPv6None, staticIPv6None},
+		{"ipv6-netblock-netblock", "::1", "2006:4:4:4::4", "v6-netblock", anonymize.Netblock, staticIPv6None, staticIPv6Netblock},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			anonymize.IPAnonymizationFlag = tt.method
+			st := &staticTracer{
+				input: tt.input,
+			}
+			h, err := newHandler(t, st)
+			if err != nil {
+				t.Fatalf("NewHandler() = %v, want nil", err)
+			}
+			h.done = make(chan struct{})
+			sockID := &inetdiag.SockID{SrcIP: tt.srcIP, DstIP: tt.dstIP}
+			h.Open(context.TODO(), time.Now(), tt.uuid, sockID)
+			h.Close(context.TODO(), time.Now(), tt.uuid)
+			waitForTrace(t, h)
+
+			if diff := deep.Equal(st.output, tt.want); diff != nil {
+				t.Errorf("Close() anonymize failed; got != want\n%s", strings.Join(diff, "\n"))
+			}
+		})
+	}
+
 }
