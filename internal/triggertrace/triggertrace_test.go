@@ -282,7 +282,6 @@ var (
 				},
 				{
 					Addr:  "4.4.4.2",
-					Name:  "",
 					Links: [][]parser.ScamperLink{{{Addr: "4.4.4.4"}}},
 				},
 			},
@@ -309,8 +308,7 @@ var (
 					Links: [][]parser.ScamperLink{{{Addr: "4.4.4.0"}}}, // NETBLOCK
 				},
 				{
-					Addr:  "4.4.4.0", // NETBLOCK
-					Name:  "",
+					Addr:  "4.4.4.0",                                   // NETBLOCK
 					Links: [][]parser.ScamperLink{{{Addr: "4.4.4.0"}}}, // NETBLOCK
 				},
 			},
@@ -338,7 +336,6 @@ var (
 				},
 				{
 					Addr:  "2006:4:4:4::2",
-					Name:  "",
 					Links: [][]parser.ScamperLink{{{Addr: "2006:4:4:4::4"}}},
 				},
 			},
@@ -365,8 +362,7 @@ var (
 					Links: [][]parser.ScamperLink{{{Addr: "2006:4:4:4::"}}}, // NETBLOCK
 				},
 				{
-					Addr:  "2006:4:4:4::", // NETBLOCK
-					Name:  "",
+					Addr:  "2006:4:4:4::",                                   // NETBLOCK
 					Links: [][]parser.ScamperLink{{{Addr: "2006:4:4:4::"}}}, // NETBLOCK
 				},
 			},
