@@ -260,8 +260,9 @@ func fakeInterfaceAddrsBad() ([]net.Addr, error) {
 	return nil, errors.New("forced inet.InterfaceAddrs error")
 }
 
+// static trace definitions for testing anonymization.
 var (
-	staticIPv4None = &parser.Scamper1{
+	staticIPv4None = parser.Scamper1{
 		Metadata:   tracer.Metadata{UUID: "ndt-b9w8b_1667420871_00000000001EDE79"},
 		CycleStart: parser.CyclestartLine{Type: "cycle-start", ListName: "default", ID: 0, Hostname: "ndt-b9w8b", StartTime: 1.671301854e+09},
 		CycleStop:  parser.CyclestopLine{Type: "cycle-stop", ListName: "default", ID: 0, Hostname: "ndt-b9w8b", StopTime: 1.671301856e+09},
@@ -272,50 +273,14 @@ var (
 			Src:     "1.1.1.1",
 			Dst:     "4.4.4.4",
 			Nodes: []parser.ScamperNode{
-				{
-					Addr:  "2.2.2.2",
-					Links: [][]parser.ScamperLink{{{Addr: "3.3.3.3"}}},
-				},
-				{
-					Addr:  "3.3.3.3",
-					Links: [][]parser.ScamperLink{{{Addr: "4.4.4.2"}}},
-				},
-				{
-					Addr:  "4.4.4.2",
-					Links: [][]parser.ScamperLink{{{Addr: "4.4.4.4"}}},
-				},
+				{Addr: "2.2.2.2", Links: [][]parser.ScamperLink{{{Addr: "3.3.3.3"}}}},
+				{Addr: "3.3.3.3", Links: [][]parser.ScamperLink{{{Addr: "4.4.4.2"}}}},
+				{Addr: "4.4.4.2", Links: [][]parser.ScamperLink{{{Addr: "4.4.4.4"}}}},
 			},
 		},
 	}
 
-	staticIPv4Netblock = &parser.Scamper1{
-		Metadata:   tracer.Metadata{UUID: "ndt-b9w8b_1667420871_00000000001EDE79"},
-		CycleStart: parser.CyclestartLine{Type: "cycle-start", ListName: "default", ID: 0, Hostname: "ndt-b9w8b", StartTime: 1.671301854e+09},
-		CycleStop:  parser.CyclestopLine{Type: "cycle-stop", ListName: "default", ID: 0, Hostname: "ndt-b9w8b", StopTime: 1.671301856e+09},
-		Tracelb: parser.TracelbLine{
-			Type:    "tracelb",
-			Version: "0.1",
-			Method:  "icmp-echo",
-			Src:     "1.1.1.1",
-			Dst:     "4.4.4.0", // NETBLOCK
-			Nodes: []parser.ScamperNode{
-				{
-					Addr:  "2.2.2.2",
-					Links: [][]parser.ScamperLink{{{Addr: "3.3.3.3"}}},
-				},
-				{
-					Addr:  "3.3.3.3",
-					Links: [][]parser.ScamperLink{{{Addr: "4.4.4.0"}}}, // NETBLOCK
-				},
-				{
-					Addr:  "4.4.4.0",                                   // NETBLOCK
-					Links: [][]parser.ScamperLink{{{Addr: "4.4.4.0"}}}, // NETBLOCK
-				},
-			},
-		},
-	}
-
-	staticIPv6None = &parser.Scamper1{
+	staticIPv6None = parser.Scamper1{
 		Metadata:   tracer.Metadata{UUID: "ndt-b9w8b_1667420871_00000000001EDE79"},
 		CycleStart: parser.CyclestartLine{Type: "cycle-start", ListName: "default", ID: 0, Hostname: "ndt-b9w8b", StartTime: 1.671301854e+09},
 		CycleStop:  parser.CyclestopLine{Type: "cycle-stop", ListName: "default", ID: 0, Hostname: "ndt-b9w8b", StopTime: 1.671301856e+09},
@@ -326,45 +291,9 @@ var (
 			Src:     "2001:1:1:1::1",
 			Dst:     "2006:4:4:4::4",
 			Nodes: []parser.ScamperNode{
-				{
-					Addr:  "2001:2:2:2::2",
-					Links: [][]parser.ScamperLink{{{Addr: "2001:3:3:3::3"}}},
-				},
-				{
-					Addr:  "2001:3:3:3::3",
-					Links: [][]parser.ScamperLink{{{Addr: "2006:4:4:4::2"}}},
-				},
-				{
-					Addr:  "2006:4:4:4::2",
-					Links: [][]parser.ScamperLink{{{Addr: "2006:4:4:4::4"}}},
-				},
-			},
-		},
-	}
-
-	staticIPv6Netblock = &parser.Scamper1{
-		Metadata:   tracer.Metadata{UUID: "ndt-b9w8b_1667420871_00000000001EDE79"},
-		CycleStart: parser.CyclestartLine{Type: "cycle-start", ListName: "default", ID: 0, Hostname: "ndt-b9w8b", StartTime: 1.671301854e+09},
-		CycleStop:  parser.CyclestopLine{Type: "cycle-stop", ListName: "default", ID: 0, Hostname: "ndt-b9w8b", StopTime: 1.671301856e+09},
-		Tracelb: parser.TracelbLine{
-			Type:    "tracelb",
-			Version: "0.1",
-			Method:  "icmp-echo",
-			Src:     "2001:1:1:1::1",
-			Dst:     "2006:4:4:4::", // NETBLOCK
-			Nodes: []parser.ScamperNode{
-				{
-					Addr:  "2001:2:2:2::2",
-					Links: [][]parser.ScamperLink{{{Addr: "2001:3:3:3::3"}}},
-				},
-				{
-					Addr:  "2001:3:3:3::3",
-					Links: [][]parser.ScamperLink{{{Addr: "2006:4:4:4::"}}}, // NETBLOCK
-				},
-				{
-					Addr:  "2006:4:4:4::",                                   // NETBLOCK
-					Links: [][]parser.ScamperLink{{{Addr: "2006:4:4:4::"}}}, // NETBLOCK
-				},
+				{Addr: "2001:2:2:2::2", Links: [][]parser.ScamperLink{{{Addr: "2001:3:3:3::3"}}}},
+				{Addr: "2001:3:3:3::3", Links: [][]parser.ScamperLink{{{Addr: "2006:4:4:4::2"}}}},
+				{Addr: "2006:4:4:4::2", Links: [][]parser.ScamperLink{{{Addr: "2006:4:4:4::4"}}}},
 			},
 		},
 	}
@@ -395,20 +324,32 @@ func (st *staticTracer) WriteFile(uuid string, t time.Time, data []byte) error {
 }
 
 func TestAnonymize(t *testing.T) {
+	// Construct netblock anonymized traces based on the v4 and v6 static traces.
+	// Override Tracelb.Nodes to prevent modifying the original structure.
+	staticIPv4Netblock := staticIPv4None
+	staticIPv4Netblock.Tracelb.Dst = "4.4.4.0" // NETBLOCK
+	staticIPv4Netblock.Tracelb.Nodes = []parser.ScamperNode{
+		{Addr: "2.2.2.2", Links: [][]parser.ScamperLink{{{Addr: "3.3.3.3"}}}},
+		{Addr: "3.3.3.3", Links: [][]parser.ScamperLink{{{Addr: "4.4.4.0"}}}}, // NETBLOCK
+		{Addr: "4.4.4.0", Links: [][]parser.ScamperLink{{{Addr: "4.4.4.0"}}}}} // NETBLOCK
+
+	staticIPv6Netblock := staticIPv6None
+	staticIPv6Netblock.Tracelb.Dst = "2006:4:4:4::" // NETBLOCK
+	staticIPv6Netblock.Tracelb.Nodes = []parser.ScamperNode{
+		{Addr: "2001:2:2:2::2", Links: [][]parser.ScamperLink{{{Addr: "2001:3:3:3::3"}}}},
+		{Addr: "2001:3:3:3::3", Links: [][]parser.ScamperLink{{{Addr: "2006:4:4:4::"}}}}, // NETBLOCK
+		{Addr: "2006:4:4:4::", Links: [][]parser.ScamperLink{{{Addr: "2006:4:4:4::"}}}}}  // NETBLOCK
 
 	tests := []struct {
 		name   string
-		srcIP  string
-		dstIP  string
-		uuid   string
 		method anonymize.Method
 		input  *parser.Scamper1
 		want   *parser.Scamper1
 	}{
-		{"ipv4-netblock-none", "1.1.1.1", "4.4.4.4", "v4-none", anonymize.None, staticIPv4None, staticIPv4None},
-		{"ipv4-netblock-netblock", "1.1.1.1", "4.4.4.4", "v4-netblock", anonymize.Netblock, staticIPv4None, staticIPv4Netblock},
-		{"ipv6-netblock-none", "2001:1:1:1::1", "2006:4:4:4::4", "v6-none", anonymize.None, staticIPv6None, staticIPv6None},
-		{"ipv6-netblock-netblock", "2001:1:1:1::1", "2006:4:4:4::4", "v6-netblock", anonymize.Netblock, staticIPv6None, staticIPv6Netblock},
+		{"ipv4-netblock-none", anonymize.None, &staticIPv4None, &staticIPv4None},
+		{"ipv4-netblock-netblock", anonymize.Netblock, &staticIPv4None, &staticIPv4Netblock},
+		{"ipv6-netblock-none", anonymize.None, &staticIPv6None, &staticIPv6None},
+		{"ipv6-netblock-netblock", anonymize.Netblock, &staticIPv6None, &staticIPv6Netblock},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -420,12 +361,12 @@ func TestAnonymize(t *testing.T) {
 			if err != nil {
 				t.Fatalf("NewHandler() = %v, want nil", err)
 			}
-			l := net.ParseIP(tt.srcIP)
+			l := net.ParseIP(tt.input.Tracelb.Src)
 			h.LocalIPs = []*net.IP{&l}
 			h.done = make(chan struct{})
-			sockID := &inetdiag.SockID{SrcIP: tt.srcIP, DstIP: tt.dstIP}
-			h.Open(context.TODO(), time.Now(), tt.uuid, sockID)
-			h.Close(context.TODO(), time.Now(), tt.uuid)
+			sockID := &inetdiag.SockID{SrcIP: tt.input.Tracelb.Src, DstIP: tt.input.Tracelb.Dst}
+			h.Open(context.TODO(), time.Now(), tt.name, sockID)
+			h.Close(context.TODO(), time.Now(), tt.name)
 			waitForTrace(t, h)
 
 			if diff := deep.Equal(st.output, tt.want); diff != nil {
