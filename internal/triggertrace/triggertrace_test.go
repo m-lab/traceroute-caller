@@ -409,10 +409,10 @@ func TestAnonymize(t *testing.T) {
 		input  *parser.Scamper1
 		want   *parser.Scamper1
 	}{
-		{"ipv4-netblock-none", "127.0.0.1", "4.4.4.4", "v4-none", anonymize.None, staticIPv4None, staticIPv4None},
-		{"ipv4-netblock-netblock", "127.0.0.1", "4.4.4.4", "v4-netblock", anonymize.Netblock, staticIPv4None, staticIPv4Netblock},
-		{"ipv6-netblock-none", "::1", "2006:4:4:4::4", "v6-none", anonymize.None, staticIPv6None, staticIPv6None},
-		{"ipv6-netblock-netblock", "::1", "2006:4:4:4::4", "v6-netblock", anonymize.Netblock, staticIPv6None, staticIPv6Netblock},
+		{"ipv4-netblock-none", "1.1.1.1", "4.4.4.4", "v4-none", anonymize.None, staticIPv4None, staticIPv4None},
+		{"ipv4-netblock-netblock", "1.1.1.1", "4.4.4.4", "v4-netblock", anonymize.Netblock, staticIPv4None, staticIPv4Netblock},
+		{"ipv6-netblock-none", "2001:1:1:1::1", "2006:4:4:4::4", "v6-none", anonymize.None, staticIPv6None, staticIPv6None},
+		{"ipv6-netblock-netblock", "2001:1:1:1::1", "2006:4:4:4::4", "v6-netblock", anonymize.Netblock, staticIPv6None, staticIPv6Netblock},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -424,6 +424,8 @@ func TestAnonymize(t *testing.T) {
 			if err != nil {
 				t.Fatalf("NewHandler() = %v, want nil", err)
 			}
+			l := net.ParseIP(tt.srcIP)
+			h.LocalIPs = []*net.IP{&l}
 			h.done = make(chan struct{})
 			sockID := &inetdiag.SockID{SrcIP: tt.srcIP, DstIP: tt.dstIP}
 			h.Open(context.TODO(), time.Now(), tt.uuid, sockID)
