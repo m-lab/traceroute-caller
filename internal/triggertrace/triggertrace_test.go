@@ -334,11 +334,11 @@ func TestAnonymize(t *testing.T) {
 		{Addr: "4.4.4.0", Links: [][]parser.ScamperLink{{{Addr: "4.4.4.0"}}}}} // NETBLOCK
 
 	staticIPv6Netblock := staticIPv6None
-	staticIPv6Netblock.Tracelb.Dst = "2006:4:4:4::" // NETBLOCK
+	staticIPv6Netblock.Tracelb.Dst = "2006:4:4::" // NETBLOCK
 	staticIPv6Netblock.Tracelb.Nodes = []parser.ScamperNode{
 		{Addr: "2001:2:2:2::2", Links: [][]parser.ScamperLink{{{Addr: "2001:3:3:3::3"}}}},
-		{Addr: "2001:3:3:3::3", Links: [][]parser.ScamperLink{{{Addr: "2006:4:4:4::"}}}}, // NETBLOCK
-		{Addr: "2006:4:4:4::", Links: [][]parser.ScamperLink{{{Addr: "2006:4:4:4::"}}}}}  // NETBLOCK
+		{Addr: "2001:3:3:3::3", Links: [][]parser.ScamperLink{{{Addr: "2006:4:4::"}}}}, // NETBLOCK
+		{Addr: "2006:4:4::", Links: [][]parser.ScamperLink{{{Addr: "2006:4:4::"}}}}}    // NETBLOCK
 
 	tests := []struct {
 		name   string
