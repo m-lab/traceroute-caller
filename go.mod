@@ -3,7 +3,7 @@ module github.com/m-lab/traceroute-caller
 go 1.18
 
 require (
-	github.com/m-lab/go v0.1.55
+	github.com/m-lab/go v0.1.56
 	github.com/m-lab/tcp-info v1.5.3
 	github.com/m-lab/uuid-annotator v0.4.7
 	github.com/prometheus/client_golang v1.12.2
