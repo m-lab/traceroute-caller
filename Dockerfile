@@ -43,8 +43,7 @@ COPY --from=build_tracers /scamper /usr/local
 
 # Install fast-mda-traceroute from PyPI.
 # We build pycaracal from source to avoid pulling precompiled binaries.
-# TODO(#152): Build failures as of 2022-12-16. Re-enable once needed.
-# RUN pip3 install --no-binary pycaracal --no-cache-dir --verbose fast-mda-traceroute==0.1.10
+RUN pip3 install --no-binary pycaracal --no-cache-dir --verbose fast-mda-traceroute==0.1.10
 
 # Run ldconfig to locate all new libraries and verify the tools we need
 # are available.
