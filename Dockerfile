@@ -10,7 +10,7 @@ RUN go get -v . && \
     chmod -R a+rx /go/bin/traceroute-caller
 
 # Build and install the tools that are called by traceroute-caller.
-FROM ubuntu:20.04 as build_tracers
+FROM ubuntu:22.04 as build_tracers
 RUN apt-get update && \
     apt-get install -y make coreutils autoconf libtool git build-essential && \
     apt-get clean && \
@@ -26,7 +26,7 @@ RUN chmod +x ./configure && \
     make install
 
 # Create an image for traceroute-caller and the tools that it calls.
-FROM ubuntu:20.04
+FROM ubuntu:22.04
 RUN apt-get update && \
     apt-get install -y python3-pip tini && \
     apt-get clean && \
@@ -43,7 +43,8 @@ COPY --from=build_tracers /scamper /usr/local
 
 # Install fast-mda-traceroute from PyPI.
 # We build pycaracal from source to avoid pulling precompiled binaries.
-RUN pip3 install --no-binary pycaracal --no-cache-dir --verbose fast-mda-traceroute==0.1.10
+RUN pip3 install --upgrade pip wheel setuptools
+RUN pip3 install --no-binary pycaracal --no-cache-dir --verbose fast-mda-traceroute==0.1.13
 
 # Run ldconfig to locate all new libraries and verify the tools we need
 # are available.
