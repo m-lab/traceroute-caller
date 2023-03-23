@@ -11,6 +11,7 @@ import (
 
 	"github.com/m-lab/go/prometheusx"
 	"github.com/m-lab/go/rtx"
+	"github.com/m-lab/uuid/prefix"
 )
 
 func init() {
@@ -19,7 +20,7 @@ func init() {
 
 func TestNewScamper(t *testing.T) {
 	nonWritableDir := "testdata/non-writable"
-	if err := os.MkdirAll(nonWritableDir, 0555); err != nil {
+	if err := os.MkdirAll(nonWritableDir, 0o555); err != nil {
 		t.Fatal(err)
 	}
 	defer os.RemoveAll(nonWritableDir)
@@ -47,7 +48,7 @@ func TestNewScamper(t *testing.T) {
 	}
 	for _, test := range tests {
 		scamperCfg := ScamperConfig{
-			Binary:           test.binary,
+			Executable:       test.binary,
 			OutputPath:       test.outputPath,
 			Timeout:          test.timeout,
 			TraceType:        test.traceType,
@@ -64,36 +65,12 @@ func TestNewScamper(t *testing.T) {
 	}
 }
 
-func TestEmptyUUID(t *testing.T) {
-	wantErr := "uuid is empty"
-	scamperCfg := ScamperConfig{
-		Binary:           "/bin/false",
-		OutputPath:       t.TempDir(),
-		Timeout:          1 * time.Second,
-		TraceType:        "mda",
-		TracelbWaitProbe: 39,
-		TracelbPTR:       false,
-	}
-	s, err := NewScamper(scamperCfg)
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, err = s.Trace("1.2.3.4", "", time.Now())
-	if err == nil || !strings.Contains(err.Error(), wantErr) {
-		t.Errorf("Trace() = %v, want %q", err, wantErr)
-	}
-	_, err = s.CachedTrace("", time.Now(), []byte("does not matter"))
-	if err == nil || !strings.Contains(err.Error(), wantErr) {
-		t.Errorf("Trace() = %v, want %q", err, wantErr)
-	}
-}
-
 func TestTrace(t *testing.T) {
 	tempdir := t.TempDir()
-	yyyymmdd := "/2003/11/09/20031109T155559Z"
-	uuid := "12AB"
-	filename := tempdir + yyyymmdd + "_" + uuid + ".jsonl"
+	cookie := "12AB"
 	now := time.Date(2003, 11, 9, 15, 55, 59, 0, time.UTC)
+	path := tempdir + "/2003/11/09/20031109T155559Z_" + prefix.UnsafeString() + "_00000000000012AB.jsonl"
+
 	tests := []struct {
 		binary     string
 		traceType  string
@@ -104,15 +81,15 @@ func TestTrace(t *testing.T) {
 		{"testdata/fail", "mda", true, true, "exit status 1"},
 		{"testdata/loop", "mda", true, true, "signal: killed"},
 
-		{"/bin/echo", "mda", true, false, `{"UUID":"` + uuid + `","TracerouteCallerVersion":"` + prometheusx.GitShortCommit + `","CachedResult":false,"CachedUUID":""}
+		{"/bin/echo", "mda", true, false, `{"UUID":"","TracerouteCallerVersion":"` + prometheusx.GitShortCommit + `","CachedResult":false,"CachedUUID":""}
 -o- -O json -I tracelb -P icmp-echo -q 3 -W 39 -O ptr 10.1.1.1`},
-		{"/bin/echo", "mda", false, false, `{"UUID":"` + uuid + `","TracerouteCallerVersion":"` + prometheusx.GitShortCommit + `","CachedResult":false,"CachedUUID":""}
+		{"/bin/echo", "mda", false, false, `{"UUID":"","TracerouteCallerVersion":"` + prometheusx.GitShortCommit + `","CachedResult":false,"CachedUUID":""}
 -o- -O json -I tracelb -P icmp-echo -q 3 -W 39 10.1.1.1`},
 	}
 	for _, test := range tests {
-		os.RemoveAll(filename)
+		os.RemoveAll(path)
 		scamperCfg := ScamperConfig{
-			Binary:           test.binary,
+			Executable:       test.binary,
 			OutputPath:       tempdir,
 			Timeout:          1 * time.Second,
 			TraceType:        test.traceType,
@@ -124,7 +101,7 @@ func TestTrace(t *testing.T) {
 			t.Fatal(err)
 		}
 		// Run a traceroute.
-		out, err := s.Trace("10.1.1.1", uuid, now)
+		out, err := s.Trace("10.1.1.1", cookie, "", now)
 		if test.shouldFail {
 			if err == nil || !strings.Contains(err.Error(), test.want) {
 				t.Errorf("Trace() = %q, want %q", err, test.want)
@@ -139,19 +116,14 @@ func TestTrace(t *testing.T) {
 		if strings.TrimSpace(got) != strings.TrimSpace(test.want) {
 			t.Errorf("Trace() = %q, want %q", strings.TrimSpace(got), strings.TrimSpace(test.want))
 		}
-		err = s.WriteFile(uuid, now, out)
-		if err != nil {
-			t.Errorf("WriteFile() = %v, want nil", err)
-			continue
-		}
 		// Make sure that the output was correctly written to file.
-		out, err = os.ReadFile(filename)
+		out, err = os.ReadFile(path)
 		if err != nil {
 			t.Fatal(err)
 		}
 		got = string(out)
 		if strings.TrimSpace(got) != strings.TrimSpace(test.want) {
-			t.Errorf("ReadFile(%v) = %q, want %q", filename, got, test.want)
+			t.Errorf("ReadFile(%v) = %q, want %q", path, got, test.want)
 		}
 	}
 }
@@ -166,7 +138,7 @@ func TestTraceWritesMeta(t *testing.T) {
 	hostname = "testhostname"
 
 	scamperCfg := ScamperConfig{
-		Binary:           "/bin/echo",
+		Executable:       "/bin/echo",
 		OutputPath:       tempdir,
 		Timeout:          1 * time.Minute,
 		TraceType:        "mda",
@@ -180,20 +152,16 @@ func TestTraceWritesMeta(t *testing.T) {
 	faketime := time.Date(2019, time.April, 1, 3, 45, 51, 0, time.UTC)
 	prometheusx.GitShortCommit = "Fake Version"
 	wantUUID := "0123456789"
-	out, err := s.Trace("1.2.3.4", wantUUID, faketime)
+	_, err = s.Trace("1.2.3.4", "1", wantUUID, faketime)
 	if err != nil {
 		t.Errorf("Trace() = %v, want nil", err)
 	}
-	err = s.WriteFile(wantUUID, faketime, out)
-	if err != nil {
-		t.Errorf("WriteFile() = %v, want nil", err)
-	}
 
 	// Unmarshal the first line of the output file.
-	out, err = os.ReadFile(tempdir + "/2019/04/01/20190401T034551Z_" + wantUUID + ".jsonl")
+	b, err := os.ReadFile(tempdir + "/2019/04/01/20190401T034551Z_" + prefix.UnsafeString() + "_0000000000000001.jsonl")
 	rtx.Must(err, "failed to read file")
 	m := Metadata{}
-	lines := strings.Split(string(out), "\n")
+	lines := strings.Split(string(b), "\n")
 	if len(lines) < 2 {
 		t.Errorf("len(lines) = %d, want 2", len(lines))
 	}
@@ -217,7 +185,7 @@ func TestCachedTrace(t *testing.T) {
 	hostname = "testhostname"
 
 	scamperCfg := ScamperConfig{
-		Binary:           "/bin/echo",
+		Executable:       "/bin/echo",
 		OutputPath:       tempdir,
 		Timeout:          1 * time.Minute,
 		TraceType:        "mda",
@@ -231,22 +199,21 @@ func TestCachedTrace(t *testing.T) {
 
 	faketime := time.Date(2019, time.April, 1, 3, 45, 51, 0, time.UTC)
 	prometheusx.GitShortCommit = "Fake Version"
-	uuid := "ndt-plh7v_1566050090_000000000004D64D"
 	cachedTrace := []byte(`{"UUID": "ndt-plh7v_1566050090_000000000004D64D"}
 	{"type":"cycle-start", "list_name":"/tmp/scamperctrl:51811", "id":1, "hostname":"ndt-plh7v", "start_time":1566691298}
 	{"type":"tracelb", "version":"0.1", "userid":0, "method":"icmp-echo", "src":"::ffff:180.87.97.101", "dst":"::ffff:1.47.236.62", "start":{"sec":1566691298, "usec":476221, "ftime":"2019-08-25 00:01:38"}, "probe_size":60, "firsthop":1, "attempts":3, "confidence":95, "tos":0, "gaplimit":3, "wait_timeout":5, "wait_probe":250, "probec":0, "probec_max":3000, "nodec":0, "linkc":0}
 	{"type":"cycle-stop", "list_name":"/tmp/scamperctrl:51811", "id":1, "hostname":"ndt-plh7v", "stop_time":1566691298}`)
 
-	_, err = s.CachedTrace(uuid, faketime, []byte("Broken cached traceroute"))
-	if err == nil {
-		t.Error("CacheTrace() returned nil error, want error")
+	_ = s.CachedTrace("1", "ndt-plh7v_1566050090_000000000004D64D", faketime, []byte("Broken cached traceroute"))
+	_, errInvalidTest := os.ReadFile(tempdir + "/2019/04/01/20190401T034551Z_" + prefix.UnsafeString() + "_0000000000000001.jsonl")
+	if errInvalidTest == nil {
+		t.Error("CachedTrace() = nil, want error")
 	}
 
-	b, err := s.CachedTrace(uuid, faketime, cachedTrace)
-	if err != nil {
-		t.Errorf("CacheTrace() = %v, want nil", err)
-	}
+	_ = s.CachedTrace("1", "ndt-plh7v_1566050090_000000000004D64D", faketime, cachedTrace)
 	// Unmarshal the first line of the output file.
+	b, err := os.ReadFile(tempdir + "/2019/04/01/20190401T034551Z_" + prefix.UnsafeString() + "_0000000000000001.jsonl")
+	rtx.Must(err, "failed to read file")
 	m := Metadata{}
 	lines := strings.Split(string(b), "\n")
 	if len(lines) < 2 {
@@ -265,8 +232,9 @@ func TestCachedTrace(t *testing.T) {
 	if m.CachedResult != true {
 		t.Errorf("got cached result %v, want true", m.CachedResult)
 	}
-	if m.CachedUUID != uuid {
-		t.Errorf("got cached UUID %q, want %q", m.CachedUUID, uuid)
+	wantUUID = "ndt-plh7v_1566050090_000000000004D64D"
+	if m.CachedUUID != "ndt-plh7v_1566050090_000000000004D64D" {
+		t.Errorf("got cached UUID %q, want %q", m.CachedUUID, wantUUID)
 	}
 }
 
@@ -284,7 +252,7 @@ func TestExtractUUID(t *testing.T) {
 
 func TestDontTrace(t *testing.T) {
 	scamperCfg := ScamperConfig{
-		Binary:           "/bin/echo",
+		Executable:       "/bin/echo",
 		OutputPath:       "/tmp",
 		Timeout:          1 * time.Minute,
 		TraceType:        "mda",
@@ -304,6 +272,27 @@ func TestCreateMetaline(t *testing.T) {
 	wantMeta := []byte("0000000000000ABC\",\"TracerouteCallerVersion\":\"Fake Version\",\"CachedResult\":true,\"CachedUUID\":\"00EF\"")
 	if !bytes.Contains(gotMeta, wantMeta) {
 		t.Errorf("gotMeta %q does not contain wantMeta %q", gotMeta, wantMeta)
+	}
+}
+
+func TestInvalidCookie(t *testing.T) {
+	scamperCfg := ScamperConfig{
+		Executable:       "/bin/echo",
+		OutputPath:       "/tmp",
+		Timeout:          1 * time.Minute,
+		TraceType:        "mda",
+		TracelbPTR:       true,
+		TracelbWaitProbe: 39,
+	}
+	s, err := NewScamper(scamperCfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Trace("10.1.1.1", "an invalid cookie", "", time.Now()); err == nil {
+		t.Error("Trace() = nil, want error")
+	}
+	if err := s.CachedTrace("an invalid cookie", "", time.Now(), nil); err == nil {
+		t.Error("CachedTrace() = nil, want error")
 	}
 }
 

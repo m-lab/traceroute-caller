@@ -13,38 +13,40 @@ import (
 	"time"
 )
 
-var (
-	// ErrEmptyUUID is returned when a required UUID is empty.
-	ErrEmptyUUID = errors.New("uuid is empty")
+const (
+	fastMDATracerouteExecutable = "/usr/local/bin/fast-mda-traceroute"
 )
 
 // ScamperConfig contains configuration parameters of scamper.
 type ScamperConfig struct {
-	Binary           string
-	OutputPath       string
-	Timeout          time.Duration
-	TraceType        string
-	TracelbPTR       bool
-	TracelbWaitProbe int
+	Executable            string
+	OutputPath            string
+	Timeout               time.Duration
+	TraceType             string
+	TracelbPTR            bool
+	TracelbWaitProbe      int
+	FastMDATracerouteRuns int
 }
 
 // Scamper invokes an instance of the scamper tool for each traceroute.
 type Scamper struct {
-	binary     string
-	outputPath string
-	timeout    time.Duration
-	cmd        string
+	executable            string
+	outputPath            string
+	timeout               time.Duration
+	cmd                   string
+	numTraceroutes        uint
+	fastMDATracerouteRuns uint
 }
 
 // NewScamper validates the specified scamper configuration and, if successful,
 // returns a new Scamper instance.  Otherwise, it returns nil and an error.
 func NewScamper(cfg ScamperConfig) (*Scamper, error) {
-	// Validate that the cfg.Binary exists and is an executable file.
-	if err := exec.Command("test", "-f", cfg.Binary, "-a", "-x", cfg.Binary).Run(); err != nil {
-		return nil, fmt.Errorf("%q: is not an executable file", cfg.Binary)
+	// Validate that the cfg.Executable exists and is an executable file.
+	if err := exec.Command("test", "-f", cfg.Executable, "-a", "-x", cfg.Executable).Run(); err != nil {
+		return nil, fmt.Errorf("%q: is not an executable file", cfg.Executable)
 	}
 	// Validate that traceroute files can be saved in cfg.OutputPath.
-	if err := os.MkdirAll(cfg.OutputPath, 0777); err != nil {
+	if err := os.MkdirAll(cfg.OutputPath, 0o777); err != nil {
 		return nil, fmt.Errorf("failed to create directory %q (error: %v)", cfg.OutputPath, err)
 	}
 	dir, err := os.MkdirTemp(cfg.OutputPath, "trc-testdir")
@@ -74,21 +76,12 @@ func NewScamper(cfg ScamperConfig) (*Scamper, error) {
 		return nil, fmt.Errorf("%s: invalid traceroute type", cfg.TraceType)
 	}
 	return &Scamper{
-		binary:     cfg.Binary,
-		outputPath: cfg.OutputPath,
-		timeout:    cfg.Timeout,
-		cmd:        traceCmd,
+		executable:            cfg.Executable,
+		outputPath:            cfg.OutputPath,
+		timeout:               cfg.Timeout,
+		cmd:                   traceCmd,
+		fastMDATracerouteRuns: uint(cfg.FastMDATracerouteRuns),
 	}, nil
-}
-
-// WriteFile writes the given data to a file in the configured Scamper output
-// path using the given UUID and time.
-func (s *Scamper) WriteFile(uuid string, t time.Time, data []byte) error {
-	filename, err := generateFilename(s.outputPath, uuid, t)
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(filename, data, 0644)
 }
 
 // Trace starts a new scamper process to run a traceroute based on the
@@ -96,28 +89,30 @@ func (s *Scamper) WriteFile(uuid string, t time.Time, data []byte) error {
 func (s *Scamper) Trace(remoteIP, uuid string, t time.Time) ([]byte, error) {
 	tracesInProgress.WithLabelValues("scamper").Inc()
 	defer tracesInProgress.WithLabelValues("scamper").Dec()
-	if uuid == "" {
-		return nil, ErrEmptyUUID
-	}
 	return s.trace(remoteIP, uuid, t)
 }
 
-// CachedTrace creates an updated traceroute using the given uuid and time based on the traceroute cache.
-func (s *Scamper) CachedTrace(uuid string, t time.Time, cachedTrace []byte) ([]byte, error) {
-	if uuid == "" {
-		return nil, ErrEmptyUUID
+// CachedTrace creates a traceroute from the traceroute cache and saves it in a file.
+func (s *Scamper) CachedTrace(uuid string, t time.Time, cachedTrace []byte) error {
+	filename, err := generateFilename(s.outputPath, uuid, t)
+	if err != nil {
+		log.Printf("failed to generate filename (error: %v)\n", err)
+		tracerCacheErrors.WithLabelValues("scamper", err.Error()).Inc()
+		return err
 	}
+
 	// Remove the first line of the cached traceroute.
 	split := bytes.Index(cachedTrace, []byte{'\n'})
 	if split <= 0 || split == len(cachedTrace) {
 		log.Printf("failed to split cached traceroute (split: %v)\n", split)
 		tracerCacheErrors.WithLabelValues("scamper", "badcache").Inc()
-		return nil, errors.New("invalid cached traceroute")
+		return errors.New("invalid cached traceroute")
 	}
 
 	// Create and add the first line to the cached traceroute.
 	newTrace := append(createMetaline(uuid, true, extractUUID(cachedTrace[:split])), cachedTrace[split+1:]...)
-	return []byte(newTrace), nil
+	// Make the file readable so it won't be overwritten.
+	return os.WriteFile(filename, []byte(newTrace), 0o444)
 }
 
 // DontTrace is called when a previous traceroute that we were waiting for
@@ -126,19 +121,51 @@ func (*Scamper) DontTrace() {
 	tracesNotPerformed.WithLabelValues("scamper").Inc()
 }
 
-// trace runs a traceroute using scamper as a standalone binary. The
+// AnotherTracer returns true or false depending on whether
+// another tracer tool is configured or not.
+func (s *Scamper) AnotherTracertool() bool {
+	return s.fastMDATracerouteRuns != 0
+}
+
+// trace runs a traceroute using scamper as a standalone executable. The
 // command line to invoke scamper varies depending on the traceroute type
 // and its options.
 func (s *Scamper) trace(remoteIP, uuid string, t time.Time) ([]byte, error) {
-	// Create a context, run a traceroute, and return the output.
+	// Make sure a directory path based on the current date exists,
+	// generate a filename to save in that directory, and create
+	// a buffer to hold traceroute data.
+	filename, err := generateFilename(s.outputPath, uuid, t)
+	if err != nil {
+		return nil, err
+	}
+
+	// Create a context, run a traceroute, and write the output to file.
+	s.numTraceroutes++
 	ctx, cancel := context.WithTimeout(context.Background(), s.timeout)
+	cmd := []string{s.executable, "-o-", "-O", "json", "-I", fmt.Sprintf("%s %s", s.cmd, remoteIP)}
+	out, err := traceAndWrite(ctx, "scamper", filename, cmd, uuid)
+	cancel()
+	if err != nil || s.fastMDATracerouteRuns == 0 || (s.numTraceroutes%s.fastMDATracerouteRuns) != 0 {
+		return out, err
+	}
+
+	log.Printf(">>> trace(): s.fastMDATracerouteRuns=%v s.numTraceroutes=%v\n", s.fastMDATracerouteRuns, s.numTraceroutes)
+	ctx, cancel = context.WithTimeout(context.Background(), s.timeout)
 	defer cancel()
-	cmd := []string{s.binary, "-o-", "-O", "json", "-I", fmt.Sprintf("%s %s", s.cmd, remoteIP)}
-	return traceWithMeta(ctx, "scamper", cmd, uuid)
+	uuid2 := fromUUID(uuid, "fmt")
+	log.Printf(">>> trace(): uuid2=(%v)\n", uuid2)
+	filename2, err := generateFilename(s.outputPath, uuid2, t)
+	if err != nil {
+		log.Printf("failed to generate filename for fast-mda-traceroute (error: %v)\n", err)
+		return out, err
+	}
+	log.Printf(">>> trace(): filename2=(%v)\n", filename2)
+	cmd = []string{fastMDATracerouteExecutable, "--format", "scamper-json", remoteIP}
+	return traceAndWrite(ctx, "fast-mda-traceroute", filename2, cmd, uuid2)
 }
 
-// traceWithMeta runs a traceroute and adds a metadata line to the result.
-func traceWithMeta(ctx context.Context, label string, cmd []string, uuid string) ([]byte, error) {
+// traceAndWrite runs a traceroute and writes the result.
+func traceAndWrite(ctx context.Context, label string, filename string, cmd []string, uuid string) ([]byte, error) {
 	data, err := runCmd(ctx, label, cmd)
 	if err != nil {
 		return nil, err
@@ -152,7 +179,8 @@ func traceWithMeta(ctx context.Context, label string, cmd []string, uuid string)
 	// the buffer becomes too large, Write() will panic with ErrTooLarge.
 	_, _ = buff.Write(createMetaline(uuid, false, ""))
 	_, _ = buff.Write(data)
-	return buff.Bytes(), nil
+	// Make the file readable so it won't be overwritten.
+	return buff.Bytes(), os.WriteFile(filename, buff.Bytes(), 0o444)
 }
 
 // runCmd runs the given command and returns its output.
@@ -180,7 +208,7 @@ func runCmd(ctx context.Context, label string, cmd []string) ([]byte, error) {
 		} else {
 			log.Printf("context %p: command failed (error: %v)\n", ctx, err)
 		}
-		log.Printf("context %p: standard error: %q\n", ctx, errb.String())
+		log.Println(errb.String())
 		return outb.Bytes(), err
 	}
 
@@ -190,14 +218,15 @@ func runCmd(ctx context.Context, label string, cmd []string) ([]byte, error) {
 }
 
 // generateFilename creates the string filename for storing the data.
-func generateFilename(path, uuid string, t time.Time) (string, error) {
-	if uuid == "" {
-		return "", ErrEmptyUUID
-	}
+func generateFilename(path string, uuid string, t time.Time) (string, error) {
 	dir, err := createDatePath(path, t)
 	if err != nil {
 		// TODO(SaiedKazemi): Add metric here.
 		return "", errors.New("failed to create output directory")
 	}
 	return dir + t.Format("20060102T150405Z") + "_" + uuid + ".jsonl", nil
+}
+
+func fromUUID(uuid, s string) string {
+	return fmt.Sprintf("%s_%s", uuid, s)
 }

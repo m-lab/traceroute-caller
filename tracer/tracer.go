@@ -10,6 +10,7 @@
 //   - Regular traceroute using Paris algorithm (trace -P icmp-paris)
 //     finds a single path between two addresses by keeping the first 4
 //     bytes of the transport header constant.
+//
 // See scamper's man page for more details.
 package tracer
 
@@ -131,6 +132,6 @@ func createMetaline(uuid string, isCache bool, cachedUUID string) []byte {
 // creating a directory of the same name.
 func createDatePath(outputPath string, t time.Time) (string, error) {
 	dir := outputPath + "/" + t.Format("2006/01/02") + "/"
-	err := os.MkdirAll(dir, 0777)
+	err := os.MkdirAll(dir, 0o777)
 	return dir, err
 }

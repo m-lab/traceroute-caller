@@ -74,6 +74,7 @@ services:
       - -scamper.timeout=30m
       - -scamper.tracelb-W=15
       - -scamper.tracelb-ptr=true
+      - -fast-mda-traceroute-runs=3
 
   trc-scamper2:
     profiles:

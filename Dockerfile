@@ -10,7 +10,7 @@ RUN go get -v . && \
     chmod -R a+rx /go/bin/traceroute-caller
 
 # Build and install the tools that are called by traceroute-caller.
-FROM ubuntu:22.04 as build_tracers
+FROM ubuntu:20.04 as build_tracers
 RUN apt-get update && \
     apt-get install -y make coreutils autoconf libtool git build-essential && \
     apt-get clean && \
@@ -26,7 +26,7 @@ RUN chmod +x ./configure && \
     make install
 
 # Create an image for traceroute-caller and the tools that it calls.
-FROM ubuntu:22.04
+FROM ubuntu:20.04
 RUN apt-get update && \
     apt-get install -y python3-pip tini && \
     apt-get clean && \
@@ -40,17 +40,13 @@ RUN mkdir -p /var/empty && \
 COPY --from=build_caller /go/bin/traceroute-caller /
 # Copy the dynamically-linked scamper binary and its associated libraries.
 COPY --from=build_tracers /scamper /usr/local
-
 # Install fast-mda-traceroute from PyPI.
 # We build pycaracal from source to avoid pulling precompiled binaries.
-RUN pip3 install --upgrade pip wheel setuptools
-RUN pip3 install --no-binary pycaracal --no-cache-dir --verbose fast-mda-traceroute==0.1.13
-
+# RUN pip3 install --no-binary pycaracal --no-cache-dir --verbose fast-mda-traceroute==0.1.10
 # Run ldconfig to locate all new libraries and verify the tools we need
 # are available.
 RUN ldconfig && \
-    which scamper tini
+#   which tini scamper fast-mda-traceroute
+    which tini scamper
 WORKDIR /
-# Make sure /traceroute-caller can run (has no missing external dependencies).
-RUN /traceroute-caller -h 2> /dev/null
 ENTRYPOINT ["tini", "--", "/traceroute-caller"]

@@ -7,7 +7,6 @@ import (
 	"net"
 	"time"
 
-	"github.com/m-lab/go/anonymize"
 	"github.com/m-lab/traceroute-caller/tracer"
 )
 
@@ -99,8 +98,7 @@ type TracelbLine struct {
 	Nodes       []ScamperNode `json:"nodes" bigquery:"nodes"`
 }
 
-type scamper1Parser struct {
-}
+type scamper1Parser struct{}
 
 // ParseRawData parses scamper's MDA traceroute in JSONL format.
 func (s1 *scamper1Parser) ParseRawData(rawData []byte) (ParsedData, error) {
@@ -146,7 +144,7 @@ func (s1 *scamper1Parser) ParseRawData(rawData []byte) (ParsedData, error) {
 		return nil, fmt.Errorf("%w: %v", ErrCycleStopType, scamper1.CycleStop.Type)
 	}
 
-	return &scamper1, nil
+	return scamper1, nil
 }
 
 // StartTime returns the start time of the traceroute.
@@ -179,43 +177,4 @@ func (s1 Scamper1) ExtractHops() []string {
 		hopStrings = append(hopStrings, h)
 	}
 	return hopStrings
-}
-
-// Anonymize looks for hops that are in the client subnet, and anonymizes them using the given anonymizer.
-func (s1 *Scamper1) Anonymize(anon anonymize.IPAnonymizer) {
-	tracelb := s1.Tracelb
-	dst := net.ParseIP(tracelb.Dst)
-	anon.IP(dst)
-	s1.Tracelb.Dst = dst.String()
-
-	for i := range tracelb.Nodes {
-		node := &tracelb.Nodes[i]
-		ip := net.ParseIP(node.Addr)
-		if anon.Contains(dst, ip) {
-			anon.IP(ip)
-			node.Addr = ip.String()
-		}
-		for j := range node.Links {
-			links := node.Links[j]
-			for k := range links {
-				link := &links[k]
-				ip = net.ParseIP(link.Addr)
-				if anon.Contains(dst, ip) {
-					anon.IP(ip)
-					link.Addr = ip.String()
-				}
-			}
-		}
-	}
-}
-
-// MarshalJSONL encodes the scamper object as JSONL.
-func (s1 Scamper1) MarshalJSONL() []byte {
-	buff := &bytes.Buffer{}
-	enc := json.NewEncoder(buff)
-	enc.Encode(s1.Metadata)
-	enc.Encode(s1.CycleStart)
-	enc.Encode(s1.Tracelb)
-	enc.Encode(s1.CycleStop)
-	return buff.Bytes()
 }

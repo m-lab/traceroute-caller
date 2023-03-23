@@ -33,21 +33,24 @@ var (
 		Options: []string{"mda", "regular"},
 		Value:   "mda",
 	}
-	scamperTracelbPTR   = flag.Bool("scamper.tracelb-ptr", true, "mda traceroute option: Look up DNS pointer records for IP addresses.")
-	scamperTracelbW     = flag.Int("scamper.tracelb-W", 25, "mda traceroute option: Wait time in 1/100ths of seconds between probes (min 15, max 200).")
-	tracerouteOutput    = flag.String("traceroute-output", "/var/spool/scamper1", "The path to store traceroute output.")
-	hopAnnotationOutput = flag.String("hopannotation-output", "/var/spool/hopannotation1", "The path to store hop annotation output.")
+	scamperTracelbPTR     = flag.Bool("scamper.tracelb-ptr", true, "mda traceroute option: Look up DNS pointer records for IP addresses.")
+	scamperTracelbW       = flag.Int("scamper.tracelb-W", 25, "mda traceroute option: Wait time in 1/100ths of seconds between probes (min 15, max 200).")
+	tracerouteOutput      = flag.String("traceroute-output", "/var/spool/scamper1", "The path to store traceroute output.")
+	hopAnnotationOutput   = flag.String("hopannotation-output", "/var/spool/hopannotation1", "The path to store hop annotation output.")
+	fastMDATracerouteRuns = flag.Int("fast-mda-traceroute-runs", 0, "For every <n> scamper runs, also run fast-mda-traceroute to the same destination.")
 	// Keeping IP cache flags capitalized for backward compatibility.
 	ipcEntryTimeout = flag.Duration("IPCacheTimeout", 10*time.Minute, "Timeout duration in seconds for an IP cache entry.")
 	ipcScanPeriod   = flag.Duration("IPCacheUpdatePeriod", 1*time.Minute, "IP cache scanning period in seconds.")
 
 	// Variables to aid in testing of main().
-	ctx, cancel    = context.WithCancel(context.Background())
-	logFatal       = log.Fatal
-	errEnvArgs     = errors.New("failed to get args from environment")
-	errEventSocket = errors.New("tcpinfo.eventsocket value was empty")
-	errScamper     = errors.New("failed to create a new scamper instance")
-	errNewHandler  = errors.New("failed to create a triggertrace handler")
+	ctx, cancel              = context.WithCancel(context.Background())
+	logFatal                 = log.Fatal
+	errEnvArgs               = errors.New("failed to get args from environment")
+	errEventSocket           = errors.New("tcpinfo.eventsocket value was empty")
+	errScamper               = errors.New("failed to create a new scamper instance")
+	errNewHandler            = errors.New("failed to create a triggertrace handler")
+	errFastMDATracerouteRuns = errors.New("invalid value for fast-mda-traceroute-runs")
+	errMismatchTraceTypes    = errors.New("trace type mismatch between scamper (regular) and fast-mda-traceroute (mda)")
 )
 
 func init() {
@@ -64,6 +67,15 @@ func main() {
 	if *eventsocket.Filename == "" {
 		logFatal(errEventSocket)
 	}
+	if *fastMDATracerouteRuns < 0 {
+		logFatal(errFastMDATracerouteRuns)
+	}
+	// If we are invoked to run fast-mda-traceroute in addition to
+	// scamper, make sure trace types match.
+	if *fastMDATracerouteRuns > 0 && scamperTraceType.Value != "mda" {
+		logFatal(errMismatchTraceTypes)
+	}
+	log.Printf(">>> main(): ctx=%v\n", ctx)
 
 	promSrv := prometheusx.MustServeMetrics()
 	defer func() {
@@ -80,10 +92,11 @@ func main() {
 
 	// 1. The traceroute tool (scamper).
 	scamperCfg := tracer.ScamperConfig{
-		Binary:     *scamperBin,
-		OutputPath: *tracerouteOutput,
-		Timeout:    *scamperTimeout,
-		TraceType:  scamperTraceType.Value,
+		Executable:            *scamperBin,
+		OutputPath:            *tracerouteOutput,
+		Timeout:               *scamperTimeout,
+		TraceType:             scamperTraceType.Value,
+		FastMDATracerouteRuns: *fastMDATracerouteRuns,
 	}
 	if scamperCfg.TraceType == "mda" {
 		scamperCfg.TracelbPTR = *scamperTracelbPTR

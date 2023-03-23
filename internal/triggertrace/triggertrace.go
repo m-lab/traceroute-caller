@@ -9,10 +9,10 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"strconv"
 	"sync"
 	"time"
 
-	"github.com/m-lab/go/anonymize"
 	"github.com/m-lab/tcp-info/inetdiag"
 	"github.com/m-lab/traceroute-caller/hopannotation"
 	"github.com/m-lab/traceroute-caller/internal/ipcache"
@@ -20,14 +20,13 @@ import (
 	"github.com/m-lab/uuid-annotator/annotator"
 )
 
-var (
-	// Variables to aid in black-box testing.
-	netInterfaceAddrs = net.InterfaceAddrs
-)
+// Variables to aid in black-box testing.
+var netInterfaceAddrs = net.InterfaceAddrs
 
 // Destination is the host to run a traceroute to.
 type Destination struct {
 	RemoteIP string
+	Cookie   string
 }
 
 // FetchTracer is the interface for obtaining a traceroute.  The
@@ -35,7 +34,8 @@ type Destination struct {
 // cache (if it exists) in order to avoid running multiple traceroutes to
 // the same destination in a short time.
 type FetchTracer interface {
-	FetchTrace(remoteIP, uuid string) ([]byte, error)
+	FetchTrace(remoteIP, cookie string) ([]byte, error)
+	AnotherTracertool() bool
 }
 
 // ParseTracer is the interface for parsing raw traceroutes obtained
@@ -51,12 +51,6 @@ type AnnotateAndArchiver interface {
 	WriteAnnotations(map[string]*annotator.ClientAnnotations, time.Time) []error
 }
 
-// TracerWriter provides the interface for issuing traces and writing results.
-type TracerWriter interface {
-	ipcache.Tracer
-	WriteFile(uuid string, t time.Time, b []byte) error
-}
-
 // Handler implements the tcp-info/eventsocket.Handler's interface.
 type Handler struct {
 	Destinations     map[string]Destination // key is UUID
@@ -65,13 +59,11 @@ type Handler struct {
 	IPCache          FetchTracer
 	Parser           ParseTracer
 	HopAnnotator     AnnotateAndArchiver
-	Tracetool        TracerWriter
-	Anonymizer       anonymize.IPAnonymizer
 	done             chan struct{} // For testing.
 }
 
 // NewHandler returns a new instance of Handler.
-func NewHandler(ctx context.Context, tracetool TracerWriter, ipcCfg ipcache.Config, newParser parser.TracerouteParser, haCfg hopannotation.Config) (*Handler, error) {
+func NewHandler(ctx context.Context, tracetool ipcache.Tracer, ipcCfg ipcache.Config, newParser parser.TracerouteParser, haCfg hopannotation.Config) (*Handler, error) {
 	ipCache, err := ipcache.New(ctx, tracetool, ipcCfg)
 	if err != nil {
 		return nil, err
@@ -90,22 +82,16 @@ func NewHandler(ctx context.Context, tracetool TracerWriter, ipcCfg ipcache.Conf
 		IPCache:      ipCache,
 		Parser:       newParser,
 		HopAnnotator: hopCache,
-		Tracetool:    tracetool,
-		Anonymizer:   anonymize.New(anonymize.IPAnonymizationFlag),
 	}, nil
 }
 
 // Open is called when a network connection is opened.
 // Note that this function doesn't use timestamp.
 func (h *Handler) Open(ctx context.Context, timestamp time.Time, uuid string, sockID *inetdiag.SockID) {
-	if sockID == nil {
-		// TODO(SaiedKazemi): Add a metric here.
-		log.Printf("error: tcp-info passed a nil sockID\n")
-		return
-	}
-	if uuid == "" {
-		// TODO(SaiedKazemi): Add a metric here.
-		log.Printf("error: tcp-info passed an empty uuid for sockID %+v\n", *sockID)
+	log.Printf(">>> Open(): ctx=%v uuid=%v sockID=%+v\n", ctx, uuid, sockID)
+	// TODO(SaiedKazemi): Add metrics for the following errors.
+	if sockID == nil || uuid == "" {
+		log.Printf("context %p: error: nil value (sockID=%v uuid=%v)", ctx, sockID, uuid)
 		return
 	}
 
@@ -113,19 +99,21 @@ func (h *Handler) Open(ctx context.Context, timestamp time.Time, uuid string, so
 	//     to right before accessing the map.
 	h.DestinationsLock.Lock()
 	defer h.DestinationsLock.Unlock()
-	destination, err := h.findDestination(sockID)
+	dest, err := h.findDestination(sockID)
 	if err != nil {
 		log.Printf("context %p: failed to find destination from SockID %+v\n", ctx, *sockID)
 		return
 	}
-	h.Destinations[uuid] = destination
+	log.Printf(">>> Open(): dest=%+v\n", dest)
+	h.Destinations[uuid] = dest
 }
 
 // Close is called when a network connection is closed.
 // Note that this function doesn't use timestamp.
 func (h *Handler) Close(ctx context.Context, timestamp time.Time, uuid string) {
+	log.Printf(">>> Close(): ctx=%v uuid=%v\n", ctx, uuid)
 	h.DestinationsLock.Lock()
-	destination, ok := h.Destinations[uuid]
+	dest, ok := h.Destinations[uuid]
 	if !ok {
 		h.DestinationsLock.Unlock()
 		log.Printf("context %p: failed to find destination for UUID %q", ctx, uuid)
@@ -135,7 +123,10 @@ func (h *Handler) Close(ctx context.Context, timestamp time.Time, uuid string) {
 	h.DestinationsLock.Unlock()
 	// This goroutine will live for a few minutes and terminate
 	// after all hop annotations are archived.
-	go h.traceAnnotateAndArchive(ctx, uuid, destination)
+	go h.traceAnnotateAndArchive(ctx, uuid, dest)
+	if h.IPCache.AnotherTracertool() {
+		go h.traceAnnotateAndArchive(ctx, uuid, dest)
+	}
 }
 
 // traceAnnotateAndArchive runs a traceroute, annotates the hops
@@ -156,23 +147,13 @@ func (h *Handler) traceAnnotateAndArchive(ctx context.Context, uuid string, dest
 		log.Printf("context %p: failed to parse traceroute output (error: %v)\n", ctx, err)
 		return
 	}
-
-	// Anonymize the parsed data in place.
-	parsedData.Anonymize(h.Anonymizer)
-	// Remarshal anonymized data for writing.
-	rawData = parsedData.MarshalJSONL()
-
-	traceStartTime := parsedData.StartTime()
-	err = h.Tracetool.WriteFile(uuid, traceStartTime, rawData)
-	if err != nil {
-		log.Printf("context %p: failed to write trace file for uuid: %s: (error: %v)\n", ctx, uuid, err)
-	}
-
 	hops := parsedData.ExtractHops()
 	if len(hops) == 0 {
 		log.Printf("context %p: failed to extract hops from traceroute %+v\n", ctx, string(rawData))
 		return
 	}
+
+	traceStartTime := parsedData.StartTime()
 	annotations, allErrs := h.HopAnnotator.Annotate(ctx, hops, traceStartTime)
 	if allErrs != nil {
 		log.Printf("context %p: failed to annotate some or all hops (errors: %+v)\n", ctx, allErrs)
@@ -209,11 +190,13 @@ func (h *Handler) findDestination(sockid *inetdiag.SockID) (Destination, error) 
 	if srcLocal && !dstLocal {
 		return Destination{
 			RemoteIP: sockid.DstIP,
+			Cookie:   strconv.FormatUint(sockid.CookieUint64(), 16),
 		}, nil
 	}
 	if !srcLocal && dstLocal {
 		return Destination{
 			RemoteIP: sockid.SrcIP,
+			Cookie:   strconv.FormatUint(sockid.CookieUint64(), 16),
 		}, nil
 	}
 	return Destination{}, fmt.Errorf("failed to find a local/remote IP pair in %+v", sockid)

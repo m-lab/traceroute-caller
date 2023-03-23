@@ -243,7 +243,7 @@ func (hc *HopCache) writeAnnotation(wg *sync.WaitGroup, hop string, annotation *
 		errChan <- fmt.Errorf("%w (error: %v)", ErrMarshalAnnotation, err)
 		return
 	}
-	if err := writeFile(filepath, b, 0444); err != nil {
+	if err := writeFile(filepath, b, 0o444); err != nil {
 		hopAnnotationErrors.WithLabelValues("hopannotation", "writefile").Inc()
 		errChan <- fmt.Errorf("%w (error: %v)", ErrWriteMarshal, err)
 		return
@@ -255,7 +255,7 @@ func (hc *HopCache) writeAnnotation(wg *sync.WaitGroup, hop string, annotation *
 // annotation file in the format "<timestamp>_<hostname>_<ip>.json"
 func (hc *HopCache) generateAnnotationFilepath(hop string, timestamp time.Time) (string, error) {
 	dirPath := hc.outputPath + "/" + timestamp.Format("2006/01/02")
-	if err := os.MkdirAll(dirPath, 0777); err != nil {
+	if err := os.MkdirAll(dirPath, 0o777); err != nil {
 		hopAnnotationErrors.WithLabelValues("hopannotation", "mkdirall").Inc()
 		return "", fmt.Errorf("%w (error: %v)", ErrCreatePath, err)
 	}

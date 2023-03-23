@@ -13,8 +13,9 @@ import (
 // Tracer is the generic interface for all things that can perform a traceroute.
 type Tracer interface {
 	Trace(remoteIP, uuid string, t time.Time) ([]byte, error)
-	CachedTrace(uuid string, t time.Time, cachedTrace []byte) ([]byte, error)
+	CachedTrace(uuid string, t time.Time, cachedTrace []byte) error
 	DontTrace()
+	AnotherTracertool() bool
 }
 
 // Config contains configuration parameters of an IP cache.
@@ -88,9 +89,6 @@ func New(ctx context.Context, tracetool Tracer, ipcCfg Config) (*IPCache, error)
 // the remote IP exists or not. If a traceroute exists, it will be used.
 // Otherwise, it calls the tracetool to run a new traceroute.
 func (ic *IPCache) FetchTrace(remoteIP, uuid string) ([]byte, error) {
-	if uuid == "" {
-		return nil, fmt.Errorf("empty uuid")
-	}
 	cachedTrace, existed := ic.getEntry(remoteIP)
 	if existed {
 		<-cachedTrace.dataReady
@@ -98,12 +96,18 @@ func (ic *IPCache) FetchTrace(remoteIP, uuid string) ([]byte, error) {
 			ic.tracetool.DontTrace()
 			return nil, cachedTrace.err
 		}
-		data, err := ic.tracetool.CachedTrace(uuid, time.Now(), cachedTrace.data)
-		return data, err
+		_ = ic.tracetool.CachedTrace(uuid, time.Now(), cachedTrace.data)
+		return cachedTrace.data, nil
 	}
 	cachedTrace.data, cachedTrace.err = ic.tracetool.Trace(remoteIP, uuid, cachedTrace.timeStamp)
 	close(cachedTrace.dataReady)
 	return cachedTrace.data, cachedTrace.err
+}
+
+// AnotherTracer returns true or false dependingon whether
+// another tracer tool is configured or not.
+func (ic *IPCache) AnotherTracertool() bool {
+	return ic.tracetool.AnotherTracertool()
 }
 
 // getEntry returns the entry in the IP cache corresponding to the given
