@@ -18,8 +18,8 @@ RUN apt-get update && \
 # Build and install scamper.
 RUN mkdir /scamper-src
 ADD ./third_party/scamper/ /scamper-src
-RUN tar xvzf  /scamper-src/scamper-cvs-20211026.tar.gz -C /scamper-src/
-WORKDIR /scamper-src/scamper-cvs-20211026/
+RUN tar xvzf  /scamper-src/scamper-cvs-20230302.tar.gz -C /scamper-src/
+WORKDIR /scamper-src/scamper-cvs-20230302/
 RUN chmod +x ./configure && \
     ./configure --prefix=/scamper && \
     make -j 8 &&  \
