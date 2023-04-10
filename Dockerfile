@@ -28,7 +28,7 @@ RUN chmod +x ./configure && \
 # Create an image for traceroute-caller and the tools that it calls.
 FROM ubuntu:22.04
 RUN apt-get update && \
-    apt-get install -y python3-pip tini && \
+    apt-get install -y libcap2-bin python3-pip tini && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 # Create /var/empty to avoid a race condition in scamper that results
@@ -40,6 +40,15 @@ RUN mkdir -p /var/empty && \
 COPY --from=build_caller /go/bin/traceroute-caller /
 # Copy the dynamically-linked scamper binary and its associated libraries.
 COPY --from=build_tracers /scamper /usr/local
+
+# Give the scamper binary all the needed capabilities so that the container
+# processes can run as non-root.
+#   DAC_OVERRIDE: Could not connect to "/var/local/tcpinfoeventsocket/tcpevents.sock" (error: dial unix /var/local/tcpinfoeventsocket/tcpevents.sock: connect: permission denied)
+#   SYS_CHROOT: scamper_privsep_init: could not chroot to /var/empty: Operation not permitted
+#   NET_RAW: to be able to talk ICMP
+#   SETGID: scamper_privsep_init: could not setgroups: Operation not permitted
+#   SETUID: scamper_privsep_init: could not setuid: Operation not permitted
+RUN setcap cap_dac_override,cap_net_raw,cap_setgid,cap_setuid,cap_sys_chroot=ep /usr/local/bin/scamper
 
 # Install fast-mda-traceroute from PyPI.
 # We build pycaracal from source to avoid pulling precompiled binaries.
