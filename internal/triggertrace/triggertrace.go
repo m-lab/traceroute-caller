@@ -282,6 +282,7 @@ func loadbalancerIPs(localIPs []*net.IP) ([]*net.IP, error) {
 		}
 		ip := net.ParseIP(string(ipData))
 		localIPs = append(localIPs, &ip)
+		log.Printf("added load balancer IP %s to localIPs\n", ipData)
 	}
 
 	return localIPs, nil
