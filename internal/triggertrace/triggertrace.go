@@ -6,9 +6,11 @@ package triggertrace
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"net"
+	"os"
 	"sync"
 	"time"
 
@@ -226,6 +228,7 @@ func localIPs() ([]*net.IP, error) {
 	if err != nil {
 		return localIPs, err
 	}
+
 	for _, addr := range addrs {
 		var ip net.IP
 		switch a := addr.(type) {
@@ -240,5 +243,46 @@ func localIPs() ([]*net.IP, error) {
 			localIPs = append(localIPs, &ip)
 		}
 	}
+
+	localIPs, err = loadbalancerIPs(localIPs)
+	if err != nil {
+		return localIPs, err
+	}
+
+	return localIPs, nil
+}
+
+// loadbalancerIPs returns the public IP addresses, if any, of a load balancer
+// that may sit in front of the machine. Not all machines site in front of a
+// load balancer, so this function may return the the same []net.IP that was
+// passed to it. This function is necessary because traceroute-caller needs to
+// recognize the load balancer IPs as "local", else it will fail to identify a
+// proper destination, and will exit with an error, producing no traceroute data.
+func loadbalancerIPs(localIPs []*net.IP) ([]*net.IP, error) {
+	// While every machine _should_ have a /metadata/loadbalanced file, for now
+	// consider its non-existence to mean that the machine is not load balanced.
+	if _, err := os.Stat("/metadata/loadbalanced"); errors.Is(err, os.ErrNotExist) {
+		return localIPs, nil
+	}
+
+	lb, err := os.ReadFile("/metadata/loadbalanced")
+	if err != nil {
+		return localIPs, fmt.Errorf("unable to read file /metadata/loadbalanced: %v", err)
+	}
+
+	// If the machine isn't load balanced, then just return localIps unmodified.
+	if string(lb) == "false" {
+		return localIPs, nil
+	}
+
+	for _, f := range []string{"external-ip", "external-ipv6"} {
+		ipData, err := os.ReadFile("/metadata/" + f)
+		if err != nil {
+			return localIPs, fmt.Errorf("unable to read file /metadata/%s: %v", f, err)
+		}
+		ip := net.ParseIP(string(ipData))
+		localIPs = append(localIPs, &ip)
+	}
+
 	return localIPs, nil
 }
