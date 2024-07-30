@@ -118,7 +118,7 @@ func (h *Handler) Open(ctx context.Context, timestamp time.Time, uuid string, so
 	defer h.DestinationsLock.Unlock()
 	destination, err := h.findDestination(sockID)
 	if err != nil {
-		log.Printf("context %p: failed to find destination from SockID %+v\n", ctx, *sockID)
+		log.Printf("context %p: failed to find destination from SockID %+v: %v\n", ctx, *sockID, err)
 		return
 	}
 	h.Destinations[uuid] = destination
