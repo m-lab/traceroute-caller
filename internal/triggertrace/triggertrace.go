@@ -11,6 +11,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -254,11 +255,13 @@ func localIPs() ([]*net.IP, error) {
 
 // loadbalancerIPs returns the public IP addresses, if any, of a load balancer
 // that may sit in front of the machine. Not all machines site in front of a
-// load balancer, so this function may return the the same []net.IP that was
+// load balancer, so this function may return the the same []*net.IP that was
 // passed to it. This function is necessary because traceroute-caller needs to
 // recognize the load balancer IPs as "local", else it will fail to identify a
 // proper destination, and will exit with an error, producing no traceroute data.
 func loadbalancerIPs(localIPs []*net.IP) ([]*net.IP, error) {
+	var ip net.IP
+
 	// While every machine _should_ have a /metadata/loadbalanced file, for now
 	// consider its non-existence to mean that the machine is not load balanced.
 	if _, err := os.Stat("/metadata/loadbalanced"); errors.Is(err, os.ErrNotExist) {
@@ -280,9 +283,20 @@ func loadbalancerIPs(localIPs []*net.IP) ([]*net.IP, error) {
 		if err != nil {
 			return localIPs, fmt.Errorf("unable to read file /metadata/%s: %v", f, err)
 		}
-		ip := net.ParseIP(string(ipData))
+		ipString := string(ipData)
+
+		// GCE metadata for key "forwarded-ipv6s" will usually be returned in
+		// CIDR format.
+		if strings.Contains(ipString, "/") {
+			ip, _, _ = net.ParseCIDR(ipString)
+		} else {
+			ip = net.ParseIP(ipString)
+		}
+		if ip == nil {
+			return localIPs, fmt.Errorf("failed to parse IP: %s", ipString)
+		}
 		localIPs = append(localIPs, &ip)
-		log.Printf("added load balancer IP %s to localIPs\n", ipData)
+		log.Printf("added load balancer IP %s to localIPs\n", ip.String())
 	}
 
 	return localIPs, nil
