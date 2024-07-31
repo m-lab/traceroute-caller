@@ -124,6 +124,7 @@ func TestNewHandler(t *testing.T) {
 	os.WriteFile(metadataDir+"/loadbalanced", []byte("true"), 0644)
 	os.WriteFile(metadataDir+"/external-ip", []byte(strV4), 0644)
 	os.WriteFile(metadataDir+"/external-ipv6", []byte(strV6), 0644)
+	defer os.RemoveAll(metadataDir)
 
 	netInterfaceAddrs = fakeInterfaceAddrs
 	handler, err := newHandler(t, &fakeTracer{})
@@ -138,28 +139,28 @@ func TestNewHandler(t *testing.T) {
 
 	ok := false
 	for _, v := range handler.LocalIPs {
-		if v.String() == ipv4.String() {
+		if v.Equal(ipv4) {
 			ok = true
 			break
 		}
 	}
 	if !ok {
-		t.Fatal("NewHandler(): LocalIPs does not contain loadbalancer IP 77.77.88.88")
+		t.Fatalf("NewHandler(): h.LocalIPs does not contain loadbalancer IP %s", strV4)
 	}
 
 	ok = false
 	for _, v := range handler.LocalIPs {
-		if v.String() == ipv6.String() {
+		if v.Equal(ipv6) {
 			ok = true
 			break
 		}
 	}
 	if !ok {
-		t.Fatal("NewHandler(): LocalIPs does not contain loadbalancer IP 7777.77.888.88::")
+		t.Fatalf("NewHandler(): h.LocalIPs does not contain loadbalancer IP %s", strV6)
 	}
 
 	// Setting loadbalanced=false should result in the original addrCount to
-	// stay the same, since no loadbalancer IPs should be added to LocalIPs.
+	// stay the same, since loadbalancerIPs() should return localIPs unmodified.
 	os.WriteFile(metadataDir+"/loadbalanced", []byte("false"), 0644)
 	handler, _ = newHandler(t, &fakeTracer{})
 	if len(handler.LocalIPs) > addrCount {
@@ -167,8 +168,8 @@ func TestNewHandler(t *testing.T) {
 	}
 
 	// If the metadata file loadbalanced doesn't exist then the original
-	// addrCount should stay the same, since no loadbalancer IPs should be added
-	// to LocalIPs.
+	// addrCount should stay the same, since loadbalancerIPs() should return
+	// localIPs unmodified.
 	os.Remove(metadataDir + "/loadbalanced")
 	handler, _ = newHandler(t, &fakeTracer{})
 	if len(handler.LocalIPs) > addrCount {
@@ -419,7 +420,7 @@ func TestAnonymize(t *testing.T) {
 				t.Fatalf("NewHandler() = %v, want nil", err)
 			}
 			l := net.ParseIP(tt.input.Tracelb.Src)
-			h.LocalIPs = []*net.IP{&l}
+			h.LocalIPs = []net.IP{l}
 			h.done = make(chan struct{})
 			sockID := &inetdiag.SockID{SrcIP: tt.input.Tracelb.Src, DstIP: tt.input.Tracelb.Dst}
 			h.Open(context.TODO(), time.Now(), tt.name, sockID)

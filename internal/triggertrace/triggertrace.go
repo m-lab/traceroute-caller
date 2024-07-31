@@ -65,7 +65,7 @@ type TracerWriter interface {
 type Handler struct {
 	Destinations     map[string]Destination // key is UUID
 	DestinationsLock sync.Mutex
-	LocalIPs         []*net.IP
+	LocalIPs         []net.IP
 	IPCache          FetchTracer
 	Parser           ParseTracer
 	HopAnnotator     AnnotateAndArchiver
@@ -224,8 +224,8 @@ func (h *Handler) findDestination(sockid *inetdiag.SockID) (Destination, error) 
 }
 
 // localIPs returns the list of system's unicast interface addresses.
-func localIPs(metadataDir string) ([]*net.IP, error) {
-	localIPs := make([]*net.IP, 0)
+func localIPs(metadataDir string) ([]net.IP, error) {
+	localIPs := make([]net.IP, 0)
 	addrs, err := netInterfaceAddrs()
 	if err != nil {
 		return localIPs, err
@@ -242,7 +242,7 @@ func localIPs(metadataDir string) ([]*net.IP, error) {
 			return localIPs, fmt.Errorf("unknown address type %q", addr.String())
 		}
 		if ip != nil {
-			localIPs = append(localIPs, &ip)
+			localIPs = append(localIPs, ip)
 		}
 	}
 
@@ -260,7 +260,8 @@ func localIPs(metadataDir string) ([]*net.IP, error) {
 // passed to it. This function is necessary because traceroute-caller needs to
 // recognize the load balancer IPs as "local", else it will fail to identify a
 // proper destination, and will exit with an error, producing no traceroute data.
-func loadbalancerIPs(localIPs []*net.IP, metadataDir string) ([]*net.IP, error) {
+func loadbalancerIPs(localIPs []net.IP, metadataDir string) ([]net.IP, error) {
+	var ip net.IP
 
 	// While every machine _should_ have a /metadata/loadbalanced file, for now
 	// consider its non-existence to mean that the machine is not load balanced.
@@ -279,8 +280,6 @@ func loadbalancerIPs(localIPs []*net.IP, metadataDir string) ([]*net.IP, error) 
 	}
 
 	for _, f := range []string{"external-ip", "external-ipv6"} {
-		var ip net.IP
-
 		ipBytes, err := os.ReadFile(metadataDir + "/" + f)
 		if err != nil {
 			return localIPs, fmt.Errorf("unable to read file %s/%s: %v", metadataDir, f, err)
@@ -296,7 +295,7 @@ func loadbalancerIPs(localIPs []*net.IP, metadataDir string) ([]*net.IP, error) 
 		if ip == nil {
 			return localIPs, fmt.Errorf("failed to parse IP: %s", ipString)
 		}
-		localIPs = append(localIPs, &ip)
+		localIPs = append(localIPs, ip)
 		log.Printf("added load balancer IP %s to localIPs\n", ip.String())
 	}
 
