@@ -1,6 +1,6 @@
 module github.com/m-lab/traceroute-caller
 
-go 1.20
+go 1.21
 
 require (
 	github.com/go-test/deep v1.0.7
