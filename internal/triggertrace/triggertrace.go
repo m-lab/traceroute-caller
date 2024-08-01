@@ -6,9 +6,12 @@ package triggertrace
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"net"
+	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -23,6 +26,7 @@ import (
 var (
 	// Variables to aid in black-box testing.
 	netInterfaceAddrs = net.InterfaceAddrs
+	metadataDir       = "/metadata"
 )
 
 // Destination is the host to run a traceroute to.
@@ -61,7 +65,7 @@ type TracerWriter interface {
 type Handler struct {
 	Destinations     map[string]Destination // key is UUID
 	DestinationsLock sync.Mutex
-	LocalIPs         []*net.IP
+	LocalIPs         []net.IP
 	IPCache          FetchTracer
 	Parser           ParseTracer
 	HopAnnotator     AnnotateAndArchiver
@@ -76,7 +80,7 @@ func NewHandler(ctx context.Context, tracetool TracerWriter, ipcCfg ipcache.Conf
 	if err != nil {
 		return nil, err
 	}
-	myIPs, err := localIPs()
+	myIPs, err := localIPs(metadataDir)
 	if err != nil {
 		return nil, err
 	}
@@ -115,7 +119,7 @@ func (h *Handler) Open(ctx context.Context, timestamp time.Time, uuid string, so
 	defer h.DestinationsLock.Unlock()
 	destination, err := h.findDestination(sockID)
 	if err != nil {
-		log.Printf("context %p: failed to find destination from SockID %+v\n", ctx, *sockID)
+		log.Printf("context %p: failed to find destination from SockID %+v: %v\n", ctx, *sockID, err)
 		return
 	}
 	h.Destinations[uuid] = destination
@@ -220,12 +224,13 @@ func (h *Handler) findDestination(sockid *inetdiag.SockID) (Destination, error) 
 }
 
 // localIPs returns the list of system's unicast interface addresses.
-func localIPs() ([]*net.IP, error) {
-	localIPs := make([]*net.IP, 0)
+func localIPs(metadataDir string) ([]net.IP, error) {
+	localIPs := make([]net.IP, 0)
 	addrs, err := netInterfaceAddrs()
 	if err != nil {
 		return localIPs, err
 	}
+
 	for _, addr := range addrs {
 		var ip net.IP
 		switch a := addr.(type) {
@@ -237,8 +242,62 @@ func localIPs() ([]*net.IP, error) {
 			return localIPs, fmt.Errorf("unknown address type %q", addr.String())
 		}
 		if ip != nil {
-			localIPs = append(localIPs, &ip)
+			localIPs = append(localIPs, ip)
 		}
 	}
+
+	localIPs, err = loadbalancerIPs(localIPs, metadataDir)
+	if err != nil {
+		return localIPs, err
+	}
+
+	return localIPs, nil
+}
+
+// loadbalancerIPs returns the public IP addresses, if any, of a load balancer
+// that may sit in front of the machine. Not all machines site in front of a
+// load balancer, so this function may return the the same []*net.IP that was
+// passed to it. This function is necessary because traceroute-caller needs to
+// recognize the load balancer IPs as "local", else it will fail to identify a
+// proper destination, and will exit with an error, producing no traceroute data.
+func loadbalancerIPs(localIPs []net.IP, metadataDir string) ([]net.IP, error) {
+	var ip net.IP
+
+	// While every machine _should_ have a /metadata/loadbalanced file, for now
+	// consider its non-existence to mean that the machine is not load balanced.
+	if _, err := os.Stat(metadataDir + "/loadbalanced"); errors.Is(err, os.ErrNotExist) {
+		return localIPs, nil
+	}
+
+	lb, err := os.ReadFile(metadataDir + "/loadbalanced")
+	if err != nil {
+		return localIPs, fmt.Errorf("unable to read file %s/loadbalanced: %v", metadataDir, err)
+	}
+
+	// If the machine isn't load balanced, then just return localIPs unmodified.
+	if string(lb) == "false" {
+		return localIPs, nil
+	}
+
+	for _, f := range []string{"external-ip", "external-ipv6"} {
+		ipBytes, err := os.ReadFile(metadataDir + "/" + f)
+		if err != nil {
+			return localIPs, fmt.Errorf("unable to read file %s/%s: %v", metadataDir, f, err)
+		}
+		ipString := string(ipBytes)
+
+		// GCE metadata for key "forwarded-ipv6s" is returned in CIDR format.
+		if strings.Contains(ipString, "/") {
+			ip, _, _ = net.ParseCIDR(ipString)
+		} else {
+			ip = net.ParseIP(ipString)
+		}
+		if ip == nil {
+			return localIPs, fmt.Errorf("failed to parse IP: %s", ipString)
+		}
+		localIPs = append(localIPs, ip)
+		log.Printf("added load balancer IP %s to localIPs\n", ip.String())
+	}
+
 	return localIPs, nil
 }

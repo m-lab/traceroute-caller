@@ -106,6 +106,11 @@ func (fa *fakeAnnotator) Annotate(ctx context.Context, ips []string) (map[string
 }
 
 func TestNewHandler(t *testing.T) {
+	var strV4 string = "77.77.88.88"
+	var strV6 string = "7777:77:888:88::"
+
+	metadataDir = "./testdata/metadata"
+
 	saveNetInterfaceAddrs := netInterfaceAddrs
 	defer func() { netInterfaceAddrs = saveNetInterfaceAddrs }()
 
@@ -114,10 +119,63 @@ func TestNewHandler(t *testing.T) {
 		t.Fatalf("NewHandler() = nil, want error")
 	}
 
+	// Set up metadata files
+	os.MkdirAll(metadataDir, 0755)
+	os.WriteFile(metadataDir+"/loadbalanced", []byte("true"), 0644)
+	os.WriteFile(metadataDir+"/external-ip", []byte(strV4), 0644)
+	os.WriteFile(metadataDir+"/external-ipv6", []byte(strV6), 0644)
+	defer os.RemoveAll(metadataDir)
+
 	netInterfaceAddrs = fakeInterfaceAddrs
-	if _, err := newHandler(t, &fakeTracer{}); err != nil {
+	handler, err := newHandler(t, &fakeTracer{})
+	addrCount := len(handler.LocalIPs)
+
+	if err != nil {
 		t.Fatalf("NewHandler() = %v, want nil", err)
 	}
+
+	var ipv4 net.IP = net.ParseIP(strV4)
+	var ipv6 net.IP = net.ParseIP(strV6)
+
+	ok := false
+	for _, v := range handler.LocalIPs {
+		if v.Equal(ipv4) {
+			ok = true
+			break
+		}
+	}
+	if !ok {
+		t.Fatalf("NewHandler(): h.LocalIPs does not contain loadbalancer IP %s", strV4)
+	}
+
+	ok = false
+	for _, v := range handler.LocalIPs {
+		if v.Equal(ipv6) {
+			ok = true
+			break
+		}
+	}
+	if !ok {
+		t.Fatalf("NewHandler(): h.LocalIPs does not contain loadbalancer IP %s", strV6)
+	}
+
+	// Setting loadbalanced=false should result in the original addrCount to
+	// stay the same, since loadbalancerIPs() should return localIPs unmodified.
+	os.WriteFile(metadataDir+"/loadbalanced", []byte("false"), 0644)
+	handler, _ = newHandler(t, &fakeTracer{})
+	if len(handler.LocalIPs) > addrCount {
+		t.Fatalf("NewHandler(): LocalIPs has %d addresses, but should have %d", len(handler.LocalIPs), addrCount)
+	}
+
+	// If the metadata file loadbalanced doesn't exist then the original
+	// addrCount should stay the same, since loadbalancerIPs() should return
+	// localIPs unmodified.
+	os.Remove(metadataDir + "/loadbalanced")
+	handler, _ = newHandler(t, &fakeTracer{})
+	if len(handler.LocalIPs) > addrCount {
+		t.Fatalf("NewHandler(): LocalIPs has %d addresses, but should have %d", len(handler.LocalIPs), addrCount)
+	}
+
 }
 
 func TestOpen(t *testing.T) {
@@ -362,7 +420,7 @@ func TestAnonymize(t *testing.T) {
 				t.Fatalf("NewHandler() = %v, want nil", err)
 			}
 			l := net.ParseIP(tt.input.Tracelb.Src)
-			h.LocalIPs = []*net.IP{&l}
+			h.LocalIPs = []net.IP{l}
 			h.done = make(chan struct{})
 			sockID := &inetdiag.SockID{SrcIP: tt.input.Tracelb.Src, DstIP: tt.input.Tracelb.Dst}
 			h.Open(context.TODO(), time.Now(), tt.name, sockID)
