@@ -33,6 +33,10 @@ var (
 		Options: []string{"mda", "regular"},
 		Value:   "mda",
 	}
+	outputFormat = flagx.Enum{
+		Options: []string{"jsonl", "json"},
+		Value:   "jsonl",
+	}
 	scamperTracelbPTR   = flag.Bool("scamper.tracelb-ptr", true, "mda traceroute option: Look up DNS pointer records for IP addresses.")
 	scamperTracelbW     = flag.Int("scamper.tracelb-W", 25, "mda traceroute option: Wait time in 1/100ths of seconds between probes (min 15, max 200).")
 	tracerouteOutput    = flag.String("traceroute-output", "/var/spool/scamper1", "The path to store traceroute output.")
@@ -52,6 +56,7 @@ var (
 
 func init() {
 	flag.Var(&scamperTraceType, "scamper.trace-type", "Specify the type of traceroute (mda or regular) to run.")
+	flag.Var(&outputFormat, "output.format", "Specify the output format of traces (jsonl or json).")
 }
 
 func main() {
@@ -103,7 +108,7 @@ func main() {
 		ScanPeriod:   *ipcScanPeriod,
 	}
 	// 3. The traceroute parser.
-	newParser, err := parser.New(scamperTraceType.Value)
+	newParser, err := parser.New(scamperTraceType.Value, outputFormat.Value)
 	if err != nil {
 		logFatal(err)
 	}
