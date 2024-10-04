@@ -9,14 +9,19 @@ import (
 	"path/filepath"
 	"sort"
 
+	"github.com/m-lab/go/flagx"
 	"github.com/m-lab/traceroute-caller/parser"
 )
 
 var (
-	prComplete = flag.Bool("c", false, "print flow IDs and file names of traceroutes that completed (\"--\" for incomplete traceroutes)")
-	duration   = flag.Uint("d", 0, "print times and file names of traceroutes that took more than the specified duration")
-	verbose    = flag.Bool("v", false, "enable verbose mode (mostly for debugging)")
-	flagSet    = make(map[string]bool)
+	prComplete  = flag.Bool("c", false, "print flow IDs and file names of traceroutes that completed (\"--\" for incomplete traceroutes)")
+	duration    = flag.Uint("d", 0, "print times and file names of traceroutes that took more than the specified duration")
+	verbose     = flag.Bool("v", false, "enable verbose mode (mostly for debugging)")
+	flagSet     = make(map[string]bool)
+	inputFormat = flagx.Enum{
+		Options: []string{"jsonl", "json"},
+		Value:   "jsonl",
+	}
 
 	// Statistics printed before exiting.
 	nFilesFound   uint32 // files found
@@ -30,6 +35,10 @@ var (
 	maxDuration   uint32 // maximum traceroute duration
 	totDuration   uint64 // total duration of all traceroutes
 )
+
+func init() {
+	flag.Var(&inputFormat, "input.format", "Specify the input format of traces (jsonl or json).")
+}
 
 // Hop defines a hop.
 type Hop struct {
@@ -145,7 +154,7 @@ func parseFile(fileName string) *parser.Scamper1 {
 		nReadErrors++
 		return nil
 	}
-	mdaParser, err := parser.New("mda")
+	mdaParser, err := parser.New("mda", inputFormat.Value)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 		return nil
