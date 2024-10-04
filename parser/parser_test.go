@@ -21,7 +21,7 @@ func TestNew(t *testing.T) {
 		{"bad", ErrTracerouteType},
 	}
 	for _, test := range tests {
-		_, gotErr := New(test.traceType)
+		_, gotErr := New(test.traceType, "jsonl")
 		if badErr(gotErr, test.wantErr) {
 			t.Fatalf("New() = %v, want %v", gotErr, test.wantErr)
 		}

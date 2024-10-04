@@ -100,6 +100,12 @@ type TracelbLine struct {
 }
 
 type scamper1Parser struct {
+	format string
+}
+
+// Format returns the desired output format for this parser.
+func (s1 *scamper1Parser) Format() string {
+	return s1.format
 }
 
 // ParseRawData parses scamper's MDA traceroute in JSONL format.
@@ -209,6 +215,17 @@ func (s1 *Scamper1) Anonymize(anon anonymize.IPAnonymizer) {
 	}
 }
 
+// Marshal encodes the scamper object based on the given format.
+func (s1 Scamper1) Marshal(format string) []byte {
+	switch format {
+	case "jsonl":
+		return s1.MarshalJSONL()
+	case "json":
+		return s1.MarshalJSON()
+	}
+	panic("unsupported marshal format: " + format)
+}
+
 // MarshalJSONL encodes the scamper object as JSONL.
 func (s1 Scamper1) MarshalJSONL() []byte {
 	buff := &bytes.Buffer{}
@@ -217,5 +234,13 @@ func (s1 Scamper1) MarshalJSONL() []byte {
 	enc.Encode(s1.CycleStart)
 	enc.Encode(s1.Tracelb)
 	enc.Encode(s1.CycleStop)
+	return buff.Bytes()
+}
+
+// MarshalJSON encodes the scamper object as autoloadable JSON.
+func (s1 Scamper1) MarshalJSON() []byte {
+	buff := &bytes.Buffer{}
+	enc := json.NewEncoder(buff)
+	enc.Encode(s1)
 	return buff.Bytes()
 }
