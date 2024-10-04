@@ -235,8 +235,8 @@ func (s1 Scamper1) MarshalJSONL() []byte {
 	return buff.Bytes()
 }
 
-// MarshalJSON encodes the scamper object as autoloadable JSON.
-func (s1 Scamper1) MarshalJSON() ([]byte, error) {
+// MarshalAsJSON encodes the scamper object as autoloadable JSON.
+func (s1 Scamper1) MarshalAsJSON() ([]byte, error) {
 	buff := &bytes.Buffer{}
 	enc := json.NewEncoder(buff)
 	// TODO(soltesz): translate the Scamper1 struct into a format that can be imported into BigQuery.

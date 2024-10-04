@@ -168,7 +168,7 @@ func (s2 Scamper2) Marshal(format string) ([]byte, error) {
 	case "jsonl":
 		return s2.MarshalJSONL(), nil
 	case "json":
-		return s2.MarshalJSON()
+		return s2.MarshalAsJSON()
 	}
 	panic("unsupported marshal format: " + format)
 }
@@ -184,8 +184,8 @@ func (s2 Scamper2) MarshalJSONL() []byte {
 	return buff.Bytes()
 }
 
-// MarshalJSON encodes the scamper object as JSONL.
-func (s2 Scamper2) MarshalJSON() ([]byte, error) {
+// MarshalAsJSON encodes the scamper object as JSONL.
+func (s2 Scamper2) MarshalAsJSON() ([]byte, error) {
 	buff := &bytes.Buffer{}
 	enc := json.NewEncoder(buff)
 	err := enc.Encode(s2)
