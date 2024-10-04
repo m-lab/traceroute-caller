@@ -25,6 +25,8 @@ func init() {
 func main() {
 	flag.Parse()
 	// TODO(soltesz): parser.Schema1 does not natively support BigQuery schema inference.
+
+	// Generate and save hopannotation1 schema for autoloading.
 	hop1 := hopannotation.HopAnnotation1{}
 	sch, err := bigquery.InferSchema(hop1)
 	rtx.Must(err, "failed to generate scamper2 schema")
