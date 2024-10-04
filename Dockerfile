@@ -9,8 +9,8 @@ RUN go get -v . && \
     go install -v -ldflags "-X github.com/m-lab/go/prometheusx.GitShortCommit=$(git log -1 --format=%h)" . && \
     chmod -R a+rx /go/bin/traceroute-caller
 
-RUN go install -v ./cmd/generate-schema && \
-    chmod -R a+rx /go/bin/generate-schema
+RUN go install -v ./cmd/generate-schemas && \
+    chmod -R a+rx /go/bin/generate-schemas
 
 # Build and install the tools that are called by traceroute-caller.
 FROM ubuntu:22.04 as build_tracers
@@ -41,7 +41,7 @@ RUN mkdir -p /var/empty && \
     chmod 555 /var/empty
 # Copy the statically-linked traceroute-caller binary.
 COPY --from=build_caller /go/bin/traceroute-caller /
-COPY --from=build_caller /go/bin/generate-schema /
+COPY --from=build_caller /go/bin/generate-schemas /
 # Copy the dynamically-linked scamper binary and its associated libraries.
 COPY --from=build_tracers /scamper /usr/local
 
