@@ -286,7 +286,7 @@ func newHandler(t *testing.T, tracer TracerWriter) (*Handler, error) {
 		AnnotatorClient: annotator,
 		OutputPath:      path.Join(t.TempDir(), "annotation1"),
 	}
-	newParser, err := parser.New("mda")
+	newParser, err := parser.New("mda", "jsonl")
 	if err != nil {
 		return nil, err
 	}
@@ -369,7 +369,7 @@ func (st *staticTracer) Trace(remoteIP, uuid string, t time.Time) ([]byte, error
 }
 
 func (st *staticTracer) WriteFile(uuid string, t time.Time, data []byte) error {
-	p, err := parser.New("mda")
+	p, err := parser.New("mda", "jsonl")
 	if err != nil {
 		return err
 	}
