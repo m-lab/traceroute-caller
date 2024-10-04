@@ -54,7 +54,7 @@ type ParsedData interface {
 	StartTime() time.Time
 	ExtractHops() []string
 	MarshalJSONL() []byte
-	Marshal(format string) []byte
+	Marshal(format string) ([]byte, error)
 	Anonymize(anon anonymize.IPAnonymizer)
 }
 
