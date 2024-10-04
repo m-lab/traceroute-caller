@@ -308,7 +308,7 @@ func TestCreateMetaline(t *testing.T) {
 }
 
 func TestGenerateFilename(t *testing.T) {
-	_, err := generateFilename("/var/empty", "0000", time.Now())
+	_, err := generateFilename("/var/empty", "0000", "jsonl", time.Now())
 	wantErrStr := "failed to create output directory"
 	if err == nil || !strings.Contains(err.Error(), wantErrStr) {
 		t.Errorf("generateFilename() = %v, want %v", err, wantErrStr)
