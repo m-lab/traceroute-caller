@@ -54,7 +54,7 @@ type ScamperNode struct {
 	Name  string          `json:"name" bigquery:"name"`
 	QTTL  int             `json:"q_ttl" bigquery:"q_ttl"`
 	Linkc int64           `json:"linkc" bigquery:"linkc"`
-	Links [][]ScamperLink `json:"links" bigquery:"links"`
+	Links [][]ScamperLink `json:"links" bigquery:"-"`
 }
 
 // Scamper1 encapsulates the four lines of a traceroute:
@@ -220,8 +220,6 @@ func (s1 Scamper1) Marshal(format string) ([]byte, error) {
 	switch format {
 	case "jsonl":
 		return s1.MarshalJSONL(), nil
-	case "json":
-		return s1.MarshalJSON()
 	}
 	panic("unsupported marshal format: " + format)
 }
@@ -241,6 +239,7 @@ func (s1 Scamper1) MarshalJSONL() []byte {
 func (s1 Scamper1) MarshalJSON() ([]byte, error) {
 	buff := &bytes.Buffer{}
 	enc := json.NewEncoder(buff)
+	// TODO(soltesz): translate the Scamper1 struct into a format that can be imported into BigQuery.
 	err := enc.Encode(s1)
 	return buff.Bytes(), err
 }
