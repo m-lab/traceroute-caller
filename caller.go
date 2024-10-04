@@ -89,6 +89,7 @@ func main() {
 		OutputPath: *tracerouteOutput,
 		Timeout:    *scamperTimeout,
 		TraceType:  scamperTraceType.Value,
+		Extension:  outputFormat.Value,
 	}
 	if scamperCfg.TraceType == "mda" {
 		scamperCfg.TracelbPTR = *scamperTracelbPTR
