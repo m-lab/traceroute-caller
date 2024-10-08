@@ -24,9 +24,11 @@ type ScamperConfig struct {
 	OutputPath       string
 	Timeout          time.Duration
 	TraceType        string
-	TracelbPTR       bool
-	TracelbWaitProbe int
+	TracePTR         bool
+	TraceWaitProbe   int
 	Extension        string
+	TracelbPTR       bool // Deprecated. Use TracePTR instead.
+	TracelbWaitProbe int  // Deprecated. Use TraceWaitProbe instead.
 }
 
 // Scamper invokes an instance of the scamper tool for each traceroute.
@@ -63,17 +65,18 @@ func NewScamper(cfg ScamperConfig) (*Scamper, error) {
 	var traceCmd string
 	switch cfg.TraceType {
 	case "mda":
-		if cfg.TracelbWaitProbe < 15 || cfg.TracelbWaitProbe > 200 {
-			return nil, fmt.Errorf("%d: invalid tracelb wait probe value", cfg.TracelbWaitProbe)
-		}
-		traceCmd = "tracelb -P icmp-echo -q 3 -W " + strconv.Itoa(cfg.TracelbWaitProbe)
-		if cfg.TracelbPTR {
-			traceCmd += " -O ptr"
-		}
+		traceCmd = "tracelb -P icmp-echo -q 3"
 	case "regular":
-		traceCmd = "trace -P icmp-paris"
+		traceCmd = "trace -P icmp-paris -q 3"
 	default:
 		return nil, fmt.Errorf("%s: invalid traceroute type", cfg.TraceType)
+	}
+	if cfg.TraceWaitProbe < 15 || cfg.TraceWaitProbe > 200 {
+		return nil, fmt.Errorf("%d: invalid tracelb wait probe value", cfg.TraceWaitProbe)
+	}
+	traceCmd += " -W " + strconv.Itoa(cfg.TraceWaitProbe)
+	if cfg.TracePTR {
+		traceCmd += " -O ptr"
 	}
 	ext := cfg.Extension
 	if ext == "" {
@@ -167,6 +170,7 @@ func runCmd(ctx context.Context, label string, cmd []string) ([]byte, error) {
 	deadline, _ := ctx.Deadline()
 	timeout := time.Until(deadline)
 
+	fmt.Println(cmd)
 	c := exec.CommandContext(ctx, cmd[0], cmd[1:]...)
 	var outb, errb bytes.Buffer
 	c.Stdout = &outb
