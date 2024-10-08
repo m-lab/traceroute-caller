@@ -37,8 +37,8 @@ var (
 		Options: []string{"jsonl", "json"},
 		Value:   "jsonl",
 	}
-	scamperTracelbPTR   = flag.Bool("scamper.tracelb-ptr", true, "mda traceroute option: Look up DNS pointer records for IP addresses.")
-	scamperTracelbW     = flag.Int("scamper.tracelb-W", 25, "mda traceroute option: Wait time in 1/100ths of seconds between probes (min 15, max 200).")
+	scamperTracePTR     = flag.Bool("scamper.ptr", true, "traceroute option: Look up DNS pointer records for IP addresses.")
+	scamperTraceWait    = flag.Int("scamper.waitprobe", 25, "traceroute option: Wait time in 1/100ths of seconds between probes (min 15, max 200).")
 	tracerouteOutput    = flag.String("traceroute-output", "/var/spool/scamper1", "The path to store traceroute output.")
 	hopAnnotationOutput = flag.String("hopannotation-output", "/var/spool/hopannotation1", "The path to store hop annotation output.")
 	// Keeping IP cache flags capitalized for backward compatibility.
@@ -85,15 +85,13 @@ func main() {
 
 	// 1. The traceroute tool (scamper).
 	scamperCfg := tracer.ScamperConfig{
-		Binary:     *scamperBin,
-		OutputPath: *tracerouteOutput,
-		Timeout:    *scamperTimeout,
-		TraceType:  scamperTraceType.Value,
-		Extension:  outputFormat.Value,
-	}
-	if scamperCfg.TraceType == "mda" {
-		scamperCfg.TracelbPTR = *scamperTracelbPTR
-		scamperCfg.TracelbWaitProbe = *scamperTracelbW
+		Binary:         *scamperBin,
+		OutputPath:     *tracerouteOutput,
+		Timeout:        *scamperTimeout,
+		TracePTR:       *scamperTracePTR,
+		TraceWaitProbe: *scamperTraceWait,
+		TraceType:      scamperTraceType.Value,
+		Extension:      outputFormat.Value,
 	}
 	scamper, err := tracer.NewScamper(scamperCfg)
 	if err != nil {
