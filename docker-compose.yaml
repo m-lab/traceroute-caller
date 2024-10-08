@@ -49,6 +49,8 @@ services:
       - -hostname=mlab1-lga0t.mlab-sandbox.measurement-lab.org
 
   trc-scamper1:
+    profiles:
+      - donotstart
     build:
       context: .
       dockerfile: Dockerfile
@@ -72,12 +74,12 @@ services:
       - -scamper.trace-type=mda
       - -traceroute-output=/local/scamper1
       - -scamper.timeout=30m
-      - -scamper.tracelb-W=15
-      - -scamper.tracelb-ptr=true
+      - -scamper.waitprobe=15
+      - -scamper.ptr=true
 
   trc-scamper2:
-    profiles:
-      - donotstart
+    #profiles:
+    #  - donotstart
     build:
       context: .
       dockerfile: Dockerfile
@@ -101,3 +103,6 @@ services:
       - -scamper.trace-type=regular
       - -traceroute-output=/local/scamper2
       - -scamper.timeout=10m
+      - -scamper.waitprobe=15
+      - -scamper.ptr=true
+      - -output.format=json
