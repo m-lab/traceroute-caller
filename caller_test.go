@@ -73,7 +73,7 @@ func TestMainFunc(t *testing.T) {
 	for _, arg := range []strFlag{
 		{"-scamper.bin", "/bin/echo"},
 		{"-scamper.trace-type", "mda"},
-		{"-scamper.tracelb-W", "15"},
+		{"-scamper.waitprobe", "15"},
 		{"-prometheusx.listen-address", ":0"},
 		{"-tcpinfo.eventsocket", sockPath},
 		{"-traceroute-output", testDir},
@@ -107,7 +107,7 @@ func TestMainEventSocket(t *testing.T) {
 	for _, arg := range []strFlag{
 		{"-scamper.bin", "/bin/echo"},
 		{"-scamper.trace-type", "mda"},
-		{"-scamper.tracelb-W", "15"},
+		{"-scamper.waitprobe", "15"},
 		{"-prometheusx.listen-address", ":0"},
 		{"-tcpinfo.eventsocket", ""}, // should cause failure
 		{"-traceroute-output", testDir},
@@ -133,7 +133,7 @@ func TestMainScamper(t *testing.T) {
 	ctx, cancel = context.WithCancel(context.Background())
 	for _, arg := range []strFlag{
 		{"-scamper.bin", "/bin/echo"},
-		{"-scamper.tracelb-W", "10"}, // should cause failure (15 <= valid <= 200)
+		{"-scamper.waitprobe", "10"}, // should cause failure (15 <= valid <= 200)
 		{"-prometheusx.listen-address", ":0"},
 		{"-tcpinfo.eventsocket", sockPath},
 		{"-traceroute-output", testDir},
@@ -160,7 +160,7 @@ func TestMainNewHandler(t *testing.T) {
 	for _, arg := range []strFlag{
 		{"-scamper.bin", "/bin/echo"},
 		{"-scamper.trace-type", "mda"},
-		{"-scamper.tracelb-W", "15"},
+		{"-scamper.waitprobe", "15"},
 		{"-prometheusx.listen-address", ":0"},
 		{"-tcpinfo.eventsocket", sockPath},
 		{"-traceroute-output", testDir},
