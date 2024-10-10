@@ -46,21 +46,23 @@ func TestNewScamper(t *testing.T) {
 		{"/bin/echo", "testdata", 900 * time.Second, "regular", 25, false, ""},
 	}
 	for _, test := range tests {
-		scamperCfg := ScamperConfig{
-			Binary:         test.binary,
-			OutputPath:     test.outputPath,
-			Timeout:        test.timeout,
-			TraceType:      test.traceType,
-			TraceWaitProbe: test.traceWaitProbe,
-		}
-		_, err := NewScamper(scamperCfg)
-		if err != nil {
-			if !test.shouldFail || !strings.Contains(err.Error(), test.want) {
-				t.Errorf("Validate() = %v, want %q", err, test.want)
+		t.Run(test.binary, func(t *testing.T) {
+			scamperCfg := ScamperConfig{
+				Binary:         test.binary,
+				OutputPath:     test.outputPath,
+				Timeout:        test.timeout,
+				TraceType:      test.traceType,
+				TraceWaitProbe: test.traceWaitProbe,
 			}
-		} else if test.shouldFail {
-			t.Errorf("Validate() = nil, want %s", test.want)
-		}
+			_, err := NewScamper(scamperCfg)
+			if err != nil {
+				if !test.shouldFail || !strings.Contains(err.Error(), test.want) {
+					t.Errorf("Validate() = %v, want %q", err, test.want)
+				}
+			} else if test.shouldFail {
+				t.Errorf("Validate() = nil, want %s", test.want)
+			}
+		})
 	}
 }
 
