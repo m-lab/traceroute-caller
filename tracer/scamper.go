@@ -170,7 +170,6 @@ func runCmd(ctx context.Context, label string, cmd []string) ([]byte, error) {
 	deadline, _ := ctx.Deadline()
 	timeout := time.Until(deadline)
 
-	fmt.Println(cmd)
 	c := exec.CommandContext(ctx, cmd[0], cmd[1:]...)
 	var outb, errb bytes.Buffer
 	c.Stdout = &outb
