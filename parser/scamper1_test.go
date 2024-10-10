@@ -50,7 +50,12 @@ func TestScamper1Parser(t *testing.T) {
 			}
 
 			// Extract start_time from the cycle-start line.
-			scamperOutput, gotErr := (&scamper1Parser{}).ParseRawData(content)
+			p, err := New("mda", "jsonl")
+			if p.Format() != "jsonl" {
+				t.Errorf("Format wrong; got %q, want jsonl", p.Format())
+			}
+			testingx.Must(t, err, "failed to get new parser")
+			scamperOutput, gotErr := p.ParseRawData(content)
 			if badErr(gotErr, test.wantErr) {
 				t.Fatalf("ParseRawData(): %v, want %v", gotErr, test.wantErr)
 			}
@@ -146,18 +151,28 @@ func TestScamper1_Anonymize(t *testing.T) {
 	}
 }
 
-func TestScamper1_MarshalJSONL(t *testing.T) {
+func TestScamper1_MarshalAsJSONL(t *testing.T) {
 	tests := []struct {
-		name string
-		file string
+		name    string
+		file    string
+		as      string
+		wantErr bool
 	}{
 		{
 			name: "success-simple",
 			file: "valid-simple",
+			as:   "jsonl",
 		},
 		{
 			name: "success-complex",
 			file: "valid-complex",
+			as:   "jsonl",
+		},
+		{
+			name:    "invalid-format",
+			file:    "valid-simple",
+			as:      "tgz",
+			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
@@ -168,17 +183,39 @@ func TestScamper1_MarshalJSONL(t *testing.T) {
 
 			// Scamper generates JSON files with spaces after commas (i.e. ", ") while the Go encoder does not.
 			// So, we have a three part sequence: parse, marshal, parse, marshal, compare.
-			s1, err := (&scamper1Parser{}).ParseRawData(b)
+			s1, err := (&scamper1Parser{format: tt.as}).ParseRawData(b)
 			testingx.Must(t, err, "failed to parse raw data for %s", tt.file)
 
-			b2 := s1.MarshalJSONL()
+			b2, err := s1.Marshal(tt.as)
+			if tt.wantErr && (err == nil) {
+				t.Errorf("failed to marshal data for %s", tt.file)
+			}
+			if tt.wantErr {
+				return
+			}
+
 			s2, err := (&scamper1Parser{}).ParseRawData(b2)
 			testingx.Must(t, err, "failed to parse marshaled data: %s", string(b2))
 
-			b3 := s2.MarshalJSONL()
+			b3, err := s2.Marshal(tt.as)
+			testingx.Must(t, err, "failed to marshal data")
 			if string(b2) != string(b3) {
-				t.Errorf("Scamper1.MarshalJSONL() got %v, want %v", string(b3), string(b2))
+				t.Errorf("Scamper1.MarshalAsJSONL() got %v, want %v", string(b3), string(b2))
 			}
 		})
+	}
+}
+
+func TestScamper1_MarshalAsJSON(t *testing.T) {
+	f := filepath.Join("./testdata/scamper1/valid-simple")
+	b, err := os.ReadFile(f)
+	testingx.Must(t, err, "failed to read from file")
+
+	s2, err := (&scamper1Parser{}).ParseRawData(b)
+	testingx.Must(t, err, "failed to parse marshaled data: %s", string(b))
+
+	_, err = s2.Marshal("json")
+	if err == nil {
+		t.Errorf("failed to generate error for unsupported type")
 	}
 }

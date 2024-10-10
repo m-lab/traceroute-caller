@@ -11,9 +11,14 @@ import (
 	"github.com/m-lab/traceroute-caller/tracer"
 )
 
+var (
+	ErrUnsupportedFormat = fmt.Errorf("unsupported marshal format")
+)
+
 // ScamperHop describes a layer of hops.
 type ScamperHop struct {
 	Addr      string  `json:"addr" bigquery:"addr"`
+	Name      string  `json:"name" bigquery:"name"`
 	ProbeTTL  int32   `json:"probe_ttl" bigquery:"probe_ttl"`
 	ProbeID   int32   `json:"probe_id" bigquery:"probe_id"`
 	ProbeSize int32   `json:"probe_size" bigquery:"probe_size"`
@@ -84,6 +89,10 @@ func (s2 *scamper2Parser) ParseRawData(rawData []byte) (ParsedData, error) {
 	// newline because it's a lot faster than stripping it and creating
 	// a new slice.  We just confirm that the last line is empty.
 	lines := bytes.Split(rawData, []byte("\n"))
+	if len(lines) == 1 || (len(lines) == 2 && len(lines[1]) == 0) {
+		err := json.Unmarshal(rawData, &scamper2)
+		return &scamper2, err
+	}
 	if len(lines) != 5 || len(lines[4]) != 0 {
 		return nil, ErrTracerouteFile
 	}
@@ -166,15 +175,15 @@ func (s2 *Scamper2) Anonymize(anon anonymize.IPAnonymizer) {
 func (s2 Scamper2) Marshal(format string) ([]byte, error) {
 	switch format {
 	case "jsonl":
-		return s2.MarshalJSONL(), nil
+		return s2.MarshalAsJSONL(), nil
 	case "json":
 		return s2.MarshalAsJSON()
 	}
-	panic("unsupported marshal format: " + format)
+	return nil, ErrUnsupportedFormat
 }
 
-// MarshalJSONL encodes the scamper object as JSONL.
-func (s2 Scamper2) MarshalJSONL() []byte {
+// MarshalAsJSONL encodes the scamper object as JSONL.
+func (s2 Scamper2) MarshalAsJSONL() []byte {
 	buff := &bytes.Buffer{}
 	enc := json.NewEncoder(buff)
 	enc.Encode(s2.Metadata)

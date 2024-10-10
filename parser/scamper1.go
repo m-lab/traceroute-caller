@@ -219,13 +219,15 @@ func (s1 *Scamper1) Anonymize(anon anonymize.IPAnonymizer) {
 func (s1 Scamper1) Marshal(format string) ([]byte, error) {
 	switch format {
 	case "jsonl":
-		return s1.MarshalJSONL(), nil
+		return s1.MarshalAsJSONL(), nil
+	case "json":
+		// TODO(soltesz): translate the Scamper1 struct into a format that can be imported into BigQuery.
 	}
-	panic("unsupported marshal format: " + format)
+	return nil, ErrUnsupportedFormat
 }
 
-// MarshalJSONL encodes the scamper object as JSONL.
-func (s1 Scamper1) MarshalJSONL() []byte {
+// MarshalAsJSONL encodes the scamper object as JSONL.
+func (s1 Scamper1) MarshalAsJSONL() []byte {
 	buff := &bytes.Buffer{}
 	enc := json.NewEncoder(buff)
 	enc.Encode(s1.Metadata)
@@ -233,13 +235,4 @@ func (s1 Scamper1) MarshalJSONL() []byte {
 	enc.Encode(s1.Tracelb)
 	enc.Encode(s1.CycleStop)
 	return buff.Bytes()
-}
-
-// MarshalAsJSON encodes the scamper object as autoloadable JSON.
-func (s1 Scamper1) MarshalAsJSON() ([]byte, error) {
-	buff := &bytes.Buffer{}
-	enc := json.NewEncoder(buff)
-	// TODO(soltesz): translate the Scamper1 struct into a format that can be imported into BigQuery.
-	err := enc.Encode(s1)
-	return buff.Bytes(), err
 }
