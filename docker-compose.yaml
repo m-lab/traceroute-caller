@@ -49,8 +49,6 @@ services:
       - -hostname=mlab1-lga0t.mlab-sandbox.measurement-lab.org
 
   trc-scamper1:
-    profiles:
-      - donotstart
     build:
       context: .
       dockerfile: Dockerfile
@@ -78,8 +76,8 @@ services:
       - -scamper.ptr=true
 
   trc-scamper2:
-    #profiles:
-    #  - donotstart
+    profiles:
+      - donotstart
     build:
       context: .
       dockerfile: Dockerfile
