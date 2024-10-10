@@ -20,15 +20,13 @@ var (
 
 // ScamperConfig contains configuration parameters of scamper.
 type ScamperConfig struct {
-	Binary           string
-	OutputPath       string
-	Timeout          time.Duration
-	TraceType        string
-	TracePTR         bool
-	TraceWaitProbe   int
-	Extension        string
-	TracelbPTR       bool // Deprecated. Use TracePTR instead.
-	TracelbWaitProbe int  // Deprecated. Use TraceWaitProbe instead.
+	Binary         string
+	OutputPath     string
+	Timeout        time.Duration
+	TraceType      string
+	TracePTR       bool
+	TraceWaitProbe int
+	Extension      string
 }
 
 // Scamper invokes an instance of the scamper tool for each traceroute.
