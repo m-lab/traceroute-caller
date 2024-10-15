@@ -65,7 +65,7 @@ func NewScamper(cfg ScamperConfig) (*Scamper, error) {
 	case "mda":
 		traceCmd = "tracelb -P icmp-echo -q 3"
 	case "regular":
-		traceCmd = "trace -P icmp-paris -q 3"
+		traceCmd = "trace -P udp-paris -q 3"
 	default:
 		return nil, fmt.Errorf("%s: invalid traceroute type", cfg.TraceType)
 	}
