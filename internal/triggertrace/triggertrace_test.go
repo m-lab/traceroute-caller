@@ -365,7 +365,7 @@ type staticTracer struct {
 
 func (st *staticTracer) Trace(remoteIP, uuid string, t time.Time) ([]byte, error) {
 	defer func() { atomic.AddInt32(&st.nTraces, 1) }()
-	return st.input.MarshalAsJSONL(), nil
+	return st.input.Marshal("jsonl")
 }
 
 func (st *staticTracer) WriteFile(uuid string, t time.Time, data []byte) error {
