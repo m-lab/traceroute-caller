@@ -20,12 +20,13 @@ var (
 
 // ScamperConfig contains configuration parameters of scamper.
 type ScamperConfig struct {
-	Binary           string
-	OutputPath       string
-	Timeout          time.Duration
-	TraceType        string
-	TracelbPTR       bool
-	TracelbWaitProbe int
+	Binary         string
+	OutputPath     string
+	Timeout        time.Duration
+	TraceType      string
+	TracePTR       bool
+	TraceWaitProbe int
+	Extension      string
 }
 
 // Scamper invokes an instance of the scamper tool for each traceroute.
@@ -34,6 +35,7 @@ type Scamper struct {
 	outputPath string
 	timeout    time.Duration
 	cmd        string
+	ext        string
 }
 
 // NewScamper validates the specified scamper configuration and, if successful,
@@ -61,30 +63,36 @@ func NewScamper(cfg ScamperConfig) (*Scamper, error) {
 	var traceCmd string
 	switch cfg.TraceType {
 	case "mda":
-		if cfg.TracelbWaitProbe < 15 || cfg.TracelbWaitProbe > 200 {
-			return nil, fmt.Errorf("%d: invalid tracelb wait probe value", cfg.TracelbWaitProbe)
-		}
-		traceCmd = "tracelb -P icmp-echo -q 3 -W " + strconv.Itoa(cfg.TracelbWaitProbe)
-		if cfg.TracelbPTR {
-			traceCmd += " -O ptr"
-		}
+		traceCmd = "tracelb -P icmp-echo -q 3"
 	case "regular":
-		traceCmd = "trace -P icmp-paris"
+		traceCmd = "trace -P udp-paris -q 3"
 	default:
 		return nil, fmt.Errorf("%s: invalid traceroute type", cfg.TraceType)
+	}
+	if cfg.TraceWaitProbe < 15 || cfg.TraceWaitProbe > 200 {
+		return nil, fmt.Errorf("%d: invalid tracelb wait probe value", cfg.TraceWaitProbe)
+	}
+	traceCmd += " -W " + strconv.Itoa(cfg.TraceWaitProbe)
+	if cfg.TracePTR {
+		traceCmd += " -O ptr"
+	}
+	ext := cfg.Extension
+	if ext == "" {
+		ext = "jsonl"
 	}
 	return &Scamper{
 		binary:     cfg.Binary,
 		outputPath: cfg.OutputPath,
 		timeout:    cfg.Timeout,
 		cmd:        traceCmd,
+		ext:        ext,
 	}, nil
 }
 
 // WriteFile writes the given data to a file in the configured Scamper output
 // path using the given UUID and time.
 func (s *Scamper) WriteFile(uuid string, t time.Time, data []byte) error {
-	filename, err := generateFilename(s.outputPath, uuid, t)
+	filename, err := generateFilename(s.outputPath, uuid, s.ext, t)
 	if err != nil {
 		return err
 	}
@@ -190,7 +198,7 @@ func runCmd(ctx context.Context, label string, cmd []string) ([]byte, error) {
 }
 
 // generateFilename creates the string filename for storing the data.
-func generateFilename(path, uuid string, t time.Time) (string, error) {
+func generateFilename(path, uuid, extension string, t time.Time) (string, error) {
 	if uuid == "" {
 		return "", ErrEmptyUUID
 	}
@@ -199,5 +207,5 @@ func generateFilename(path, uuid string, t time.Time) (string, error) {
 		// TODO(SaiedKazemi): Add metric here.
 		return "", errors.New("failed to create output directory")
 	}
-	return dir + t.Format("20060102T150405Z") + "_" + uuid + ".jsonl", nil
+	return dir + t.Format("20060102T150405Z") + "_" + uuid + "." + extension, nil
 }

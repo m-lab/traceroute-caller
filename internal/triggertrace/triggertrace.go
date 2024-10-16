@@ -46,6 +46,7 @@ type FetchTracer interface {
 // from the traceroute tool.
 type ParseTracer interface {
 	ParseRawData(rawData []byte) (parser.ParsedData, error)
+	Format() string
 }
 
 // AnnotateAndArchiver is the interface for annotating IP addresses and
@@ -164,10 +165,14 @@ func (h *Handler) traceAnnotateAndArchive(ctx context.Context, uuid string, dest
 	// Anonymize the parsed data in place.
 	parsedData.Anonymize(h.Anonymizer)
 	// Remarshal anonymized data for writing.
-	rawData = parsedData.MarshalJSONL()
+	rawOut, err := parsedData.Marshal(h.Parser.Format())
+	if err != nil {
+		log.Printf("context %p: failed to marshal traceroute output (error: %v)\n", ctx, err)
+		return
+	}
 
 	traceStartTime := parsedData.StartTime()
-	err = h.Tracetool.WriteFile(uuid, traceStartTime, rawData)
+	err = h.Tracetool.WriteFile(uuid, traceStartTime, rawOut)
 	if err != nil {
 		log.Printf("context %p: failed to write trace file for uuid: %s: (error: %v)\n", ctx, uuid, err)
 	}

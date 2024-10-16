@@ -54,7 +54,7 @@ type ScamperNode struct {
 	Name  string          `json:"name" bigquery:"name"`
 	QTTL  int             `json:"q_ttl" bigquery:"q_ttl"`
 	Linkc int64           `json:"linkc" bigquery:"linkc"`
-	Links [][]ScamperLink `json:"links" bigquery:"links"`
+	Links [][]ScamperLink `json:"links" bigquery:"-"`
 }
 
 // Scamper1 encapsulates the four lines of a traceroute:
@@ -100,6 +100,12 @@ type TracelbLine struct {
 }
 
 type scamper1Parser struct {
+	format string
+}
+
+// Format returns the desired output format for this parser.
+func (s1 *scamper1Parser) Format() string {
+	return s1.format
 }
 
 // ParseRawData parses scamper's MDA traceroute in JSONL format.
@@ -209,8 +215,19 @@ func (s1 *Scamper1) Anonymize(anon anonymize.IPAnonymizer) {
 	}
 }
 
-// MarshalJSONL encodes the scamper object as JSONL.
-func (s1 Scamper1) MarshalJSONL() []byte {
+// Marshal encodes the scamper object based on the given format.
+func (s1 *Scamper1) Marshal(format string) ([]byte, error) {
+	switch format {
+	case "jsonl":
+		return s1.MarshalAsJSONL(), nil
+	case "json":
+		// TODO(soltesz): translate the Scamper1 struct into a format that can be imported into BigQuery.
+	}
+	return nil, ErrUnsupportedFormat
+}
+
+// MarshalAsJSONL encodes the scamper object as JSONL.
+func (s1 *Scamper1) MarshalAsJSONL() []byte {
 	buff := &bytes.Buffer{}
 	enc := json.NewEncoder(buff)
 	enc.Encode(s1.Metadata)

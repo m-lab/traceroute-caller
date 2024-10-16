@@ -68,8 +68,8 @@ var (
 	errInvalidConfig = errors.New("invalid context or hop annotation configuration")
 )
 
-// HopAnnotation1 is the datatype that is written to the hop annotation file.
-type HopAnnotation1 struct {
+// HopAnnotation2 is the datatype that is written to the hop annotation file.
+type HopAnnotation2 struct {
 	ID          string
 	Timestamp   time.Time
 	Annotations *annotator.ClientAnnotations
@@ -233,7 +233,7 @@ func (hc *HopCache) writeAnnotation(wg *sync.WaitGroup, hop string, annotation *
 
 	// Write to the file.
 	yyyymmdd := traceStartTime.Format("20060102")
-	b, err := json.Marshal(HopAnnotation1{
+	b, err := json.Marshal(HopAnnotation2{
 		ID:          fmt.Sprintf("%s_%s_%s", yyyymmdd, hostname, hop),
 		Timestamp:   traceStartTime,
 		Annotations: annotation,

@@ -53,22 +53,23 @@ type CyclestopLine struct {
 type ParsedData interface {
 	StartTime() time.Time
 	ExtractHops() []string
-	MarshalJSONL() []byte
+	Marshal(format string) ([]byte, error)
 	Anonymize(anon anonymize.IPAnonymizer)
 }
 
 // TracerouteParser defines the interface for raw traceroute data.
 type TracerouteParser interface {
 	ParseRawData(rawData []byte) (ParsedData, error)
+	Format() string
 }
 
 // New returns a new traceroute parser correspondong to the traceroute type.
-func New(traceType string) (TracerouteParser, error) {
+func New(traceType, format string) (TracerouteParser, error) {
 	switch traceType {
 	case "mda":
-		return &scamper1Parser{}, nil
+		return &scamper1Parser{format: format}, nil
 	case "regular":
-		return &scamper2Parser{}, nil
+		return &scamper2Parser{format: format}, nil
 	}
 	return nil, fmt.Errorf("%q: %v", traceType, ErrTracerouteType)
 }

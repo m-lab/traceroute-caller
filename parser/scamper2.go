@@ -11,9 +11,14 @@ import (
 	"github.com/m-lab/traceroute-caller/tracer"
 )
 
+var (
+	ErrUnsupportedFormat = fmt.Errorf("unsupported marshal format")
+)
+
 // ScamperHop describes a layer of hops.
 type ScamperHop struct {
 	Addr      string  `json:"addr" bigquery:"addr"`
+	Name      string  `json:"name" bigquery:"name"`
 	ProbeTTL  int32   `json:"probe_ttl" bigquery:"probe_ttl"`
 	ProbeID   int32   `json:"probe_id" bigquery:"probe_id"`
 	ProbeSize int32   `json:"probe_size" bigquery:"probe_size"`
@@ -68,6 +73,12 @@ type TraceLine struct {
 }
 
 type scamper2Parser struct {
+	format string
+}
+
+// Format returns the desired output format for this parser.
+func (s2 *scamper2Parser) Format() string {
+	return s2.format
 }
 
 // ParseRawData parses scamper's normal traceroute in JSONL format.
@@ -78,6 +89,10 @@ func (s2 *scamper2Parser) ParseRawData(rawData []byte) (ParsedData, error) {
 	// newline because it's a lot faster than stripping it and creating
 	// a new slice.  We just confirm that the last line is empty.
 	lines := bytes.Split(rawData, []byte("\n"))
+	if len(lines) == 1 || (len(lines) == 2 && len(lines[1]) == 0) {
+		err := json.Unmarshal(rawData, &scamper2)
+		return &scamper2, err
+	}
 	if len(lines) != 5 || len(lines[4]) != 0 {
 		return nil, ErrTracerouteFile
 	}
@@ -156,8 +171,19 @@ func (s2 *Scamper2) Anonymize(anon anonymize.IPAnonymizer) {
 	}
 }
 
-// MarshalJSONL encodes the scamper object as JSONL.
-func (s2 Scamper2) MarshalJSONL() []byte {
+// Marshal encodes the scamper object based on the given format.
+func (s2 *Scamper2) Marshal(format string) ([]byte, error) {
+	switch format {
+	case "jsonl":
+		return s2.MarshalAsJSONL(), nil
+	case "json":
+		return s2.MarshalAsJSON()
+	}
+	return nil, ErrUnsupportedFormat
+}
+
+// MarshalAsJSONL encodes the scamper object as JSONL.
+func (s2 *Scamper2) MarshalAsJSONL() []byte {
 	buff := &bytes.Buffer{}
 	enc := json.NewEncoder(buff)
 	enc.Encode(s2.Metadata)
@@ -165,4 +191,12 @@ func (s2 Scamper2) MarshalJSONL() []byte {
 	enc.Encode(s2.Trace)
 	enc.Encode(s2.CycleStop)
 	return buff.Bytes()
+}
+
+// MarshalAsJSON encodes the scamper object as JSONL.
+func (s2 *Scamper2) MarshalAsJSON() ([]byte, error) {
+	buff := &bytes.Buffer{}
+	enc := json.NewEncoder(buff)
+	err := enc.Encode(s2)
+	return buff.Bytes(), err
 }

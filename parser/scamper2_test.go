@@ -150,18 +150,33 @@ func TestScamper2_Anonymize(t *testing.T) {
 	}
 }
 
-func TestScamper2_MarshalJSONL(t *testing.T) {
+func TestScamper2_Marshal(t *testing.T) {
 	tests := []struct {
-		name string
-		file string
+		name    string
+		file    string
+		as      string
+		wantErr bool
 	}{
 		{
 			name: "success-simple",
 			file: "valid-simple",
+			as:   "jsonl",
 		},
 		{
 			name: "success-complex",
 			file: "valid-complex",
+			as:   "jsonl",
+		},
+		{
+			name: "success-simple-json",
+			file: "valid-simple-json",
+			as:   "json",
+		},
+		{
+			name:    "error-wrong-format",
+			file:    "valid-simple",
+			as:      "invalid-format",
+			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
@@ -172,16 +187,29 @@ func TestScamper2_MarshalJSONL(t *testing.T) {
 
 			// Scamper generates JSON files with spaces after commas (i.e. ", ") while the Go encoder does not.
 			// So, we have a three part sequence: parse, marshal, parse, marshal, compare.
-			s, err := (&scamper2Parser{}).ParseRawData(b)
+			p, err := New("regular", tt.as)
+			if p.Format() != tt.as {
+				t.Errorf("Format wrong; got %q, want jsonl", p.Format())
+			}
+			testingx.Must(t, err, "failed to get new parser")
+			s, err := p.ParseRawData(b)
 			testingx.Must(t, err, "failed to parse raw data for %s", tt.file)
 
-			b2 := s.MarshalJSONL()
+			b2, err := s.Marshal(tt.as)
+			if tt.wantErr && (err == nil) {
+				t.Errorf("failed to marshal data for %s", tt.file)
+			}
+			if tt.wantErr {
+				return
+			}
+			testingx.Must(t, err, "failed to marshal data")
 			s2, err := (&scamper2Parser{}).ParseRawData(b2)
 			testingx.Must(t, err, "failed to parse marshaled data: %s", string(b2))
 
-			b3 := s2.MarshalJSONL()
+			b3, err := s2.Marshal(tt.as)
+			testingx.Must(t, err, "failed to marshal data")
 			if string(b2) != string(b3) {
-				t.Errorf("Scamper2.MarshalJSONL() got %v, want %v", string(b3), string(b2))
+				t.Errorf("Scamper2.MarshalAsJSONL() got %v, want %v", string(b3), string(b2))
 			}
 		})
 	}

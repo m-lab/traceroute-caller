@@ -24,13 +24,13 @@ func TestNewScamper(t *testing.T) {
 	}
 	defer os.RemoveAll(nonWritableDir)
 	tests := []struct {
-		binary           string
-		outputPath       string
-		timeout          time.Duration
-		traceType        string
-		tracelbWaitProbe int
-		shouldFail       bool
-		want             string
+		binary         string
+		outputPath     string
+		timeout        time.Duration
+		traceType      string
+		traceWaitProbe int
+		shouldFail     bool
+		want           string
 	}{
 		{"testdata", "testdata", 900 * time.Second, "mda", 15, true, "is not an executable file"},
 		{"testdata/non-existent", "testdata", 900 * time.Second, "mda", 15, true, "is not an executable file"},
@@ -46,33 +46,35 @@ func TestNewScamper(t *testing.T) {
 		{"/bin/echo", "testdata", 900 * time.Second, "regular", 25, false, ""},
 	}
 	for _, test := range tests {
-		scamperCfg := ScamperConfig{
-			Binary:           test.binary,
-			OutputPath:       test.outputPath,
-			Timeout:          test.timeout,
-			TraceType:        test.traceType,
-			TracelbWaitProbe: test.tracelbWaitProbe,
-		}
-		_, err := NewScamper(scamperCfg)
-		if err != nil {
-			if !test.shouldFail || !strings.Contains(err.Error(), test.want) {
-				t.Errorf("Validate() = %v, want %q", err, test.want)
+		t.Run(test.binary, func(t *testing.T) {
+			scamperCfg := ScamperConfig{
+				Binary:         test.binary,
+				OutputPath:     test.outputPath,
+				Timeout:        test.timeout,
+				TraceType:      test.traceType,
+				TraceWaitProbe: test.traceWaitProbe,
 			}
-		} else if test.shouldFail {
-			t.Errorf("Validate() = nil, want %s", test.want)
-		}
+			_, err := NewScamper(scamperCfg)
+			if err != nil {
+				if !test.shouldFail || !strings.Contains(err.Error(), test.want) {
+					t.Errorf("Validate() = %v, want %q", err, test.want)
+				}
+			} else if test.shouldFail {
+				t.Errorf("Validate() = nil, want %s", test.want)
+			}
+		})
 	}
 }
 
 func TestEmptyUUID(t *testing.T) {
 	wantErr := "uuid is empty"
 	scamperCfg := ScamperConfig{
-		Binary:           "/bin/false",
-		OutputPath:       t.TempDir(),
-		Timeout:          1 * time.Second,
-		TraceType:        "mda",
-		TracelbWaitProbe: 39,
-		TracelbPTR:       false,
+		Binary:         "/bin/false",
+		OutputPath:     t.TempDir(),
+		Timeout:        1 * time.Second,
+		TraceType:      "mda",
+		TraceWaitProbe: 39,
+		TracePTR:       false,
 	}
 	s, err := NewScamper(scamperCfg)
 	if err != nil {
@@ -97,7 +99,7 @@ func TestTrace(t *testing.T) {
 	tests := []struct {
 		binary     string
 		traceType  string
-		tracelbPTR bool
+		tracePTR   bool
 		shouldFail bool
 		want       string
 	}{
@@ -112,12 +114,12 @@ func TestTrace(t *testing.T) {
 	for _, test := range tests {
 		os.RemoveAll(filename)
 		scamperCfg := ScamperConfig{
-			Binary:           test.binary,
-			OutputPath:       tempdir,
-			Timeout:          1 * time.Second,
-			TraceType:        test.traceType,
-			TracelbWaitProbe: 39,
-			TracelbPTR:       test.tracelbPTR,
+			Binary:         test.binary,
+			OutputPath:     tempdir,
+			Timeout:        1 * time.Second,
+			TraceType:      test.traceType,
+			TraceWaitProbe: 39,
+			TracePTR:       test.tracePTR,
 		}
 		s, err := NewScamper(scamperCfg)
 		if err != nil {
@@ -166,12 +168,12 @@ func TestTraceWritesMeta(t *testing.T) {
 	hostname = "testhostname"
 
 	scamperCfg := ScamperConfig{
-		Binary:           "/bin/echo",
-		OutputPath:       tempdir,
-		Timeout:          1 * time.Minute,
-		TraceType:        "mda",
-		TracelbPTR:       true,
-		TracelbWaitProbe: 39,
+		Binary:         "/bin/echo",
+		OutputPath:     tempdir,
+		Timeout:        1 * time.Minute,
+		TraceType:      "mda",
+		TracePTR:       true,
+		TraceWaitProbe: 39,
 	}
 	s, err := NewScamper(scamperCfg)
 	if err != nil {
@@ -217,12 +219,12 @@ func TestCachedTrace(t *testing.T) {
 	hostname = "testhostname"
 
 	scamperCfg := ScamperConfig{
-		Binary:           "/bin/echo",
-		OutputPath:       tempdir,
-		Timeout:          1 * time.Minute,
-		TraceType:        "mda",
-		TracelbPTR:       true,
-		TracelbWaitProbe: 39,
+		Binary:         "/bin/echo",
+		OutputPath:     tempdir,
+		Timeout:        1 * time.Minute,
+		TraceType:      "mda",
+		TracePTR:       true,
+		TraceWaitProbe: 39,
 	}
 	s, err := NewScamper(scamperCfg)
 	if err != nil {
@@ -284,12 +286,12 @@ func TestExtractUUID(t *testing.T) {
 
 func TestDontTrace(t *testing.T) {
 	scamperCfg := ScamperConfig{
-		Binary:           "/bin/echo",
-		OutputPath:       "/tmp",
-		Timeout:          1 * time.Minute,
-		TraceType:        "mda",
-		TracelbPTR:       true,
-		TracelbWaitProbe: 39,
+		Binary:         "/bin/echo",
+		OutputPath:     "/tmp",
+		Timeout:        1 * time.Minute,
+		TraceType:      "mda",
+		TracePTR:       true,
+		TraceWaitProbe: 39,
 	}
 	s, err := NewScamper(scamperCfg)
 	if err != nil {
@@ -308,7 +310,7 @@ func TestCreateMetaline(t *testing.T) {
 }
 
 func TestGenerateFilename(t *testing.T) {
-	_, err := generateFilename("/var/empty", "0000", time.Now())
+	_, err := generateFilename("/var/empty", "0000", "jsonl", time.Now())
 	wantErrStr := "failed to create output directory"
 	if err == nil || !strings.Contains(err.Error(), wantErrStr) {
 		t.Errorf("generateFilename() = %v, want %v", err, wantErrStr)
