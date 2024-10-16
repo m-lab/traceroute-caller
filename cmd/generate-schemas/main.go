@@ -14,26 +14,26 @@ import (
 
 var (
 	scamper2schema string
-	hop1schema     string
+	hop2schema     string
 )
 
 func init() {
 	flag.StringVar(&scamper2schema, "scamper2", "/var/spool/datatypes/scamper2.json", "filename to write scamper2 schema")
-	flag.StringVar(&hop1schema, "hopannotation1", "/var/spool/datatypes/hopannotation1.json", "filename to write hopannotation1 schema")
+	flag.StringVar(&hop2schema, "hopannotation2", "/var/spool/datatypes/hopannotation2.json", "filename to write hopannotation2 schema")
 }
 
 func main() {
 	flag.Parse()
 	// TODO(soltesz): parser.Schema1 does not natively support BigQuery schema inference.
 
-	// Generate and save hopannotation1 schema for autoloading.
-	hop1 := hopannotation.HopAnnotation1{}
-	sch, err := bigquery.InferSchema(hop1)
-	rtx.Must(err, "failed to generate scamper2 schema")
+	// Generate and save hopannotation2 schema for autoloading.
+	hop2 := hopannotation.HopAnnotation2{}
+	sch, err := bigquery.InferSchema(hop2)
+	rtx.Must(err, "failed to generate hopannotation2 schema")
 	sch = bqx.RemoveRequired(sch)
 	b, err := sch.ToJSONFields()
 	rtx.Must(err, "failed to marshal schema")
-	os.WriteFile(hop1schema, b, 0o644)
+	os.WriteFile(hop2schema, b, 0o644)
 
 	// Generate and save scamper2 schema for autoloading.
 	row2 := parser.Scamper2{}
