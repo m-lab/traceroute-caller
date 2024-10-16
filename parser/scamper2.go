@@ -172,7 +172,7 @@ func (s2 *Scamper2) Anonymize(anon anonymize.IPAnonymizer) {
 }
 
 // Marshal encodes the scamper object based on the given format.
-func (s2 Scamper2) Marshal(format string) ([]byte, error) {
+func (s2 *Scamper2) Marshal(format string) ([]byte, error) {
 	switch format {
 	case "jsonl":
 		return s2.MarshalAsJSONL(), nil
@@ -183,7 +183,7 @@ func (s2 Scamper2) Marshal(format string) ([]byte, error) {
 }
 
 // MarshalAsJSONL encodes the scamper object as JSONL.
-func (s2 Scamper2) MarshalAsJSONL() []byte {
+func (s2 *Scamper2) MarshalAsJSONL() []byte {
 	buff := &bytes.Buffer{}
 	enc := json.NewEncoder(buff)
 	enc.Encode(s2.Metadata)
@@ -194,7 +194,7 @@ func (s2 Scamper2) MarshalAsJSONL() []byte {
 }
 
 // MarshalAsJSON encodes the scamper object as JSONL.
-func (s2 Scamper2) MarshalAsJSON() ([]byte, error) {
+func (s2 *Scamper2) MarshalAsJSON() ([]byte, error) {
 	buff := &bytes.Buffer{}
 	enc := json.NewEncoder(buff)
 	err := enc.Encode(s2)

@@ -53,7 +53,6 @@ type CyclestopLine struct {
 type ParsedData interface {
 	StartTime() time.Time
 	ExtractHops() []string
-	MarshalAsJSONL() []byte
 	Marshal(format string) ([]byte, error)
 	Anonymize(anon anonymize.IPAnonymizer)
 }
