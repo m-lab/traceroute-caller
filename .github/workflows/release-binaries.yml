@@ -1,0 +1,78 @@
+# Build the official traceroute-caller binaries and attach them to GitHub
+# Releases.
+#
+# Publishing a release builds traceroute-caller and its schema generator
+# (cmd/generate-schemas) for linux/amd64 and uploads them to that release,
+# together with a checksums.txt:
+#
+#   traceroute-caller_<tag>_linux_amd64
+#   generate-schemas_<tag>_linux_amd64
+#   checksums.txt
+#
+# The binaries are pure Go, statically linked (CGO_ENABLED=0), and stripped
+# (-s -w); like the container image, traceroute-caller is stamped with
+# prometheusx.GitShortCommit, which it also records in its output as
+# TracerouteCallerVersion. scamper, which traceroute-caller runs, is not
+# included.
+#
+# To attach the binaries to a release that predates this workflow, dispatch
+# it with that release's tag; the workflow from the default branch then
+# builds the tagged sources:
+#
+#   gh workflow run release-binaries.yml -f tag=v0.12.0
+name: release-binaries
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Tag of an existing release to build and upload binaries for
+        required: true
+        type: string
+  pull_request:
+
+jobs:
+  release-binaries:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    env:
+      # Empty on pull requests: the binaries are then named after
+      # `git describe` output and nothing is uploaded.
+      TAG: ${{ inputs.tag || github.event.release.tag_name }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag || github.event.release.tag_name || github.sha }}
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version: stable
+
+      - name: Build
+        run: |
+          version="${TAG:-$(git describe --tags --always)}"
+          ldflags="-s -w"
+          ldflags+=" -X github.com/m-lab/go/prometheusx.GitShortCommit=$(git log -1 --format=%h)"
+          CGO_ENABLED=0 go build -trimpath -ldflags "${ldflags}" \
+            -o "dist/traceroute-caller_${version}_linux_amd64" .
+          CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" \
+            -o "dist/generate-schemas_${version}_linux_amd64" ./cmd/generate-schemas
+
+          for bin in dist/*; do
+            file -L "${bin}" | grep "statically linked" ||
+              { echo "ERROR: ${bin} is not statically linked" >&2; exit 1; }
+            go version -m "${bin}"
+          done
+
+      - name: Upload to the release
+        if: github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd dist
+          sha256sum *_linux_amd64 > checksums.txt
+          cat checksums.txt
+          gh release upload "${TAG}" *_linux_amd64 checksums.txt --clobber --repo "${GITHUB_REPOSITORY}"
