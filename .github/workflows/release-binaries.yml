@@ -51,17 +51,19 @@ jobs:
         with:
           go-version: stable
 
+      # Build outside the checkout: an untracked dist/ would make Go stamp
+      # vcs.modified=true on the later builds.
       - name: Build
         run: |
           version="${TAG:-$(git describe --tags --always)}"
           ldflags="-s -w"
           ldflags+=" -X github.com/m-lab/go/prometheusx.GitShortCommit=$(git log -1 --format=%h)"
           CGO_ENABLED=0 go build -trimpath -ldflags "${ldflags}" \
-            -o "dist/traceroute-caller_${version}_linux_amd64" .
+            -o "${RUNNER_TEMP}/dist/traceroute-caller_${version}_linux_amd64" .
           CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" \
-            -o "dist/generate-schemas_${version}_linux_amd64" ./cmd/generate-schemas
+            -o "${RUNNER_TEMP}/dist/generate-schemas_${version}_linux_amd64" ./cmd/generate-schemas
 
-          for bin in dist/*; do
+          for bin in "${RUNNER_TEMP}"/dist/*; do
             file -L "${bin}" | grep "statically linked" ||
               { echo "ERROR: ${bin} is not statically linked" >&2; exit 1; }
             go version -m "${bin}"
@@ -72,7 +74,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          cd dist
+          cd "${RUNNER_TEMP}/dist"
           sha256sum *_linux_amd64 > checksums.txt
           cat checksums.txt
           gh release upload "${TAG}" *_linux_amd64 checksums.txt --clobber --repo "${GITHUB_REPOSITORY}"
