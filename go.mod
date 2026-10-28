@@ -6,7 +6,7 @@ require (
 	cloud.google.com/go/bigquery v1.49.0
 	github.com/go-test/deep v1.0.7
 	github.com/m-lab/go v0.1.75
-	github.com/m-lab/tcp-info v1.5.3
+	github.com/m-lab/tcp-info v1.10.0
 	github.com/m-lab/uuid-annotator v0.4.7
 	github.com/prometheus/client_golang v1.12.2
 )
