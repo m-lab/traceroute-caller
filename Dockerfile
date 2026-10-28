@@ -62,7 +62,10 @@ RUN setcap cap_dac_override,cap_net_raw,cap_setgid,cap_setuid,cap_sys_chroot=ep 
 # libtins dependency (built by conan) still does. Tell CMake to accept them.
 ENV CMAKE_POLICY_VERSION_MINIMUM=3.5
 RUN pip3 install --upgrade pip wheel setuptools
-RUN pip3 install --no-binary pycaracal --no-cache-dir --verbose fast-mda-traceroute==0.1.13
+# fast-mda-traceroute 0.1.13 depends on typer 0.4.2, which breaks on click >=
+# 8.2 ("Secondary flag is not valid for non-boolean flag"); keep the click
+# series the released images were built with.
+RUN pip3 install --no-binary pycaracal --no-cache-dir --verbose fast-mda-traceroute==0.1.13 "click<8.2"
 
 # Run ldconfig to locate all new libraries and verify the tools we need
 # are available.
