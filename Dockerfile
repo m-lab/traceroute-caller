@@ -56,6 +56,11 @@ RUN setcap cap_dac_override,cap_net_raw,cap_setgid,cap_setuid,cap_sys_chroot=ep 
 
 # Install fast-mda-traceroute from PyPI.
 # We build pycaracal from source to avoid pulling precompiled binaries.
+#
+# pycaracal's build pulls the latest cmake from PyPI, and CMake >= 4.0 refuses
+# to configure projects that declare cmake_minimum_required < 3.5, which its
+# libtins dependency (built by conan) still does. Tell CMake to accept them.
+ENV CMAKE_POLICY_VERSION_MINIMUM=3.5
 RUN pip3 install --upgrade pip wheel setuptools
 RUN pip3 install --no-binary pycaracal --no-cache-dir --verbose fast-mda-traceroute==0.1.13
 
